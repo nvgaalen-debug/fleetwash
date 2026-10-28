@@ -1215,16 +1215,21 @@ function searchOptions(ids,crit){
       if(d===today){const nw=new Date(),earliest=Math.ceil((nw.getHours()*60+nw.getMinutes()+30)/15)*15;js.forEach(j=>{const f=t2m(j.from);if(f==null||f<earliest)j.from=m2t(Math.min(earliest,1439))})}
       for(const w of D.workers){
         if(!avail(w,d)||(crit.wids&&crit.wids.length&&!crit.wids.includes(w.id))||js.some(j=>!skillOk(w,j)))continue;
-        const r=((P.routes||{})[w.id]||[]).filter(id=>!ids.includes(id)),base=simulate(w,r,d),b=bestPos(w,r,ids,true);if(!b)continue;
-        const g=b.s.seg.filter(x=>x.k==='job'&&ids.includes(x.id)),m={};g.forEach(x=>m[x.id]=[x.a,x.b]);
-        const st=Math.min(...g.map(x=>x.a)),en=Math.max(...g.map(x=>x.b)),dd=Math.round((new Date(d+'T12:00:00')-new Date(from+'T12:00:00'))/864e5);
-        const same=d===saved[0][0]&&(jobWhere(ids[0])||{}).wid===w.id&&Math.abs(st-((jobWhere(ids[0])||{}).start??-999))<1;if(same)continue;
-        out.push({kind:'search',date:d,wid:w.id,start:st,end:en,segs:m,dtrav:b.s.trav-base.trav,dkm:b.s.km-base.km,setWin:crit.mode!=='zelfde',dev:0,
-          score:(b.s.trav-base.trav)+kw*(b.s.km-base.km)+dd*15+(want!=null?Math.abs(st-want)*.3:0)});
+        const r=((P.routes||{})[w.id]||[]).filter(id=>!ids.includes(id)),base=simulate(w,r,d),cur=jobWhere(ids[0])||{},mine=[];
+        for(let p=0;p<=r.length;p++){
+          const arr=r.slice(0,p).concat(ids,r.slice(p)),sm=simulate(w,arr,d);if(!feas(sm))continue;
+          const g=sm.seg.filter(x=>x.k==='job'&&ids.includes(x.id)),m={};g.forEach(x=>m[x.id]=[x.a,x.b]);
+          const st=Math.min(...g.map(x=>x.a)),en=Math.max(...g.map(x=>x.b)),dd=Math.round((new Date(d+'T12:00:00')-new Date(from+'T12:00:00'))/864e5);
+          if(d===saved[0][0]&&cur.wid===w.id&&Math.abs(st-(cur.start??-999))<1)continue;
+          if(mine.some(c=>Math.abs(c.start-st)<10))continue;
+          mine.push({kind:'search',date:d,wid:w.id,start:st,end:en,segs:m,dtrav:sm.trav-base.trav,dkm:sm.km-base.km,setWin:crit.mode!=='zelfde',dev:0,
+            score:(sm.trav-base.trav)+kw*(sm.km-base.km)+dd*15+(want!=null?Math.abs(st-want)*.3:0)});
+        }
+        mine.sort((a,b)=>a.score-b.score);out.push(...mine.slice(0,(crit.wids&&crit.wids.length)?4:2));
       }
     }
   }finally{js.forEach((j,i)=>{j.date=saved[i][0];j.from=saved[i][1];j.to=saved[i][2]})}
-  out.sort((a,b)=>a.score-b.score);const per={};return out.filter(c=>(per[c.date]=(per[c.date]||0)+1)<=2).slice(0,6);
+  out.sort((a,b)=>a.score-b.score);const per={},lim=(crit.wids&&crit.wids.length)||crit.van===crit.tot?4:2;return out.filter(c=>(per[c.date]=(per[c.date]||0)+1)<=lim).slice(0,6);
 }
 const QUICK=['Vandaag','Morgen','Volgende week','Zelfde tijd volgende week'];
 function localParse(text,C){const t=normTxt(text),today=todayIso();
@@ -1279,11 +1284,14 @@ function openChat(id){
 function renderChat(){
   const C=CHAT,log=$('#chatLog');if(!C||!log)return;
   log.innerHTML=C.msgs.map((m,mi)=>m.role==='u'?`<div class="msg-u">${esc(m.text)}</div>`
-    :`<div class="msg-a">${m.busy?'<span class="muted">Even zoeken…</span>':esc(m.text)}${m.cands&&m.cands.length?`<div class="chat-opts">${m.cands.map((c,ci)=>{const w=WRK[c.wid];
+    :`<div class="msg-a">${m.busy?'<span class="muted">Even zoeken…</span>':esc(m.text)}${m.pw&&mi===C.msgs.length-1?`<form class="chatf" data-pwform="${mi}"><input type="password" id="chatPw" placeholder="App-wachtwoord" autocomplete="current-password"><button class="btn primary" type="submit">Opslaan en opnieuw</button></form>`:''}${m.cands&&m.cands.length?`<div class="chat-opts">${m.cands.map((c,ci)=>{const w=WRK[c.wid];
       return`<div class="prop${ci===0?' rec':''}"><div class="prop-main"><div class="row"><b><i class="dot" style="background:${wc(w)}"></i> ${esc(w.name)}</b>${ci===0?'<span class="chip ok">Beste optie</span>':''}</div>
         <div class="prop-t">${esc(fdate(c.date,{weekday:'short',day:'numeric',month:'short'}))} · ${m2t(c.start)}–${m2t(c.end)}</div><div class="small muted">+${fdur(Math.max(0,c.dtrav))} rijden · +${fkm(Math.max(0,c.dkm))}${c.setWin?' · tijdvak wordt aangepast':' · binnen tijdvak klant'}</div></div>
         <button class="btn sm${ci===0?' primary':''}" data-act="chatapply" data-m="${mi}" data-i="${ci}">Toepassen</button></div>`}).join('')}</div>`:''}</div>`).join('');
   log.scrollTop=log.scrollHeight;
+  const pf=log.querySelector('[data-pwform]');if(pf){const inp=pf.querySelector('input');setTimeout(()=>inp.focus(),20);
+    pf.addEventListener('submit',e=>{e.preventDefault();const v=inp.value.trim();if(!v)return;PWMEM=v;try{localStorage.setItem(PWKEY,v)}catch(x){}
+      const q=C.msgs[+pf.dataset.pwform].pw;C.msgs.splice(+pf.dataset.pwform-1,2);chatSend(q)})}
 }
 async function chatSend(text){
   const C=CHAT;if(!C||AICTL)return;C.msgs.push({role:'u',text});C.turns.push({role:'user',content:text});
@@ -1294,6 +1302,7 @@ async function chatSend(text){
     AICTL=new AbortController();$('#chatStop').hidden=false;
     try{const r=await aiParse(C,text);if(r&&r.vraag){reply.busy=false;reply.text=String(r.vraag);C.turns.push({role:'assistant',content:reply.text});renderChat();return}crit=critFromAI(r||{})}
     catch(err){const e=err&&err.name==='AbortError'?{code:'cancelled'}:err instanceof SyntaxError?{code:'invalid_json'}:(err||{});
+      if(e.code==='pw'){reply.busy=false;reply.pw=text;reply.text='Om AI te gebruiken heb ik het app-wachtwoord nodig (APP_PASSWORD uit Netlify). Vul het hieronder in; je verzoek wordt daarna direct opnieuw verstuurd.';C.turns.pop();renderChat();return}
       reply.busy=false;reply.text=e.code==='cancelled'?'Gestopt.':{not_granted:'Je hebt Claude niet toegestaan voor deze pagina.',rate_limited:'Even te veel verzoeken of je tegoed is op. Probeer het later opnieuw.',invalid_json:'Ik begreep het verzoek niet goed. Probeer het anders te formuleren.',pw:'Vul eerst het app-wachtwoord in (bijv. via Publiceer) en probeer opnieuw.',nofn:'De AI-functie is niet gevonden op deze site.'}[e.code]||(e.message?'Fout: '+e.message:'Het verzoek kon niet worden verwerkt.');renderChat();return}
     finally{AICTL=null;const s=$('#chatStop');if(s)s.hidden=true}
   }

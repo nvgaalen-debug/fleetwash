@@ -248,6 +248,7 @@ function visitHtml(v,st){
     <div class="vbody">
       <div class="meta">${v.jobs.length} ${v.jobs.length===1?'auto':"auto's"} · reinigen ${esc(v.start)}–${esc(v.end)}${v.travel?` · ${esc(v.travel)} min rijden`:''}</div>
       ${v.info?`<div class="info"><b>Locatie-info</b>${esc(v.info)}</div>`:''}
+      ${v.custNote?`<div class="info"><b>Opmerking klant</b>${esc(v.custNote)}</div>`:''}
       ${v.contact||v.phone||v.login?`<div class="contact">${v.contact?`<span>${esc(v.contact)}</span>`:''}${v.phone?`<a href="tel:${esc(tel)}">${esc(v.phone)}</a>`:''}${v.login?`<span>Inlog <code>${esc(v.login)}</code> <button class="minibtn" data-act="copy" data-v="${esc(v.login)}">Kopieer</button></span>`:''}</div>`:''}
       <ul class="cars">${v.jobs.map(j=>carHtml(j,st)).join('')}</ul>
       <a class="navbtn" href="${esc(mapsUrl(v))}" target="_blank" rel="noopener">${IC.nav} Navigeer naar ${esc(v.city||'locatie')}</a>

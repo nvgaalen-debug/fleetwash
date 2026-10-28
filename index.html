@@ -189,6 +189,11 @@ td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}
 tr:hover td{background:color-mix(in srgb,var(--accent-soft) 40%,transparent)}
 td.act{white-space:nowrap;text-align:right}
 .sec{display:grid;gap:12px}
+.ai-card{white-space:normal;display:grid;gap:12px}
+.ai-card p{margin:4px 0 8px}
+.ai-alt,.ai-msg{border-top:1px solid var(--line);padding-top:10px}
+.ai-msg p{background:var(--surface);border-radius:6px;padding:8px 10px}
+.prop.ai{box-shadow:0 0 0 2px var(--accent)}
 .reps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
 .rep{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:8px 10px}
 .rep time{font:600 15px var(--f-disp)}
@@ -730,7 +735,7 @@ function openPropose(ids){
   const row=(c,i)=>{const w=WRK[c.wid];let tag;
     if(c.kind==='shift')tag=c.dev<.5?'<span class="chip ok">Binnen tijdvak</span>':`<span class="chip warn">${fdur(c.dev)} ${c.early?'eerder':'later'} dan tijdvak</span>`;
     else tag=`<span class="chip acc">${c.days>0?c.days+' dag'+(c.days>1?'en':'')+' later':(-c.days)+' dag'+(c.days<-1?'en':'')+' eerder'}</span>`;
-    return`<div class="prop${i===rec?' rec':''}"><div class="prop-main"><div class="row"><b><i class="dot" style="background:${wc(w)}"></i> ${esc(w.name)}</b>${i===rec?'<span class="chip ok">Aanbevolen</span>':''}</div>
+    return`<div class="prop${i===rec?' rec':''}"><div class="prop-main"><div class="row"><span class="chip">Optie ${i+1}</span><b><i class="dot" style="background:${wc(w)}"></i> ${esc(w.name)}</b><span class="chip acc ai-tag" hidden>AI-advies</span>${i===rec?'<span class="chip ok">Aanbevolen</span>':''}</div>
       <div class="prop-t">${esc(fdate(c.date,{weekday:'short',day:'numeric',month:'short'}))} · ${m2t(c.start)}–${m2t(c.end)}</div>
       <div class="row small muted">${tag}<span>+${fdur(Math.max(0,c.dtrav))} rijden · +${fkm(Math.max(0,c.dkm))}</span></div></div>
       <button class="btn ${i===rec?'primary':''} sm" data-act="papply" data-i="${i}">Toepassen</button></div>`};
@@ -776,16 +781,50 @@ async function serverAI(prompt,signal){
 }
 async function askAI(){
   const mode=aiMode();if(!mode||!PROP)return;const out=$('#aiOut'),btn=$('#aiBtn'),stop=$('#aiStop'),note=$('#aiNote');
-  const ids=PROP.ids,j0=JOB[ids[0]],l=LOC[j0.locationId]||{},cu=CUS[l.customerId]||{};
+  const ids=PROP.ids,j0=JOB[ids[0]],l=LOC[j0.locationId]||{},cu=CUS[l.customerId]||{},N=PROP.cands.length;
   const opts=PROP.cands.map((c,i)=>({optie:i+1,soort:c.kind==='shift'?'zelfde dag, ander tijdstip':'andere dag, zelfde tijdvak',datum:fdate(c.date,{weekday:'long',day:'numeric',month:'long'}),medewerker:WRK[c.wid].name,standplaats:WRK[c.wid].city,tijd:m2t(c.start)+'-'+m2t(c.end),afwijking_van_tijdvak_min:Math.round(c.dev),richting:c.dev<.5?'binnen tijdvak':(c.early?'eerder':'later'),extra_rijtijd_min:Math.round(c.dtrav),extra_km:Math.round(c.dkm)}));
-  const prompt=`Je bent ervaren planner bij een bedrijf dat auto's reinigt op de locatie van klanten. Een afspraak past niet goed in de planning. De planningssoftware heeft de mogelijke opties al doorgerekend. Gebruik alleen deze opties en verzin geen andere tijden, datums of medewerkers.\n\nAfspraak:\n- Klant: ${cu.name}${cu.contact?' (contactpersoon '+cu.contact+')':''}\n- Adres: ${l.address}, ${l.postcode} ${l.city}\n- Voertuig(en): ${ids.map(id=>JOB[id].plate).join(', ')}\n- Gewenste datum: ${fdate(PROP.date,{weekday:'long',day:'numeric',month:'long',year:'numeric'})}\n- Tijdvak: ${ids.map(id=>JOB[id]).map(j=>(j.from||'?')+'-'+(j.to||'?')).join(', ')}\n- Probleem: ${PROP.reason}\n- Werkafspraak: medewerkers zijn op hun begintijd bij de eerste klant.\n\nOpties (JSON):\n${JSON.stringify(opts)}\n\nOptie ${PROP.rec+1} scoort het best op de rekenregel (afwijking van het tijdvak telt dubbel, plus extra rijtijd; een andere dag kost 25 punten per dag).\n\nSchrijf in het Nederlands, kort en zakelijk, als gewone tekst zonder markdown:\n1. Advies: welke optie (nummer) je aanraadt en waarom, in 2 tot 3 zinnen. Weeg de klantafspraak, extra rijtijd en kilometers, en de impact van een andere dag.\n2. Alternatief: een tweede optie en wanneer die beter is, in 1 tot 2 zinnen.\n3. Bericht aan de klant: een kort, vriendelijk conceptbericht (maximaal 70 woorden) waarin je de aanbevolen tijd of datum voorstelt.`;
-  AICTL=new AbortController();btn.disabled=true;stop.hidden=false;out.hidden=false;out.textContent='Claude denkt na…';note.textContent='';
-  try{if(mode==='claude')await SAMPLE(prompt,{signal:AICTL.signal,onText:({text})=>{out.textContent=text}});else out.textContent=await serverAI(prompt,AICTL.signal)}
-  catch(err){const e=err&&err.name==='AbortError'?{code:'cancelled'}:(err||{});out.textContent=e.text||'';if(!e.text)out.hidden=true;
-    const msg={not_granted:'Je hebt Claude niet toegestaan voor deze pagina.',sampling_disabled:'Claude is niet beschikbaar voor dit account.',rate_limited:'Even te veel verzoeken of je tegoed is op. Probeer het later opnieuw.',session_expired:'Log opnieuw in bij Claude en probeer het nog eens.',refused:'Claude kon hier geen advies over geven.',pw:'Vul het app-wachtwoord in en klik opnieuw op de knop.',nofn:'De AI-functie is niet gevonden op deze site. Deploy de site via GitHub, inclusief de map netlify/functions.',srv:e.message?'AI-functie gaf een fout: '+e.message:'De AI-functie gaf geen antwoord. Controleer de API-sleutel in Netlify.'};
+  const win=ids.map(id=>JOB[id]).map(j=>j.from||j.to?(j.from||'?')+'-'+(j.to||'?'):'hele dag').join(', ');
+  const prompt=`Je bent ervaren planner bij een bedrijf dat auto's reinigt op de locatie van klanten. Een afspraak past niet goed in de planning. De planningssoftware heeft de mogelijke opties doorgerekend. Kies alleen uit deze opties en verzin geen andere tijden, datums of medewerkers.
+
+Afspraak:
+- Klant: ${cu.name}${cu.contact?' (contactpersoon '+cu.contact+')':''}
+- Adres: ${[l.address,l.postcode,l.city].filter(Boolean).join(', ')}
+- Voertuig(en): ${ids.map(id=>JOB[id].plate).join(', ')}
+- Gewenste datum: ${fdate(PROP.date,{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
+- Tijdvak klant: ${win}
+- Probleem: ${PROP.reason}
+- Werkafspraak: medewerkers zijn op hun begintijd bij de eerste klant.
+
+Opties (JSON):
+${JSON.stringify(opts)}
+
+Weeg: zo dicht mogelijk bij de gewenste datum en het tijdvak van de klant, daarna zo weinig mogelijk extra rijtijd en kilometers.
+Antwoord met alleen een JSON-object, zonder andere tekst, in het Nederlands, kort en zakelijk:
+{"aanbevolen": <optienummer>, "waarom": "<maximaal 2 zinnen>", "alternatief": <optienummer of null>, "alternatief_waarom": "<1 zin of lege tekst>", "bericht_klant": "<vriendelijk conceptbericht aan de klant van maximaal 60 woorden dat de aanbevolen datum en tijd voorstelt>"}`;
+  AICTL=new AbortController();btn.disabled=true;stop.hidden=false;out.hidden=false;out.className='ai-out';out.textContent='Claude denkt na…';note.textContent='';
+  let res=null,raw='';
+  try{
+    if(mode==='claude')res=await SAMPLE.json(prompt,{signal:AICTL.signal});
+    else{raw=await serverAI(prompt,AICTL.signal);const a=raw.indexOf('{'),b=raw.lastIndexOf('}');res=JSON.parse(raw.slice(a,b+1))}
+  }catch(err){
+    const e=err&&err.name==='AbortError'?{code:'cancelled'}:err instanceof SyntaxError?{code:'invalid_json',text:raw}:(err||{});
+    out.textContent=e.code==='invalid_json'?(e.text||''):'';out.hidden=!out.textContent;
+    const msg={not_granted:'Je hebt Claude niet toegestaan voor deze pagina.',sampling_disabled:'Claude is niet beschikbaar voor dit account.',rate_limited:'Even te veel verzoeken of je tegoed is op. Probeer het later opnieuw.',session_expired:'Log opnieuw in bij Claude en probeer het nog eens.',refused:'Claude kon hier geen advies over geven.',invalid_json:'Het advies kwam niet in de verwachte vorm. Klik nog een keer op de knop.',pw:'Vul het app-wachtwoord in en klik opnieuw op de knop.',nofn:'De AI-functie is niet gevonden op deze site. Deploy de site via GitHub, inclusief de map netlify/functions.',srv:e.message?'AI-functie gaf een fout: '+e.message:'De AI-functie gaf geen antwoord. Controleer de API-sleutel in Netlify.'};
     if(e.code!=='cancelled')note.textContent=msg[e.code]||'Het advies kon niet worden opgehaald. Probeer het opnieuw.';
-    if(['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'].includes(e.code))btn.hidden=true}
-  finally{btn.disabled=false;stop.hidden=true;AICTL=null}
+    if(['not_granted','sampling_disabled','not_declared','capability_disabled','capability_removed'].includes(e.code))btn.hidden=true;
+    btn.disabled=false;stop.hidden=true;AICTL=null;return;
+  }
+  btn.disabled=false;stop.hidden=true;AICTL=null;
+  const rec=Math.round(+res.aanbevolen),alt=res.alternatief==null?NaN:Math.round(+res.alternatief);
+  if(!(rec>=1&&rec<=N)){out.textContent='Claude koos geen geldige optie. Klik nog een keer op de knop of kies zelf een optie hierboven.';return}
+  PROP.ai={rec:rec-1,alt:alt>=1&&alt<=N&&alt!==rec?alt-1:-1,msg:String(res.bericht_klant||'')};
+  const desc=i=>{const c=PROP.cands[i];return`${esc(WRK[c.wid].name)}, ${esc(fdate(c.date,{weekday:'short',day:'numeric',month:'short'}))} ${m2t(c.start)}–${m2t(c.end)}`};
+  out.className='ai-out ai-card';
+  out.innerHTML=`<div class="ai-pick"><div class="row"><span class="chip acc">${I.auto} AI-advies</span><b>Optie ${rec}: ${desc(rec-1)}</b></div>
+      <p>${esc(res.waarom||'')}</p><button class="btn primary" data-act="papply" data-i="${rec-1}">${I.check} Plan volgens advies</button></div>
+    ${PROP.ai.alt>=0?`<div class="ai-alt"><div class="row"><b>Alternatief, optie ${PROP.ai.alt+1}: ${desc(PROP.ai.alt)}</b></div>${res.alternatief_waarom?`<p>${esc(res.alternatief_waarom)}</p>`:''}<button class="btn sm" data-act="papply" data-i="${PROP.ai.alt}">Plan dit alternatief</button></div>`:''}
+    ${PROP.ai.msg?`<div class="ai-msg"><b>Conceptbericht aan de klant</b><p>${esc(PROP.ai.msg)}</p><button class="btn sm" data-act="copymsg">${I.copy} Kopieer bericht</button></div>`:''}`;
+  document.querySelectorAll('.prop').forEach((el,i)=>{el.classList.toggle('ai',i===rec-1);const t=el.querySelector('.ai-tag');if(t)t.hidden=i!==rec-1});
 }
 
 /* ---------- weergave ---------- */
@@ -1383,6 +1422,7 @@ function onClick(e){
     case'repf':S.repF=el.dataset.k;render();break;
     case'handled':{D.handled=D.handled||{};if(D.handled[el.dataset.id])delete D.handled[el.dataset.id];else D.handled[el.dataset.id]=Date.now();save();render();break}
     case'refreshst':fetchStatus(S.date,true).then(()=>{render();toast('Meldingen bijgewerkt.')});break;
+    case'copymsg':if(PROP&&PROP.ai)copyText(PROP.ai.msg,'Bericht gekopieerd.');break;
     case'propose':openPropose(el.dataset.ids.split(','));break;
     case'extend':{const w=WRK[el.dataset.wid],d=PROP.date,ids=PROP.ids;w.overrides=w.overrides||{};w.overrides[d]={start:el.dataset.start,end:el.dataset.end,note:'Incidenteel langer'};
       const P=getPlan(d);for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));

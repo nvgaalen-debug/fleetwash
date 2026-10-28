@@ -45,7 +45,7 @@ export default async (req) => {
       },
       body: JSON.stringify({
         model: process.env.AI_MODEL || "claude-sonnet-5-5",
-        max_tokens: 900,
+        max_tokens: 2000,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -53,7 +53,7 @@ export default async (req) => {
     if (!r.ok) return json({ error: data?.error?.message || `API-fout ${r.status}` }, 502);
     const text = (data.content || []).filter((c) => c.type === "text").map((c) => c.text).join("").trim();
     if (!text) return json({ error: "Leeg antwoord van de AI." }, 502);
-    return json({ text });
+    return json({ text, truncated: data.stop_reason === "max_tokens" });
   } catch (e) {
     return json({ error: "De AI-dienst is niet bereikbaar." }, 502);
   }

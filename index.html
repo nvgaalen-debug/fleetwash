@@ -794,6 +794,7 @@ function runSick(wid,from,to,note){
     insertLoop(day.aff,R,ws);eject(R,ws,P.pinned,day.aff.map(id=>JOB[id]));
     Object.assign(P.routes,R);day.aff.forEach(id=>{for(const k in R)if(R[k].includes(id))P.pinned[id]=k});P.edited=Date.now();if(!P.auto)P.auto=Date.now();
   }
+  D.sickLog=(D.sickLog||[]).concat({wid,from,to,note,at:Date.now(),orig:Object.fromEntries(days.map(x=>[x.date,x.aff]))}).slice(-50);
   SICK={wid,from,to,note,snap,days,ai:null};save();render();openSickResult();
 }
 function whereIs(id){const j=JOB[id];if(!j)return null;const P=D.plans[j.date];let wid=null;if(P&&P.routes)for(const k in P.routes)if(P.routes[k].includes(id))wid=k;
@@ -819,6 +820,36 @@ function openSickResult(){
     ${unGroups.length?`<h4 class="ph">Plan voor wat niet past</h4><div id="sickAi"><p class="small muted" id="sickNote" style="margin:0 0 8px">${mode?`Claude kiest voor ${unGroups.length===1?'de afspraak':`elk van de ${unGroups.length} afspraken`} die niet past het beste alternatief: een ander tijdstip, een andere dag of een collega die incidenteel langer werkt. Daarna pas je het met één klik toe.`:'AI-advies is hier niet beschikbaar. Gebruik per afspraak het Slim voorstel.'}</p>${mode?`<div class="row"><button class="btn primary" id="sickBtn" data-act="sickai">${I.auto} Laat Claude een plan maken</button></div>`:''}<div id="sickOut"></div></div>`:tot?'<p class="ok-line">Alle afspraken zijn herverdeeld.</p>':''}
     <div class="dlg-foot"><button class="btn danger" data-act="sickundo" title="Ziekmelding, herverdeling en toegepaste AI-keuzes terugdraaien">Ongedaan maken</button><span class="sp"></span>${SERVER&&tot?`<button class="btn" data-act="publish">${I.send} Publiceer</button>`:''}<button class="btn primary" data-act="sickclose">Klaar</button></div></div>`;
   $('#modal').hidden=false;if(K.ai)renderSickAI();
+}
+
+/* Ziekmelding later intrekken: medewerker weer beschikbaar maken en eventueel de oorspronkelijke afspraken terugzetten */
+function sickDates(w){return Object.keys(w.absentNote||{}).filter(d=>(w.absent||[]).includes(d)).sort()}
+function sickBtns(w,date){const ds=sickDates(w).filter(d=>d>=todayIso()||d===date);
+  return`<button class="btn sm" data-act="sick" data-id="${w.id}">Ziek melden</button>${ds.length?`<button class="btn sm" data-act="unsick" data-id="${w.id}" title="Ziek gemeld: ${esc(ds.map(d=>fdate(d,{day:'numeric',month:'short'})).join(', '))}">Ziekmelding intrekken</button>`:''}`}
+function openUnsick(wid){
+  const w=WRK[wid];if(!w)return;const ds=sickDates(w);if(!ds.length){toast(`Er staat geen ziekmelding voor ${w.name}.`);return}
+  const cur=ds.includes(S.date)?S.date:(ds.find(d=>d>=todayIso())||ds[0]);let from=cur,to=cur;while(ds.includes(addDays(from,-1)))from=addDays(from,-1);while(ds.includes(addDays(to,1)))to=addDays(to,1);
+  openForm({title:`Ziekmelding ${w.name} intrekken`,note:`Ziek gemeld op: ${ds.map(d=>fdate(d,{weekday:'short',day:'numeric',month:'short'})).join(', ')}.`,
+    fields:[{k:'from',label:'Vanaf',type:'date',req:1},{k:'to',label:'Tot en met',type:'date',req:1},
+      {k:'mode',label:'Afspraken',type:'select',wide:1,options:[['orig',`Oorspronkelijke afspraken terugzetten bij ${w.name.split(' ')[0]}`],['keep','Alleen weer beschikbaar maken; de huidige verdeling blijft staan']]}],
+    values:{from,to,mode:'orig'},okLabel:'Intrekken',
+    onSave:v=>{if(v.to<v.from)return'"Tot en met" moet op of na "Vanaf" liggen.';setTimeout(()=>unsick(wid,v.from,v.to,v.mode),0);return''}});
+}
+function unsick(wid,from,to,mode){
+  const w=WRK[wid];let back=0,moved=0,days=0,ovr=0;
+  for(let d=from;d<=to;d=addDays(d,1)){
+    if(!(w.absent||[]).includes(d))continue;days++;
+    w.absent=w.absent.filter(x=>x!==d);if(w.absentNote)delete w.absentNote[d];
+    D.workers.forEach(x=>{if(x.id!==wid&&x.overrides&&x.overrides[d]&&/Incidenteel|Extra werkdag/.test(x.overrides[d].note||''))ovr++});
+    if(mode!=='orig')continue;
+    const log=[...(D.sickLog||[])].reverse().find(x=>x.wid===wid&&x.orig&&x.orig[d]);if(!log)continue;
+    const P=getPlan(d),ids=log.orig[d].filter(id=>JOB[id]&&JOB[id].date===d);moved+=log.orig[d].filter(id=>JOB[id]&&JOB[id].date!==d).length;
+    for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));
+    P.routes[wid]=[...ids,...(P.routes[wid]||[]).filter(id=>!ids.includes(id))];ids.forEach(id=>P.pinned[id]=wid);P.edited=Date.now();if(!P.auto)P.auto=Date.now();back+=ids.length;
+  }
+  if(!days){toast('In deze periode stond geen ziekmelding.');return}
+  save();render();
+  toast(`Ziekmelding van ${w.name} ingetrokken (${days} dag${days>1?'en':''}).${mode==='orig'?` ${back} afspraken staan weer bij ${w.name.split(' ')[0]}.`:''}${moved?` ${moved} afspraak/afspraken waren al naar een andere dag verplaatst en blijven daar.`:''}${ovr?' Afwijkende werktijden van collega’s blijven staan; pas die zo nodig aan via "Werktijd deze dag".':''}${SERVER?' Publiceer opnieuw voor de medewerker-app.':''}`);
 }
 function sickUndo(){const K=SICK;if(!K)return;const s=JSON.parse(K.snap);D.jobs=s.jobs;D.plans=s.plans;D.workers=s.workers;index();
   SICK=null;closeForm();save();render();toast('Ziekmelding ongedaan gemaakt. De oorspronkelijke planning is terug.')}
@@ -1073,7 +1104,7 @@ function routePanel(st){
   li+=`<li><span></span><div class="rt-end" data-drop="end:${w.id}">Sleep hierheen om achteraan de rit toe te voegen</div></li>`;
   const util=s.n?Math.round(s.serv/Math.max(1,s.end-s.start)*100):0;
   return`<section class="panel">${chips}
-  <div class="rt-head"><div class="row"><h2>Rit ${esc(w.name)}</h2><span class="sp"></span><button class="btn sm" data-act="sick" data-id="${w.id}">Ziek melden</button><button class="btn sm" data-act="ovr" data-wid="${w.id}">${I.edit} Werktijd deze dag</button><button class="btn sm" data-act="seqopt" data-wid="${w.id}">${I.route} Volgorde optimaliseren</button></div>
+  <div class="rt-head"><div class="row"><h2>Rit ${esc(w.name)}</h2><span class="sp"></span>${sickBtns(w,S.date)}<button class="btn sm" data-act="ovr" data-wid="${w.id}">${I.edit} Werktijd deze dag</button><button class="btn sm" data-act="seqopt" data-wid="${w.id}">${I.route} Volgorde optimaliseren</button></div>
   <div class="sub">Standplaats ${esc(w.postcode)} ${esc(w.city)} · werktijd ${esc(shiftOf(w,date).start)}–${esc(shiftOf(w,date).end)}${ovr(w,date)?` <span class="chip warn">Afwijkend vandaag${ovr(w,date).note?': '+esc(ovr(w,date).note):''} · normaal ${esc(w.start)}–${esc(w.end)}</span>`:''}${(w.skills||[]).length?' · '+esc(w.skills.join(', ')):''}${why?` · <b style="color:var(--bad)">${esc(why)}</b>`:''}</div>
   <dl class="stats"><div><dt>Vertrek</dt><dd>${m2t(s.depart)}</dd></div><div><dt>Terug</dt><dd>${m2t(s.finish)}</dd></div><div><dt>Voertuigen</dt><dd>${s.n}</dd></div><div><dt>Rijtijd</dt><dd>${fdur(s.trav)}</dd></div><div><dt>Afstand</dt><dd>${fkm(s.km)}</dd></div><div><dt>Benutting</dt><dd>${util}%</dd></div></dl></div>
   <ol class="rt">${li}</ol></section>`;
@@ -1206,7 +1237,7 @@ function fixGeo(v,old){
 /* ---------- beheer: medewerkers ---------- */
 function allSkills(){return[...new Set([...D.types.map(t=>t.skill).filter(Boolean),...D.workers.flatMap(w=>w.skills||[])])]}
 function viewWorkers(){
-  const r=D.workers.map(w=>`<tr><td><b style="display:flex;gap:7px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w.name)}</b></td><td>${esc(w.postcode)} ${esc(w.city)}</td><td class="mono">${esc(w.start)}–${esc(w.end)}</td><td>${DAYS.filter(([n])=>(w.days||[]).includes(n)).map(d=>d[1]).join(' ')}</td><td class="small">${(w.absent||[]).length?w.absent.map(d=>esc(fdate(d,{day:'numeric',month:'short'}))).join(', '):'<span class="muted">—</span>'}</td><td class="small">${Object.entries(w.overrides||{}).filter(([d])=>d>=new Date().toISOString().slice(0,10)).sort().map(([d,o])=>`<span class="chip warn" title="${esc(o.note||'')}">${esc(fdate(d,{day:'numeric',month:'short'}))} ${esc(o.start)}–${esc(o.end)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${(w.skills||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${avail(w,S.date)?'<span class="chip ok">Beschikbaar</span>':`<span class="chip bad">${esc(availWhy(w,S.date))}</span>`}</td><td><div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="wlink" data-id="${w.id}">${I.copy} Kopieer link</button><button class="btn sm" data-act="sick" data-id="${w.id}">Ziek melden</button></div></td><td class="act"><button class="btn ghost" data-act="editw" data-id="${w.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
+  const r=D.workers.map(w=>`<tr><td><b style="display:flex;gap:7px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w.name)}</b></td><td>${esc(w.postcode)} ${esc(w.city)}</td><td class="mono">${esc(w.start)}–${esc(w.end)}</td><td>${DAYS.filter(([n])=>(w.days||[]).includes(n)).map(d=>d[1]).join(' ')}</td><td class="small">${(w.absent||[]).length?w.absent.map(d=>esc(fdate(d,{day:'numeric',month:'short'}))).join(', '):'<span class="muted">—</span>'}</td><td class="small">${Object.entries(w.overrides||{}).filter(([d])=>d>=new Date().toISOString().slice(0,10)).sort().map(([d,o])=>`<span class="chip warn" title="${esc(o.note||'')}">${esc(fdate(d,{day:'numeric',month:'short'}))} ${esc(o.start)}–${esc(o.end)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${(w.skills||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${avail(w,S.date)?'<span class="chip ok">Beschikbaar</span>':`<span class="chip bad">${esc(availWhy(w,S.date))}</span>`}</td><td><div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="wlink" data-id="${w.id}">${I.copy} Kopieer link</button>${sickBtns(w,S.date)}</div></td><td class="act"><button class="btn ghost" data-act="editw" data-id="${w.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
   return`<section class="panel"><div class="toolbar"><h2>Medewerkers</h2><span class="sp"></span><button class="btn primary" data-act="neww">${I.plus} Nieuwe medewerker</button></div>
   <div class="tbl-wrap"><table><thead><tr><th>Medewerker</th><th>Standplaats</th><th>Werktijd</th><th>Werkdagen</th><th>Afwezig</th><th>Afwijkende werktijd</th><th>Vaardigheden</th><th>${esc(fdate(S.date,{day:'numeric',month:'short'}))}</th><th>Medewerker-app</th><th></th></tr></thead><tbody>${r||'<tr><td colspan="10" class="empty">Nog geen medewerkers</td></tr>'}</tbody></table></div>
   <p class="hint">Vaardigheden koppelen aan reinigingstypes (Instellingen). Een opdracht die een vaardigheid vraagt, gaat alleen naar medewerkers die die vaardigheid hebben.</p></section>`;
@@ -1535,6 +1566,7 @@ function onClick(e){
     case'copymsg':if(PROP&&PROP.ai)copyText(PROP.ai.msg,'Bericht gekopieerd.');break;
     case'sick':openSick(el.dataset.id);break;
     case'sickundo':sickUndo();break;
+    case'unsick':openUnsick(el.dataset.id);break;
     case'sickclose':SICK=null;closeForm();break;
     case'sickai':sickAI();break;
     case'sickapply':sickApply([+el.dataset.g]);break;

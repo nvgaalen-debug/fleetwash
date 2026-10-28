@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mijn Wasroute</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#0a6a88">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: mobiele dagkaart; vaste kop met dag-navigatie, daaronder de rit als tijdlijn van bezoeken met per auto een grote meldknop */
+:root{
+  --bg:#edf2f3; --surface:#ffffff; --sunk:#e2e9eb; --ink:#10212a; --muted:#56696f; --line:#d2dde0;
+  --accent:#0a6a88; --accent-soft:#d5edf3; --on-accent:#ffffff;
+  --bad:#bf3626; --bad-soft:#fbe2dd; --warn:#9a5600; --warn-soft:#fcecd2; --ok:#22784f; --ok-soft:#d9efe3;
+  --plate:#f5c400; --plate-ink:#111111; --eu:#1d3e9e;
+  --f-disp:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0b1418; --surface:#122029; --sunk:#0e1a20; --ink:#e1ebee; --muted:#8fa3ab; --line:#233740;
+  --accent:#4db4d4; --accent-soft:#113444; --on-accent:#04202a;
+  --bad:#f07b69; --bad-soft:#3a1c18; --warn:#e8a549; --warn-soft:#382912; --ok:#5ac690; --ok-soft:#113124;
+  color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0b1418; --surface:#122029; --sunk:#0e1a20; --ink:#e1ebee; --muted:#8fa3ab; --line:#233740;
+  --accent:#4db4d4; --accent-soft:#113444; --on-accent:#04202a;
+  --bad:#f07b69; --bad-soft:#3a1c18; --warn:#e8a549; --warn-soft:#382912; --ok:#5ac690; --ok-soft:#113124;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:400 16px/1.45 var(--f-body);font-variant-numeric:tabular-nums}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--accent)}
+button,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:640px;margin:0 auto}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--accent);color:var(--on-accent)}
+.top .wrap{padding-block:10px;display:flex;align-items:center;gap:10px}
+.brand{font:700 20px/1 var(--f-disp);letter-spacing:.02em;display:flex;align-items:center;gap:8px}
+.who{margin-left:auto;font-weight:600;font-size:15px;opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.daynav{background:var(--surface);border-bottom:1px solid var(--line)}
+.daynav .wrap{padding-block:8px}
+.daynav button.arrow{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center;cursor:pointer;color:var(--ink)}
+.dayt{text-align:center;font:600 19px/1.15 var(--f-disp);letter-spacing:.01em}
+.dayt small{display:block;font:500 13px var(--f-body);color:var(--muted);letter-spacing:0}
+.dchips{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;scrollbar-width:none}
+.dchips button{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:14px;cursor:pointer;color:var(--ink)}
+.dchips button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-weight:600}
+main .wrap{padding-block:14px 60px;display:grid;gap:14px}
+.banner{background:var(--warn-soft);color:var(--warn);border-radius:10px;padding:10px 12px;font-size:14px}
+.msg{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:26px 18px;text-align:center;color:var(--muted)}
+.msg h2{font:600 21px var(--f-disp);color:var(--ink);margin:0 0 6px}
+.msg.err{border-color:var(--bad);color:var(--bad)}
+.sum{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:10px}
+.sumrow{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.sumrow span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.sumrow b{font:600 22px/1.1 var(--f-disp)}
+.prog{height:10px;border-radius:999px;background:var(--sunk);overflow:hidden}
+.prog i{display:block;height:100%;background:var(--ok);border-radius:999px;transition:width .3s}
+.sum p{margin:0;font-size:14px;color:var(--muted)}
+.sum .shift{color:var(--warn);font-weight:600}
+.tl{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.ev{display:flex;gap:12px;align-items:baseline;color:var(--muted);font-size:15px;padding:0 4px}
+.ev time{font:600 17px var(--f-disp);color:var(--ink);min-width:48px}
+.visit{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.visit.alldone{border-color:var(--ok)}
+.vhead{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:14px 16px 10px;align-items:start}
+.vtime{font:700 24px/1 var(--f-disp);grid-row:span 2}
+.vtime small{display:block;font:500 12px var(--f-body);color:var(--muted);margin-top:4px}
+.vname{font:600 20px/1.15 var(--f-disp);margin:0;text-wrap:balance}
+.addr{color:var(--accent);font-weight:500;text-decoration:none;font-size:15px}
+.vbody{padding:0 16px 14px;display:grid;gap:10px}
+.meta{font-size:14px;color:var(--muted)}
+.info{background:var(--warn-soft);color:var(--ink);border-left:4px solid var(--warn);border-radius:8px;padding:9px 11px;font-size:15px}
+.info b{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--warn);margin-bottom:2px}
+.contact{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:15px;align-items:center}
+.contact a{color:var(--accent);font-weight:600}
+code{background:var(--sunk);padding:2px 6px;border-radius:5px;font-size:14px}
+.cars{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.car{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:10px;background:var(--surface)}
+.car.is-done{background:var(--ok-soft);border-color:transparent}
+.car.is-issue{background:var(--bad-soft);border-color:transparent}
+.car-top{display:flex;gap:12px;align-items:center}
+.plate{display:inline-flex;align-items:stretch;border-radius:4px;overflow:hidden;border:1px solid rgba(0,0,0,.4);font:700 19px/1 var(--f-disp);letter-spacing:.06em;flex:none}
+.plate i{font-style:normal;background:var(--eu);color:#fff;font-size:9px;padding:0 4px 3px;display:flex;align-items:flex-end}
+.plate span{background:var(--plate);color:var(--plate-ink);padding:5px 8px 4px}
+.car-meta{display:grid;min-width:0}
+.car-meta b{font-weight:600}
+.car-meta span{font-size:14px;color:var(--muted)}
+.note{margin:0;font-size:14px;background:var(--sunk);border-radius:8px;padding:7px 9px}
+.acts{display:grid;grid-template-columns:1fr auto;gap:8px}
+.big{border:0;border-radius:12px;padding:14px;font:600 18px var(--f-disp);letter-spacing:.03em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px}
+.big.ok{background:var(--ok);color:#fff}
+.big.alt{background:var(--sunk);color:var(--ink);font-size:16px;padding:14px 12px}
+.state{display:flex;align-items:center;gap:8px;font-weight:600}
+.state.ok{color:var(--ok)} .state.bad{color:var(--bad)}
+.state small{font-weight:500;color:var(--muted)}
+.linkbtn{border:0;background:none;color:var(--accent);font-weight:600;padding:4px 0;cursor:pointer;justify-self:start;font-size:15px}
+.reasons{display:grid;gap:6px}
+.reasons label{display:flex;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);cursor:pointer}
+.reasons input{width:20px;height:20px;accent-color:var(--bad)}
+textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:var(--surface)}
+.big.bad{background:var(--bad);color:#fff}
+.navbtn{display:flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:12px;background:var(--accent-soft);color:var(--accent);font-weight:600;text-decoration:none}
+.minibtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px 8px;font-size:13px;cursor:pointer;color:var(--ink)}
+.ic{width:20px;height:20px;flex:none}
+#toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;font-size:15px;z-index:60;width:max-content;max-width:calc(100% - 32px)}
+.refresh{justify-self:center;border:0;background:none;color:var(--muted);font-size:14px;cursor:pointer;text-decoration:underline}
+@media (prefers-reduced-motion:reduce){.prog i{transition:none}}
+@media (max-width:380px){.sumrow b{font-size:19px}.vtime{font-size:21px}}
+</style>
+<style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}</style>
+</head>
+<body>
+<header class="top gut"><div class="wrap"><div class="brand"><svg width="22" height="22" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="currentColor"/></svg>Mijn Wasroute</div><div class="who" id="who"></div></div></header>
+<nav class="daynav gut" aria-label="Dag kiezen"><div class="wrap">
+  <div style="display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px">
+    <button class="arrow" data-act="day" data-d="-1" aria-label="Vorige dag"><svg class="ic" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="dayt" id="dayt"></div>
+    <button class="arrow" data-act="day" data-d="1" aria-label="Volgende dag"><svg class="ic" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+  </div>
+  <div class="dchips" id="dchips"></div>
+</div></nav>
+<main class="gut"><div class="wrap" id="app"></div></main>
+<div id="toast" hidden></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad=n=>String(n).padStart(2,'0');
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const addDays=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return iso(d)};
+const fdate=(s,o)=>new Date(s+'T12:00:00').toLocaleDateString('nl-NL',o);
+const hhmm=isoT=>{try{return new Date(isoT).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}catch(e){return''}};
+const TODAY=iso(new Date());
+const IC={check:'<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  warn:'<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2 14.5 13.5h-13z"/><path d="M8 6.5v3M8 11.6v.1"/></g></svg>',
+  nav:'<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M14 2 2 7.2l5 1.8 1.8 5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>'};
+
+/* Verbinding: op de eigen site via /api, anders (bijv. als voorbeeld in Claude) met fictieve gegevens */
+const API=(()=>{try{return !window.claude&&/^https?:$/.test(location.protocol)}catch(e){return false}})();
+let TOK='';
+try{TOK=new URLSearchParams(location.search).get('t')||localStorage.getItem('wasroute.tok')||'';if(TOK&&TOK!=='demo')localStorage.setItem('wasroute.tok',TOK)}catch(e){try{TOK=new URLSearchParams(location.search).get('t')||''}catch(x){}}
+const DEMO=!API||TOK==='demo';
+const S={date:TODAY,data:null,dates:[],loading:false,err:'',form:null};
+const QKEY='wasroute.queue';
+const getQ=()=>{try{return JSON.parse(localStorage.getItem(QKEY)||'[]')}catch(e){return[]}};
+const setQ=q=>{try{localStorage.setItem(QKEY,JSON.stringify(q))}catch(e){}};
+
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3500)}
+
+/* ---------- voorbeeldgegevens ---------- */
+const DEMO_ST={};
+function demo(date){
+  const off=(new Date(date+'T12:00:00').getDay()+6)%7>4;
+  const route=off?{worker:{id:'demo',name:'Sanne Jansen'},date,visits:[],off:'Werkt niet op '+fdate(date,{weekday:'long'}),shift:{start:'07:30',end:'16:00',note:''}}:{
+    worker:{id:'demo',name:'Sanne Jansen'},date,shift:{start:'07:30',end:'16:00',note:''},depart:'07:12',finish:'13:05',km:41,
+    pauses:[{from:'10:55',to:'11:25'}],
+    visits:[
+      {nr:1,arrive:'07:30',start:'08:00',end:'09:40',travel:18,customer:'Autohuis Lage Weide',contact:'Kees Mulder',phone:'030 241 77 00',login:'',address:'Cartesiusweg 90',postcode:'3542 AA',city:'Utrecht',info:'Werkplaatsingang aan de achterkant. Sleutels ophalen bij de balie.',
+        jobs:[{id:'d1',plate:'HJ-078-D',vehicle:'VW Golf',type:'Compleet in + uit',duration:45,window:'08:00–13:00',start:'08:00',end:'08:45',notes:''},
+              {id:'d2',plate:'7-KTR-41',vehicle:'Skoda Octavia',type:'Compleet in + uit',duration:45,window:'08:00–13:00',start:'08:45',end:'09:30',notes:'Kinderzitje laten zitten'},
+              {id:'d3',plate:'GZ-381-K',vehicle:'Kia Niro',type:'Buitenwas',duration:20,window:'08:00–13:00',start:'09:30',end:'09:50',notes:''}]},
+      {nr:2,arrive:'10:05',start:'10:05',end:'10:45',travel:15,customer:'Kantoorpark Laagraven',contact:'Facilitair bureau',phone:'030 600 45 45',login:'schoonmaak@laagraven',address:'Laagraven 3',postcode:'3439 LG',city:'Nieuwegein',info:'Parkeerdek P2. Pas ophalen bij de receptie op de begane grond.',
+        jobs:[{id:'d4',plate:'XF-552-B',vehicle:'Tesla Model 3',type:'Buitenwas',duration:20,window:'',start:'10:05',end:'10:25',notes:''},
+              {id:'d5',plate:'3-NRS-07',vehicle:'Peugeot 308',type:'Buitenwas',duration:20,window:'',start:'10:25',end:'10:45',notes:''}]},
+      {nr:3,arrive:'11:40',start:'11:40',end:'12:45',travel:15,customer:'Studio Glans',contact:'Mila Koster',phone:'06 4123 8812',login:'',address:'Meidoornkade 14',postcode:'3991 AE',city:'Houten',info:'',
+        jobs:[{id:'d6',plate:'LB-901-T',vehicle:'Volvo XC40',type:'Lak & coating',duration:90,window:'09:00–17:00',start:'11:40',end:'12:45',notes:'Klant wil graag even laten zien wat er is gedaan'}]}
+    ]};
+  return{name:'Sanne Jansen',date,route,dates:[TODAY,addDays(TODAY,1),addDays(TODAY,2)],status:DEMO_ST[date]||(DEMO_ST[date]=date===TODAY?{d1:{st:'done',at:new Date(new Date().setHours(8,44)).toISOString()}}:{})};
+}
+
+/* ---------- gegevens ---------- */
+async function load(quiet){
+  if(!quiet){S.loading=true;S.err='';render()}
+  if(DEMO){S.data=demo(S.date);S.dates=S.data.dates;S.loading=false;render();return}
+  if(!TOK){S.loading=false;S.err='nolink';render();return}
+  try{
+    const r=await fetch(`/api/mijn-planning?t=${encodeURIComponent(TOK)}&date=${S.date}`,{cache:'no-store'});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){S.err=d.error||('Er ging iets mis ('+r.status+').')}
+    else{d.status=d.status||{};
+      for(const q of getQ())if(q.date===d.date){if(q.st==='open')delete d.status[q.jobId];else d.status[q.jobId]={st:q.st,at:q.at,reason:q.reason,note:q.note,pending:true}}
+      if(d.date===S.date){S.data=d;S.dates=d.dates||S.dates;S.err=''}}
+  }catch(e){S.err='offline'}
+  S.loading=false;if(!S.form||!quiet)render();
+}
+async function post(item){if(DEMO)return true;try{const r=await fetch('/api/melding',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({t:TOK,...item})});return r.ok||r.status===403}catch(e){return false}}
+async function flush(){
+  const q=getQ();if(!q.length||DEMO)return;const left=[];
+  for(const it of q)if(!(await post(it)))left.push(it);
+  setQ(left);
+  if(left.length<q.length&&S.data){for(const it of q)if(!left.includes(it)&&it.date===S.date&&S.data.status[it.jobId])S.data.status[it.jobId].pending=false;if(!S.form)render();toast('Wachtende meldingen zijn verstuurd.')}
+}
+async function report(jobId,st,reason,note){
+  const at=new Date().toISOString(),item={date:S.date,jobId,st,reason:reason||'',note:note||'',at};
+  if(st==='open')delete S.data.status[jobId];else S.data.status[jobId]={st,at,reason:item.reason,note:item.note,pending:!DEMO};
+  if(DEMO)DEMO_ST[S.date]=S.data.status;
+  S.form=null;render();
+  const ok=await post(item);
+  if(ok){if(S.data.status[jobId])S.data.status[jobId].pending=false;render()}
+  else{setQ(getQ().filter(q=>!(q.jobId===jobId&&q.date===item.date)).concat(item));toast('Geen verbinding. De melding wordt verstuurd zodra je weer online bent.')}
+}
+
+/* ---------- weergave ---------- */
+function dayHeader(){
+  const rel=S.date===TODAY?'Vandaag':S.date===addDays(TODAY,1)?'Morgen':S.date===addDays(TODAY,-1)?'Gisteren':'';
+  $('#dayt').innerHTML=`${esc(rel||fdate(S.date,{weekday:'long'}))}<small>${esc(fdate(S.date,{weekday:rel?'long':undefined,day:'numeric',month:'long'}))}</small>`;
+  const ds=[...new Set([TODAY,...(S.dates||[]).filter(d=>d>=TODAY)])].sort().slice(0,7);
+  $('#dchips').innerHTML=ds.map(d=>`<button data-act="goto" data-date="${d}" aria-pressed="${d===S.date}">${d===TODAY?'Vandaag':esc(fdate(d,{weekday:'short',day:'numeric',month:'short'}))}</button>`).join('');
+}
+const mapsUrl=v=>'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([v.address,[v.postcode,v.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')||`${v.lat},${v.lng}`);
+const REASONS=['Auto niet aanwezig','Geen toegang tot de locatie','Schade of niet goed te reinigen','Anders'];
+function carHtml(j,st){
+  const s=st[j.id];
+  let act;
+  if(S.form===j.id){
+    act=`<div class="reasons" role="radiogroup" aria-label="Wat is er aan de hand?">${REASONS.map((r,i)=>`<label><input type="radio" name="rs" value="${esc(r)}"${i===0?' checked':''}> ${esc(r)}</label>`).join('')}</div>
+      <textarea id="note" placeholder="Toelichting (optioneel)"></textarea>
+      <div class="acts"><button class="big bad" data-act="sendissue" data-id="${esc(j.id)}">${IC.warn} Probleem melden</button><button class="big alt" data-act="cancel">Annuleren</button></div>`;
+  }else if(!s){
+    act=`<div class="acts"><button class="big ok" data-act="done" data-id="${esc(j.id)}">${IC.check} Gereed</button><button class="big alt" data-act="issue" data-id="${esc(j.id)}">Probleem</button></div>`;
+  }else if(s.st==='done'){
+    act=`<div class="state ok">${IC.check} Gereed om ${esc(hhmm(s.at))}${s.pending?' <small>wordt verstuurd…</small>':''}</div><button class="linkbtn" data-act="undo" data-id="${esc(j.id)}">Ongedaan maken</button>`;
+  }else{
+    act=`<div class="state bad">${IC.warn} ${esc(s.reason||'Probleem gemeld')}${s.pending?' <small>wordt verstuurd…</small>':''}</div>${s.note?`<p class="note">${esc(s.note)}</p>`:''}<button class="linkbtn" data-act="undo" data-id="${esc(j.id)}">Ongedaan maken</button>`;
+  }
+  return`<li class="car${s&&S.form!==j.id?' is-'+s.st:''}"><div class="car-top"><span class="plate"><i>NL</i><span>${esc(j.plate)}</span></span><div class="car-meta"><b>${esc(j.type)}</b><span>${esc([j.vehicle,j.start&&j.end?j.start+'–'+j.end:'',j.duration?j.duration+' min':''].filter(Boolean).join(' · '))}</span>${j.window?`<span>Tijdvak klant ${esc(j.window)}</span>`:''}</div></div>${j.notes?`<p class="note">${esc(j.notes)}</p>`:''}${act}</li>`;
+}
+function visitHtml(v,st){
+  const all=v.jobs.length&&v.jobs.every(j=>st[j.id]&&st[j.id].st==='done');
+  const place=[v.address,[v.postcode,v.city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+  const tel=v.phone?String(v.phone).replace(/[^\d+]/g,''):'';
+  return`<li class="visit${all?' alldone':''}"><div class="vhead"><div class="vtime">${esc(v.start||v.arrive)}<small>aankomst ${esc(v.arrive)}</small></div>
+    <h2 class="vname">${esc(v.nr)}. ${esc(v.customer)}</h2><a class="addr" href="${esc(mapsUrl(v))}" target="_blank" rel="noopener">${esc(place)}</a></div>
+    <div class="vbody">
+      <div class="meta">${v.jobs.length} ${v.jobs.length===1?'auto':"auto's"} · reinigen ${esc(v.start)}–${esc(v.end)}${v.travel?` · ${esc(v.travel)} min rijden`:''}</div>
+      ${v.info?`<div class="info"><b>Locatie-info</b>${esc(v.info)}</div>`:''}
+      ${v.contact||v.phone||v.login?`<div class="contact">${v.contact?`<span>${esc(v.contact)}</span>`:''}${v.phone?`<a href="tel:${esc(tel)}">${esc(v.phone)}</a>`:''}${v.login?`<span>Inlog <code>${esc(v.login)}</code> <button class="minibtn" data-act="copy" data-v="${esc(v.login)}">Kopieer</button></span>`:''}</div>`:''}
+      <ul class="cars">${v.jobs.map(j=>carHtml(j,st)).join('')}</ul>
+      <a class="navbtn" href="${esc(mapsUrl(v))}" target="_blank" rel="noopener">${IC.nav} Navigeer naar ${esc(v.city||'locatie')}</a>
+    </div></li>`;
+}
+function render(){
+  dayHeader();
+  const a=$('#app'),d=S.data&&S.data.date===S.date?S.data:null;
+  $('#who').textContent=(S.data&&S.data.name)||'';
+  let h=DEMO?'<div class="banner">Voorbeeldweergave met fictieve afspraken. Medewerkers openen de echte app via hun persoonlijke link van de planner.</div>':'';
+  if(S.err==='nolink'){a.innerHTML=h+'<div class="msg"><h2>Open je persoonlijke link</h2>Je hebt van de planner een link gekregen naar deze app. Open die link één keer; daarna onthoudt deze telefoon hem.</div>';return}
+  if(S.err&&!d){a.innerHTML=h+`<div class="msg err"><h2>${S.err==='offline'?'Geen verbinding':'Kan planning niet laden'}</h2>${esc(S.err==='offline'?'Controleer je internetverbinding.':S.err)}<p><button class="minibtn" data-act="reload">Opnieuw proberen</button></p></div>`;return}
+  if(!d){a.innerHTML=h+'<div class="msg">Afspraken laden…</div>';return}
+  if(S.err==='offline')h+='<div class="banner">Geen verbinding. Je ziet de laatst geladen planning; meldingen worden later verstuurd.</div>';
+  const r=d.route,st=d.status||{};
+  if(!r){a.innerHTML=h+'<div class="msg"><h2>Nog geen planning</h2>Voor deze dag is nog geen planning gepubliceerd. Kijk later nog eens of vraag het de planner.</div>';return}
+  if(!r.visits||!r.visits.length){a.innerHTML=h+`<div class="msg"><h2>${r.off?'Vrij':'Geen afspraken'}</h2>${esc(r.off||'Er staan voor deze dag geen afspraken voor je gepland.')}</div>`;return}
+  const jobs=r.visits.flatMap(v=>v.jobs),done=jobs.filter(j=>st[j.id]&&st[j.id].st==='done').length,iss=jobs.filter(j=>st[j.id]&&st[j.id].st==='issue').length;
+  h+=`<section class="sum"><div class="sumrow"><div><span>Vertrek</span><b>${esc(r.depart||'')}</b></div><div><span>Bezoeken</span><b>${r.visits.length}</b></div><div><span>Auto's</span><b>${jobs.length}</b></div><div><span>Terug</span><b>${esc(r.finish||'')}</b></div></div>
+    <div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="${jobs.length}" aria-valuenow="${done}"><i style="width:${jobs.length?Math.round((done+iss)/jobs.length*100):0}%"></i></div>
+    <p>${done} van ${jobs.length} gereed${iss?` · ${iss} met probleem`:''}${r.shift&&r.shift.note?` · <span class="shift">Werktijd vandaag ${esc(r.shift.start)}–${esc(r.shift.end)} (${esc(r.shift.note)})</span>`:''}</p></section>`;
+  const evs=[{t:r.depart,o:0,k:'dep'},...r.visits.map(v=>({t:v.arrive,o:1,k:'v',v})),...(r.pauses||[]).map(p=>({t:p.from,o:2,k:'p',p})),{t:r.finish,o:3,k:'end'}].filter(e=>e.t).sort((x,y)=>x.t===y.t?x.o-y.o:x.t<y.t?-1:1);
+  h+=`<ol class="tl">${evs.map(e=>e.k==='dep'?`<li class="ev"><time>${esc(e.t)}</time>Vertrek vanaf je standplaats</li>`
+    :e.k==='p'?`<li class="ev"><time>${esc(e.p.from)}</time>Pauze tot ${esc(e.p.to)}</li>`
+    :e.k==='end'?`<li class="ev"><time>${esc(e.t)}</time>Terug op standplaats${r.km?` · ${esc(r.km)} km vandaag`:''}</li>`
+    :visitHtml(e.v,st)).join('')}</ol><button class="refresh" data-act="reload">Planning verversen</button>`;
+  a.innerHTML=h;
+}
+
+/* ---------- acties ---------- */
+document.addEventListener('click',e=>{
+  const el=e.target.closest('[data-act]');if(!el)return;const id=el.dataset.id;
+  switch(el.dataset.act){
+    case'day':S.date=addDays(S.date,+el.dataset.d);S.form=null;load();break;
+    case'goto':S.date=el.dataset.date;S.form=null;load();break;
+    case'reload':load();break;
+    case'done':report(id,'done');break;
+    case'issue':S.form=id;render();break;
+    case'cancel':S.form=null;render();break;
+    case'sendissue':{const r=(document.querySelector('input[name="rs"]:checked')||{}).value||'Probleem';report(id,'issue',r,($('#note')||{}).value||'');break}
+    case'undo':report(id,'open');break;
+    case'copy':{const v=el.dataset.v;try{navigator.clipboard.writeText(v).then(()=>toast('Gekopieerd'),()=>toast(v))}catch(x){toast(v)}break}
+  }
+});
+window.addEventListener('online',()=>{flush();load(true)});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!S.form){flush();load(true)}});
+setInterval(()=>{if(!document.hidden&&!S.form){flush();load(true)}},120000);
+flush();load();
+</script>
+
+</body>
+</html>

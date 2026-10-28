@@ -17,6 +17,7 @@
   --plate:#f5c400; --plate-ink:#111111; --eu:#1d3e9e;
   --land:#e4ece7; --land-line:#bccbc3; --water:#d9e6ed;
   --w0:#0a7ea4; --w1:#cf5a21; --w2:#6a4ec0; --w3:#23895a; --w4:#bd3576; --w5:#8c700c; --on-w:#ffffff;
+  --abs-vakantie:#2a78c8; --abs-vrij:#6a4ec0; --abs-ziek:#bf3626; --abs-training:#b8740a; --abs-bijzonder:#23895a; --abs-arts:#0a8a9a; --abs-overig:#6b7a80;
   --f-disp:"Barlow Semi Condensed","Arial Narrow",system-ui,sans-serif;
   --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
   --r:6px;
@@ -27,6 +28,7 @@
   --bad:#f07b69; --bad-soft:#3a1c18; --warn:#e8a549; --warn-soft:#382912; --ok:#5ac690; --ok-soft:#113124;
   --land:#16262c; --land-line:#2b3f47; --water:#0e1a20;
   --w0:#41b3d9; --w1:#f08c55; --w2:#a08aee; --w3:#4fc486; --w4:#ec6dab; --w5:#d6b444; --on-w:#08141a;
+  --abs-vakantie:#4a95e0; --abs-vrij:#9a84ec; --abs-ziek:#e5685a; --abs-training:#d99a32; --abs-bijzonder:#4fb883; --abs-arts:#3fb4c4; --abs-overig:#8fa0a6;
   color-scheme:dark;
 }}
 :root[data-theme="dark"]{
@@ -35,6 +37,7 @@
   --bad:#f07b69; --bad-soft:#3a1c18; --warn:#e8a549; --warn-soft:#382912; --ok:#5ac690; --ok-soft:#113124;
   --land:#16262c; --land-line:#2b3f47; --water:#0e1a20;
   --w0:#41b3d9; --w1:#f08c55; --w2:#a08aee; --w3:#4fc486; --w4:#ec6dab; --w5:#d6b444; --on-w:#08141a;
+  --abs-vakantie:#4a95e0; --abs-vrij:#9a84ec; --abs-ziek:#e5685a; --abs-training:#d99a32; --abs-bijzonder:#4fb883; --abs-arts:#3fb4c4; --abs-overig:#8fa0a6;
   color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -189,6 +192,27 @@ td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}
 tr:hover td{background:color-mix(in srgb,var(--accent-soft) 40%,transparent)}
 td.act{white-space:nowrap;text-align:right}
 .sec{display:grid;gap:12px}
+.abschip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--ac) 16%,transparent);color:var(--ink);white-space:nowrap}
+.abschip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ac)}
+.cal-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+.cal{border-collapse:separate;border-spacing:0;font-size:12px;width:100%}
+.cal th,.cal td{padding:0;border-top:1px solid var(--line);text-align:center}
+.cal thead th{background:var(--sunk);padding:4px 0;font:600 12px var(--f-body);letter-spacing:0;text-transform:none;color:var(--muted);min-width:27px}
+.cal thead th span{display:block;font-size:10px;font-weight:500}
+.cal .we{background:color-mix(in srgb,var(--sunk) 65%,transparent)}
+.cal .today{box-shadow:inset 0 0 0 2px var(--accent)}
+.cal td.wk,.cal th.wk{position:sticky;left:0;background:var(--surface);text-align:left;padding:6px 10px;white-space:nowrap;font-weight:600;z-index:1;border-right:1px solid var(--line);min-width:150px}
+.cal thead th.wk{background:var(--sunk)}
+.cal-c{height:32px;cursor:pointer;border-left:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
+.cal-c:hover{background:var(--accent-soft)}
+.cal-c.cal-off{background:repeating-linear-gradient(135deg,var(--sunk) 0 4px,transparent 4px 8px);cursor:default}
+.cal-c.has{background:var(--ac);color:#fff}
+.cal-c.half{background:linear-gradient(135deg,var(--ac) 50%,color-mix(in srgb,var(--ac) 18%,transparent) 50%);color:#fff}
+.cal-c i{font-style:normal;font-weight:700;font-size:11px}
+.abslegend{margin-top:2px}
+.lgabs{display:inline-grid;place-items:center;min-width:20px;height:16px;border-radius:3px;background:var(--ac);color:#fff;font:700 10px var(--f-body);font-style:normal;padding:0 3px}
+.lgabs.half{background:linear-gradient(135deg,var(--ac) 50%,transparent 50%);border:1px solid var(--line)}
+.bar{height:8px;border-radius:99px;background:var(--sunk);overflow:hidden}.bar i{display:block;height:100%;background:var(--accent)}
 .steps{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:8px}
 .steps li{display:grid;gap:2px;border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:9px 12px}
 .steps li span{font-size:13px;color:var(--muted)}
@@ -281,6 +305,7 @@ td.act{white-space:nowrap;text-align:right}
 <style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}</style>
 </head>
 <body>
+
 <header class="top"><div class="top-in gut">
   <div class="brand"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="var(--accent)"/><path d="M9.5 15.5c1.2 1.8 4.6 2.2 6.4-.4" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round"/></svg>Wasroute <small>dispatch &amp; routeplanning</small></div>
   <nav class="tabs" id="tabs"></nav>
@@ -338,7 +363,7 @@ const KEY='wasroute.v1';
 let D=null;
 const S={tab:'planning',date:'2026-10-29',wid:null,selLoc:null,mapMode:'routes',jobScope:'dag'};
 let JOB={},LOC={},CUS={},WRK={},TYP={};
-function index(){JOB={};LOC={};CUS={};WRK={};TYP={};D.jobs.forEach(x=>JOB[x.id]=x);D.locations.forEach(x=>LOC[x.id]=x);D.customers.forEach(x=>CUS[x.id]=x);D.workers.forEach(x=>WRK[x.id]=x);D.types.forEach(x=>TYP[x.id]=x)}
+function index(){JOB={};LOC={};CUS={};WRK={};TYP={};D.jobs.forEach(x=>JOB[x.id]=x);D.locations.forEach(x=>LOC[x.id]=x);D.customers.forEach(x=>CUS[x.id]=x);D.workers.forEach(x=>WRK[x.id]=x);if(!D.absences)migrateAbsences();syncAbsences();D.types.forEach(x=>TYP[x.id]=x)}
 function rng(seed){return()=>(seed=(seed*1664525+1013904223)%4294967296)/4294967296}
 function sample(){
   const r=rng(11),CON='BDFGHJKLNPRSTVXZ',L=()=>CON[Math.floor(r()*CON.length)],N=()=>Math.floor(r()*10);
@@ -376,7 +401,12 @@ function sample(){
    {id:'w4',name:'Lisa Bakker',postcode:'4001 AA',city:'Tiel',lat:51.886,lng:5.429,geo:'pc4',start:'08:30',end:'15:00',days:[1,2,3,4],absent:[],skills:[],color:3},
    {id:'w5',name:'Tom Peters',postcode:'6511 AB',city:'Nijmegen',lat:51.842,lng:5.853,geo:'pc4',start:'08:00',end:'16:30',days:[1,2,3,4,5],absent:['2026-10-29'],skills:['bedrijfswagens'],color:4}
   ];
-  d.workers.forEach(w=>w.token=randTok());
+  d.workers.forEach((w,i)=>{w.token=randTok();w.leaveDays=[25,25,24,20,25][i]});
+  d.absences=[{id:'a_s1',wid:'w5',type:'vakantie',from:'2026-10-29',to:'2026-10-30',part:'',time:'',note:'Herfstvakantie',at:0},
+    {id:'a_s2',wid:'w2',type:'training',from:'2026-11-12',to:'2026-11-12',part:'',time:'',note:'Cursus keramische coating',at:0},
+    {id:'a_s3',wid:'w3',type:'arts',from:'2026-11-04',to:'2026-11-04',part:'laat',time:'10:00',note:'Tandarts',at:0},
+    {id:'a_s4',wid:'w1',type:'vakantie',from:'2026-08-03',to:'2026-08-21',part:'',time:'',note:'Zomervakantie',at:0},
+    {id:'a_s5',wid:'w4',type:'vrij',from:'2026-11-19',to:'2026-11-19',part:'',time:'',note:'',at:0}];
   return d;
 }
 function load(){try{const raw=typeof localStorage!=='undefined'&&localStorage.getItem(KEY);if(raw){const x=JSON.parse(raw);if(x&&x.version)D=x}}catch(e){}if(!D)D=sample();if(D.ui&&D.ui.date)S.date=D.ui.date;index();D.workers.forEach(w=>{if(!w.token)w.token=randTok()});
@@ -391,7 +421,9 @@ const jobSkill=j=>(TYP[j.type]&&TYP[j.type].skill)||'';
 const skillOk=(w,j)=>{const s=jobSkill(j);return !s||(w.skills||[]).includes(s)};
 /* Incidentele afwijking van de werktijd op één datum: w.overrides[datum] = {start,end,note} */
 const ovr=(w,date)=>(date&&w.overrides&&w.overrides[date])||null;
-function shiftOf(w,date){const o=ovr(w,date);return{start:(o&&o.start)||w.start,end:(o&&o.end)||w.end,o}}
+function shiftOf(w,date){const o=ovr(w,date);let start=(o&&o.start)||w.start,end=(o&&o.end)||w.end;const pa=date&&D.absences?partialAbs(w,date):null;
+  if(pa){if(pa.part==='laat'&&t2m(pa.time)>t2m(start))start=pa.time;if(pa.part==='vroeg'&&t2m(pa.time)<t2m(end))end=pa.time}
+  return{start,end,o:o||(pa?{start,end,note:`${(ABS[pa.type]||{}).name||'Afwezig'} (${pa.part==='laat'?'begint '+pa.time:'stopt '+pa.time})`}:null),pa}}
 function availWhy(w,date){if((w.absent||[]).includes(date))return(w.absentNote&&w.absentNote[date])||'Afwezig';if(ovr(w,date))return'';if(!(w.days||[]).includes(wday(date)))return'Werkt niet op '+fdate(date,{weekday:'long'});return''}
 const avail=(w,date)=>!availWhy(w,date);
 
@@ -501,6 +533,125 @@ async function importPipeline(ds,newLocs,msg){
 function orsChip(date,rows){
   if(!useORS())return'';const pts=orsPointsFor([date]);const miss=orsMissing(pts);
   return miss?`<button class="btn sm" data-act="orsfetch" data-date="${date}" title="Voor ${miss} trajecten is nog geen echte rijtijd bekend; daar wordt geschat">${I.route} ${miss} rijtijden ophalen</button>`:'<span class="chip ok" title="Rijtijden van OpenRouteService">Echte rijtijden</span>';
+}
+
+/* ---------- afwezigheid: soorten, registraties, verlofkalender en saldo ---------- */
+const ABS_TYPES=[
+  {id:'vakantie',name:'Vakantie',short:'V',leave:true},
+  {id:'vrij',name:'Vrije dag',short:'VD',leave:true},
+  {id:'ziek',name:'Ziek',short:'Z'},
+  {id:'training',name:'Training / cursus',short:'T'},
+  {id:'bijzonder',name:'Bijzonder verlof',short:'B'},
+  {id:'arts',name:'Dokter / tandarts',short:'D'},
+  {id:'overig',name:'Overig',short:'O'}];
+const ABS=Object.fromEntries(ABS_TYPES.map(t=>[t.id,t]));
+const absVar=t=>`var(--abs-${ABS[t]?t:'overig'})`;
+function absDates(a){const out=[];for(let d=a.from,n=0;d<=a.to&&n<400;d=addDays(d,1),n++)out.push(d);return out}
+function migrateAbsences(){
+  D.absences=[];
+  for(const w of D.workers){const ds=[...new Set(w.absent||[])].sort();let cur=null;
+    for(const d of ds){const note=(w.absentNote||{})[d]||'',type=/ziek/i.test(note)?'ziek':'overig';
+      if(cur&&addDays(cur.to,1)===d&&cur.type===type)cur.to=d;
+      else{cur={id:uid('a'),wid:w.id,type,from:d,to:d,part:'',time:'',note:type==='overig'&&note&&note!=='Afwezig'?note:'',at:Date.now()};D.absences.push(cur)}}}
+}
+function syncAbsences(){
+  const by={};for(const a of D.absences||[]){if(a.part)continue;(by[a.wid]=by[a.wid]||[]).push(a)}
+  for(const w of D.workers){w.absent=[];w.absentNote={};
+    for(const a of by[w.id]||[])for(const d of absDates(a)){if(!w.absent.includes(d))w.absent.push(d);w.absentNote[d]=(ABS[a.type]||ABS.overig).name}
+    w.absent.sort()}
+}
+const partialAbs=(w,date)=>(D.absences||[]).find(a=>a.wid===w.id&&a.part&&a.from<=date&&a.to>=date);
+function removeAbsenceDates(wid,from,to){const out=[];
+  for(const a of D.absences||[]){if(a.wid!==wid||a.part||a.to<from||a.from>to){out.push(a);continue}
+    if(a.from<from)out.push({...a,id:uid('a'),to:addDays(from,-1)});if(a.to>to)out.push({...a,id:uid('a'),from:addDays(to,1)})}
+  D.absences=out;
+}
+function absWorkdays(a,w,year){let n=0;for(const d of absDates(a)){if(year&&d.slice(0,4)!==String(year))continue;if((w.days||[]).includes(wday(d)))n+=a.part?.5:1}return n}
+function leaveBalance(w,year){const recs=(D.absences||[]).filter(a=>a.wid===w.id&&ABS[a.type]&&ABS[a.type].leave);
+  const today=todayIso();let used=0,planned=0;
+  for(const a of recs)for(const d of absDates(a)){if(d.slice(0,4)!==String(year)||!(w.days||[]).includes(wday(d)))continue;const v=a.part?.5:1;if(d<today)used+=v;else planned+=v}
+  const total=+w.leaveDays||0;return{used,planned,total,left:total?total-used-planned:null}}
+function absImpact(wid,from,to){const ids=[];for(let d=from;d<=to;d=addDays(d,1)){const P=D.plans[d];((P&&P.routes&&P.routes[wid])||[]).forEach(id=>{if(JOB[id])ids.push(id)})}return ids}
+function absPeriod(a){const p=a.from===a.to?fdate(a.from,{weekday:'short',day:'numeric',month:'short'}):`${fdate(a.from,{day:'numeric',month:'short'})} t/m ${fdate(a.to,{day:'numeric',month:'short',year:a.from.slice(0,4)!==a.to.slice(0,4)?'numeric':undefined})}`;
+  return p+(a.part?` · ${a.part==='laat'?'begint om '+a.time:'stopt om '+a.time}`:'')}
+const absChip=a=>`<span class="abschip" style="--ac:${absVar(a.type)}">${esc(ABS[a.type]?ABS[a.type].name:'Afwezig')}</span>`;
+
+function viewAbsence(){
+  const ym=S.absMonth||S.date.slice(0,7),[y,m]=ym.split('-').map(Number),first=`${ym}-01`,n=new Date(y,m,0).getDate(),today=todayIso();
+  const days=[];for(let i=0;i<n;i++)days.push(addDays(first,i));
+  const wdL=['zo','ma','di','wo','do','vr','za'];
+  const head=days.map(d=>{const wd=wday(d);return`<th class="cal-d${wd===0||wd===6?' we':''}${d===today?' today':''}" title="${esc(fdate(d,{weekday:'long',day:'numeric',month:'long'}))}"><span>${wdL[wd]}</span>${+d.slice(8)}</th>`}).join('');
+  const rows=D.workers.map(w=>{
+    const cells=days.map(d=>{const wd=wday(d),works=(w.days||[]).includes(wd),full=(D.absences||[]).find(a=>a.wid===w.id&&!a.part&&a.from<=d&&a.to>=d),pa=partialAbs(w,d),cls=`cal-c${wd===0||wd===6?' we':''}${d===today?' today':''}`;
+      const tip=x=>`${w.name}: ${ABS[x.type]?ABS[x.type].name:''} ${absPeriod(x)}${x.note?' – '+x.note:''}`;
+      if(full)return`<td class="${cls} has" style="--ac:${absVar(full.type)}" data-act="absedit" data-id="${full.id}" title="${esc(tip(full))}"><i>${esc(ABS[full.type]?ABS[full.type].short:'?')}</i></td>`;
+      if(pa)return`<td class="${cls} half" style="--ac:${absVar(pa.type)}" data-act="absedit" data-id="${pa.id}" title="${esc(tip(pa))}"><i>${esc(ABS[pa.type]?ABS[pa.type].short:'?')}</i></td>`;
+      if(!works&&!ovr(w,d))return`<td class="${cls} cal-off" title="${esc(w.name)} werkt niet op ${wdL[wd]}"></td>`;
+      return`<td class="${cls}" data-act="absnew" data-wid="${w.id}" data-date="${d}" title="Afwezigheid registreren voor ${esc(w.name)} op ${esc(fdate(d,{weekday:'short',day:'numeric',month:'short'}))}"></td>`}).join('');
+    return`<tr><td class="wk"><i class="dot" style="background:${wc(w)}"></i> ${esc(w.name)}</td>${cells}</tr>`}).join('');
+  const legend=ABS_TYPES.map(t=>`<span><i class="lgabs" style="--ac:${absVar(t.id)}">${t.short}</i>${t.name}</span>`).join('')+'<span><i class="lgabs half" style="--ac:var(--muted)"></i>Deel van de dag</span>';
+  const scope=S.absScope||'komend',fw=S.absW||'',ft=S.absT||'';
+  const list=(D.absences||[]).filter(a=>WRK[a.wid]&&(!fw||a.wid===fw)&&(!ft||a.type===ft)&&(scope==='alle'||(scope==='komend'?a.to>=today:a.to<today)))
+    .sort((a,b)=>scope==='verleden'?b.from.localeCompare(a.from):a.from.localeCompare(b.from));
+  const lrows=list.map(a=>{const w=WRK[a.wid],imp=a.part?[]:absImpact(a.wid,a.from,a.to).filter(id=>JOB[id].date>=today);
+    return`<tr><td><b style="display:flex;gap:7px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w.name)}</b></td><td>${absChip(a)}</td><td class="mono small">${esc(absPeriod(a))}</td><td class="mono">${absWorkdays(a,w)} ${absWorkdays(a,w)===1?'werkdag':'werkdagen'}</td><td class="small">${esc(a.note||'')}</td>
+      <td>${imp.length?`<button class="btn sm" data-act="absredis" data-id="${a.id}" title="Deze afspraken staan nog bij ${esc(w.name)}">${I.auto} ${imp.length} afspraken herverdelen</button>`:'<span class="muted small">—</span>'}</td>
+      <td class="act"><button class="btn ghost" data-act="absedit" data-id="${a.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('');
+  const yr=+ym.slice(0,4);
+  const bal=D.workers.map(w=>{const b=leaveBalance(w,yr);const pct=b.total?Math.min(100,Math.round((b.used+b.planned)/b.total*100)):0;
+    return`<tr><td><b style="display:flex;gap:7px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w.name)}</b></td><td class="mono">${b.total||'<span class="muted">niet ingesteld</span>'}</td><td class="mono">${b.used}</td><td class="mono">${b.planned}</td><td class="mono">${b.left==null?'—':`<b style="color:var(--${b.left<0?'bad':'ink'})">${b.left}</b>`}</td><td style="min-width:120px">${b.total?`<div class="bar"><i style="width:${pct}%"></i></div>`:''}</td></tr>`}).join('');
+  const sel=(id,act,opts,val)=>`<select class="mini" id="${id}" data-absf="${act}">${opts.map(([v,l])=>`<option value="${esc(v)}"${v===val?' selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  return`<section class="panel sec"><div class="toolbar"><h2>Verlofkalender</h2><div class="row"><button class="iconbtn" data-act="absmonth" data-d="-1" aria-label="Vorige maand"><svg class="ic" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button><b style="font:600 17px var(--f-disp);min-width:9em;text-align:center">${esc(fdate(first,{month:'long',year:'numeric'}))}</b><button class="iconbtn" data-act="absmonth" data-d="1" aria-label="Volgende maand"><svg class="ic" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div><span class="sp"></span><button class="btn primary" data-act="absnew">${I.plus} Afwezigheid registreren</button></div>
+    <div class="cal-wrap"><table class="cal"><thead><tr><th class="wk">Medewerker</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="legend abslegend">${legend}</div><p class="hint" style="margin:0">Klik op een lege dag om afwezigheid te registreren, of op een gekleurde dag om die te wijzigen. Gestreepte dagen zijn vaste vrije dagen van de medewerker.</p></section>
+  <section class="panel sec"><div class="toolbar"><h2>Registraties</h2><span class="sp"></span>${sel('absW','w',[['','Alle medewerkers'],...D.workers.map(w=>[w.id,w.name])],fw)}${sel('absT','t',[['','Alle soorten'],...ABS_TYPES.map(t=>[t.id,t.name])],ft)}<div class="seg">${[['komend','Komend'],['verleden','Verleden'],['alle','Alles']].map(([k,l])=>`<button data-act="absscope" data-k="${k}" aria-pressed="${scope===k}">${l}</button>`).join('')}</div></div>
+    ${lrows?`<div class="tbl-wrap"><table><thead><tr><th>Medewerker</th><th>Soort</th><th>Periode</th><th>Duur</th><th>Opmerking</th><th>Afspraken</th><th></th></tr></thead><tbody>${lrows}</tbody></table></div>`:'<p class="empty">Geen registraties in deze selectie.</p>'}</section>
+  <section class="panel sec"><div class="toolbar"><h2>Verlofsaldo ${yr}</h2><span class="sp"></span><span class="small muted">Vakantie en vrije dagen, in werkdagen. Stel het aantal verlofdagen per jaar in bij Medewerkers.</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Medewerker</th><th>Recht</th><th>Opgenomen</th><th>Gepland</th><th>Resterend</th><th></th></tr></thead><tbody>${bal}</tbody></table></div></section>`;
+}
+let ABSPEND=null;
+function openAbs(id,preset={}){
+  const a=id?(D.absences||[]).find(x=>x.id===id):null;if(id&&!a)return;
+  const v=a?{...a}:{wid:preset.wid||(D.workers[0]||{}).id,type:preset.type||'vakantie',from:preset.date||S.date,to:preset.date||S.date,part:'',time:'',note:''};
+  openForm({title:a?'Afwezigheid wijzigen':'Afwezigheid registreren',okLabel:'Opslaan',
+    note:'Hele dagen maken de medewerker niet beschikbaar voor de planning. "Later beginnen" of "Eerder stoppen" past alleen de werktijd van die dag(en) aan.',
+    fields:[{k:'wid',label:'Medewerker',type:'select',options:D.workers.map(w=>[w.id,w.name])},{k:'type',label:'Soort',type:'select',options:ABS_TYPES.map(t=>[t.id,t.name])},
+      {k:'from',label:'Vanaf',type:'date',req:1},{k:'to',label:'Tot en met',type:'date',req:1},
+      {k:'part',label:'Duur',type:'select',options:[['','Hele dag(en)'],['laat','Later beginnen (deel van de dag)'],['vroeg','Eerder stoppen (deel van de dag)']]},{k:'time',label:'Tijd (bij deel van de dag)',type:'time'},
+      {k:'note',label:'Opmerking',wide:1,ph:'bijv. vakantie Spanje, cursus coating, tandarts'}],values:v,
+    onSave:f=>{
+      if(f.to<f.from)return'"Tot en met" moet op of na "Vanaf" liggen.';
+      if((new Date(f.to)-new Date(f.from))/864e5>366)return'Kies een periode van maximaal een jaar.';
+      if(f.part&&!f.time)return'Vul de tijd in waarop de medewerker begint of stopt.';
+      if(!f.part)f.time='';
+      const clash=(D.absences||[]).find(x=>x.id!==(a&&a.id)&&x.wid===f.wid&&!x.part&&!f.part&&x.from<=f.to&&x.to>=f.from);
+      if(clash)return`Overlapt met ${ABS[clash.type].name} (${absPeriod(clash)}). Pas die registratie aan of kies een andere periode.`;
+      const rec={...(a||{id:uid('a'),at:Date.now()}),...f};
+      const imp=f.part?[]:absImpact(f.wid,f.from,f.to).filter(id=>JOB[id].date>=todayIso());
+      if(imp.length){ABSPEND={rec,old:a};setTimeout(()=>absChoice(rec,imp.length),0);return''}
+      absStore(rec,a);return'';
+    },
+    onDelete:a?()=>{absDelete(a)}:null,delNote:a?'De medewerker is daarna op deze dag(en) weer beschikbaar.':''});
+}
+function absStore(rec,old){
+  D.absences=(D.absences||[]).filter(x=>x.id!==rec.id).concat(rec);syncAbsences();
+  const ds=[];const lo=old&&old.from<rec.from?old.from:rec.from,hi=old&&old.to>rec.to?old.to:rec.to;for(let d=lo;d<=hi;d=addDays(d,1))ds.push(d);
+  replan(ds.filter(d=>D.plans[d]||jobsOn(d).length));
+  toast(`${ABS[rec.type].name} geregistreerd voor ${WRK[rec.wid].name}: ${absPeriod(rec)}.`);
+}
+function absChoice(rec,n){
+  const w=WRK[rec.wid];FORM=null;
+  $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="acT" style="width:min(560px,100%)"><h3 id="acT">${esc(ABS[rec.type].name)}: ${esc(w.name)}</h3>
+    <p>${esc(absPeriod(rec))}. Op deze dag(en) staan nog <b>${n} ${n===1?'afspraak':'afspraken'}</b> bij ${esc(w.name.split(' ')[0])}.</p>
+    <div class="dlg-foot" style="flex-wrap:wrap"><button class="btn" data-act="dlgx">Annuleren</button><span class="sp"></span><button class="btn" data-act="absgo" data-mode="only">Alleen registreren</button><button class="btn primary" data-act="absgo" data-mode="redis">${I.auto} Registreren en herverdelen</button></div>
+    <p class="hint">Herverdelen zet de afspraken bij collega's, zonder hun planning om te gooien, en toont daarna een overzicht met een AI-plan voor wat niet past. Bij "Alleen registreren" blijven de afspraken voorlopig staan en zie je ze rood in de planning.</p></div>`;
+  $('#modal').hidden=false;
+}
+function absDelete(a){
+  const imp=!a.part&&(D.sickLog||[]).some(x=>x.wid===a.wid&&Object.keys(x.orig||{}).some(d=>d>=a.from&&d<=a.to));
+  if(imp){setTimeout(()=>{openUnsick(a.wid);const f=$('#f_from'),t=$('#f_to');if(f)f.value=a.from;if(t)t.value=a.to},0);return}
+  D.absences=(D.absences||[]).filter(x=>x.id!==a.id);syncAbsences();
+  const ds=absDates(a).filter(d=>D.plans[d]||jobsOn(d).length);replan(ds);toast(`Registratie verwijderd; ${WRK[a.wid]?WRK[a.wid].name:'de medewerker'} is weer beschikbaar.`);
 }
 
 /* ---------- dagsimulatie ---------- */
@@ -901,12 +1052,14 @@ function openSick(wid){
     fields:[{k:'from',label:'Vanaf',type:'date',req:1},{k:'to',label:'Tot en met',type:'date',req:1},{k:'note',label:'Reden',wide:1,ph:'Ziek'}],values:{from:S.date,to:S.date,note:'Ziek'},okLabel:'Ziek melden en herplannen',
     onSave:v=>{if(v.to<v.from)return'"Tot en met" moet op of na "Vanaf" liggen.';if((new Date(v.to)-new Date(v.from))/864e5>30)return'Kies maximaal 31 dagen.';setTimeout(()=>runSick(wid,v.from,v.to,v.note||'Ziek'),0);return''}});
 }
-function runSick(wid,from,to,note){
+function runSick(wid,from,to,note,opts={}){
   const w=WRK[wid],dates=[];for(let d=from;d<=to;d=addDays(d,1))dates.push(d);
   for(const d of dates)if(jobsOn(d).length&&!hasPlan(d))autoPlan(d);
-  const snap=JSON.stringify({jobs:D.jobs,plans:D.plans,workers:D.workers});
+  const snap=JSON.stringify({jobs:D.jobs,plans:D.plans,workers:D.workers,absences:D.absences||[]});
   const days=dates.map(d=>{const P=getPlan(d),before={};D.workers.forEach(x=>{if(x.id!==wid&&P.routes[x.id])before[x.id]=(t=>t.serv+t.trav)(simulate(x,P.routes[x.id],d))});return{date:d,aff:(P.routes[wid]||[]).filter(id=>JOB[id]),before}});
-  w.absent=[...new Set([...(w.absent||[]),...dates])];w.absentNote=Object.assign({},w.absentNote||{});dates.forEach(d=>w.absentNote[d]=note);
+  if(opts.rec)D.absences=(D.absences||[]).filter(x=>x.id!==opts.rec.id).concat(opts.rec);
+  else if(!opts.existing){removeAbsenceDates(wid,from,to);D.absences=(D.absences||[]).concat({id:uid('a'),wid,type:opts.type||'ziek',from,to,part:'',time:'',note:note&&note!=='Ziek'?note:'',at:Date.now()})}
+  syncAbsences();
   for(const day of days){
     const d=day.date,P=getPlan(d);delete P.routes[wid];day.aff.forEach(id=>{if(P.pinned[id]===wid)delete P.pinned[id]});
     if(!day.aff.length)continue;
@@ -916,7 +1069,7 @@ function runSick(wid,from,to,note){
   }
   (D.sickLog||[]).forEach(x=>delete x.snap);
   const entry={id:uid('s'),wid,from,to,note,at:Date.now(),orig:Object.fromEntries(days.map(x=>[x.date,x.aff])),before:Object.fromEntries(days.map(x=>[x.date,x.before])),snap};
-  D.sickLog=(D.sickLog||[]).concat(entry).slice(-50);SICK=entry;save();render();openSickResult();
+  entry.type=opts.rec?opts.rec.type:(opts.type||'ziek');D.sickLog=(D.sickLog||[]).concat(entry).slice(-50);SICK=entry;save();render();openSickResult();
 }
 function whereIs(id){const j=JOB[id];if(!j)return null;const P=D.plans[j.date];let wid=null;if(P&&P.routes)for(const k in P.routes)if(P.routes[k].includes(id))wid=k;
   if(!wid||!WRK[wid])return{date:j.date};const s=simulate(WRK[wid],P.routes[wid],j.date),g=s.seg.find(x=>x.k==='job'&&x.id===id);return{date:j.date,wid,start:g?g.a:null,late:g&&g.late}}
@@ -933,32 +1086,33 @@ function openSickResult(){
       return`<tr><td><b>${esc(cu.name||'')}</b><div class="small muted">${esc(l.city||'')}</div></td><td>${ids.map(id=>plateBtn(JOB[id])).join(' ')}</td><td class="small mono">${esc(win)}</td><td>${res}${un.length?` <span class="chip bad">${un.length} niet ingepland</span> <button class="btn sm" data-act="propose" data-ids="${un.join(',')}">${I.auto} Slim voorstel</button>`:''}</td></tr>`}).join('');
     const load=Object.keys(P.routes).filter(x=>WRK[x]&&x!==K.wid).map(x=>{const b=day.before[x],a=simulate(WRK[x],P.routes[x],d);const extra=(a.serv+a.trav)-(b||0);return extra>.5?`${esc(WRK[x].name)} +${fdur(extra)} (terug ${m2t(a.finish)})`:''}).filter(Boolean).join(' · ');
     return`<h4 class="ph">${esc(fdate(d,{weekday:'long',day:'numeric',month:'long'}))}</h4><div class="tbl-wrap"><table><thead><tr><th>Klant</th><th>Auto's</th><th>Tijdvak</th><th>Nieuwe planning</th></tr></thead><tbody>${rows}</tbody></table></div>${load?`<p class="small muted" style="margin:6px 0 0">Extra werk voor collega's: ${load}</p>`:''}`}).join('');
-  K.unGroups=unGroups;const mode=aiMode();
+  K.unGroups=unGroups;const mode=aiMode(),kb=!K.type||K.type==='ziek'?'Ziekmelding':'Afwezigheid';
   const period=K.from===K.to?fdate(K.from,{weekday:'long',day:'numeric',month:'long'}):`${fdate(K.from,{day:'numeric',month:'short'})} t/m ${fdate(K.to,{day:'numeric',month:'short'})}`;
-  $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="skT" style="width:min(920px,100%)"><h3 id="skT">Ziekmelding ${esc(w.name)}</h3>
+  $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="skT" style="width:min(920px,100%)"><h3 id="skT">${K.type&&K.type!=='ziek'&&ABS[K.type]?esc(ABS[K.type].name)+': ':'Ziekmelding '}${esc(w.name)}</h3>
     <p class="note">${esc(K.note)} · ${esc(period)}. ${tot?`<b>${ok} van ${tot}</b> auto's zijn ingepland bij collega's en vastgezet.`:'Er stonden geen afspraken op deze dag(en).'}${SERVER&&tot?' Publiceer daarna opnieuw, zodat de collega’s het in hun app zien.':''}</p>
     ${sections}
     ${unGroups.length?`<h4 class="ph">Plan voor wat niet past</h4><div id="sickAi"><p class="small muted" id="sickNote" style="margin:0 0 8px">${mode?`Claude kiest voor ${unGroups.length===1?'de afspraak':`elk van de ${unGroups.length} afspraken`} die niet past het beste alternatief: een ander tijdstip, een andere dag of een collega die incidenteel langer werkt. Daarna pas je het met één klik toe.`:'AI-advies is hier niet beschikbaar. Gebruik per afspraak het Slim voorstel.'}</p>${mode?`<div class="row"><button class="btn primary" id="sickBtn" data-act="sickai">${I.auto} Laat Claude een plan maken</button></div>`:''}<div id="sickOut"></div></div>`:tot?'<p class="ok-line">Alle afspraken zijn herverdeeld.</p>':''}
-    <div class="dlg-foot">${K.snap?`<button class="btn danger" data-act="sickundo">Ziekmelding terugdraaien</button>`:`<button class="btn danger" data-act="unsick" data-id="${K.wid}">Ziekmelding intrekken</button>`}<span class="sp"></span>${SERVER&&tot?`<button class="btn" data-act="publish">${I.send} Publiceer naar medewerker-app</button>`:''}<button class="btn primary" data-act="sickclose">${unGroups.length?'Sluiten, later verder':'Klaar'}</button></div>
-    <p class="hint" style="margin-top:10px">${K.snap?`<b>Ziekmelding terugdraaien</b> maakt ${esc(w.name.split(' ')[0])} weer beschikbaar en zet de planning terug zoals die v\u00f3\u00f3r de ziekmelding was.`:`<b>Ziekmelding intrekken</b> maakt ${esc(w.name.split(' ')[0])} weer beschikbaar en kan de oorspronkelijke afspraken terugzetten.`}${SERVER&&tot?' <b>Publiceer</b> stuurt de nieuwe ritten naar de telefoons van de collega\u2019s.':''} <b>${unGroups.length?'Sluiten, later verder':'Klaar'}</b> bewaart alles zoals het nu is; je opent dit overzicht later weer via de melding bovenaan Planning of de knop "Ziekmelding bekijken" bij ${esc(w.name.split(' ')[0])}.</p></div>`;
+    <div class="dlg-foot">${K.snap?`<button class="btn danger" data-act="sickundo">${kb} terugdraaien</button>`:`<button class="btn danger" data-act="unsick" data-id="${K.wid}">${kb} intrekken</button>`}<span class="sp"></span>${SERVER&&tot?`<button class="btn" data-act="publish">${I.send} Publiceer naar medewerker-app</button>`:''}<button class="btn primary" data-act="sickclose">${unGroups.length?'Sluiten, later verder':'Klaar'}</button></div>
+    <p class="hint" style="margin-top:10px">${K.snap?`<b>${kb} terugdraaien</b> maakt ${esc(w.name.split(' ')[0])} weer beschikbaar en zet de planning terug zoals die vóór ${kb==='Ziekmelding'?'de ziekmelding':'deze registratie'} was.`:`<b>${kb} intrekken</b> maakt ${esc(w.name.split(' ')[0])} weer beschikbaar en kan de oorspronkelijke afspraken terugzetten.`}${SERVER&&tot?' <b>Publiceer</b> stuurt de nieuwe ritten naar de telefoons van de collega\u2019s.':''} <b>${unGroups.length?'Sluiten, later verder':'Klaar'}</b> bewaart alles zoals het nu is; je opent dit overzicht later weer via de melding bovenaan Planning of de knop "${kb} bekijken" bij ${esc(w.name.split(' ')[0])}.</p></div>`;
   $('#modal').hidden=false;if(SICKAI[K.id])renderSickAI();
 }
 
 
 const SICKAI={};
 const sickDays=K=>Object.keys(K.orig||{}).sort().map(d=>({date:d,aff:(K.orig[d]||[]).filter(id=>JOB[id]),before:(K.before||{})[d]||{}}));
-function sickOpenCount(K){let n=0;for(const day of sickDays(K))for(const id of day.aff){const p=whereIs(id);if(p&&!p.wid&&p.date>=todayIso())n++}return n}
-function latestSick(wid){return[...(D.sickLog||[])].reverse().find(x=>x.wid===wid&&WRK[x.wid]&&x.to>=todayIso())}
+const stillSick=(K,d)=>{const w=WRK[K.wid];return!!w&&(w.absent||[]).includes(d)};
+function sickOpenCount(K){let n=0;for(const day of sickDays(K)){if(!stillSick(K,day.date))continue;for(const id of day.aff){const p=whereIs(id);if(p&&!p.wid&&p.date>=todayIso())n++}}return n}
+function latestSick(wid){return[...(D.sickLog||[])].reverse().find(x=>x.wid===wid&&WRK[x.wid]&&x.to>=todayIso()&&Object.keys(x.orig||{}).some(d=>d>=todayIso()&&stillSick(x,d)))}
 function sickBanner(){
   const seen={},items=[];
   for(const K of [...(D.sickLog||[])].reverse()){if(seen[K.wid]||!WRK[K.wid]||K.to<todayIso())continue;seen[K.wid]=1;const n=sickOpenCount(K);if(n)items.push({K,n})}
   if(!items.length)return'';
-  return items.map(({K,n})=>`<section class="panel sickbar"><div class="row"><span class="chip bad">Ziek</span><b>${esc(WRK[K.wid].name)}</b><span>${esc(K.from===K.to?fdate(K.from,{weekday:'short',day:'numeric',month:'short'}):fdate(K.from,{day:'numeric',month:'short'})+' t/m '+fdate(K.to,{day:'numeric',month:'short'}))}: <b>${n}</b> ${n===1?'auto is':"auto's zijn"} nog niet herpland.</span><span class="sp"></span><button class="btn sm primary" data-act="sickview" data-id="${K.id}">Bekijken en herplannen</button></div></section>`).join('');
+  return items.map(({K,n})=>`<section class="panel sickbar"><div class="row"><span class="abschip" style="--ac:${absVar(K.type||'ziek')}">${esc((ABS[K.type||'ziek']||ABS.ziek).name)}</span><b>${esc(WRK[K.wid].name)}</b><span>${esc(K.from===K.to?fdate(K.from,{weekday:'short',day:'numeric',month:'short'}):fdate(K.from,{day:'numeric',month:'short'})+' t/m '+fdate(K.to,{day:'numeric',month:'short'}))}: <b>${n}</b> ${n===1?'auto is':"auto's zijn"} nog niet herpland.</span><span class="sp"></span><button class="btn sm primary" data-act="sickview" data-id="${K.id}">Bekijken en herplannen</button></div></section>`).join('');
 }
 /* Ziekmelding later intrekken: medewerker weer beschikbaar maken en eventueel de oorspronkelijke afspraken terugzetten */
-function sickDates(w){return Object.keys(w.absentNote||{}).filter(d=>(w.absent||[]).includes(d)).sort()}
+function sickDates(w){return(D.absences||[]).filter(a=>a.wid===w.id&&a.type==='ziek'&&!a.part).flatMap(absDates).sort()}
 function sickBtns(w,date){const ds=sickDates(w).filter(d=>d>=todayIso()||d===date),lg=latestSick(w.id);
-  return`<button class="btn sm" data-act="sick" data-id="${w.id}">Ziek melden</button>${lg?`<button class="btn sm" data-act="sickview" data-id="${lg.id}">Ziekmelding bekijken</button>`:''}${ds.length?`<button class="btn sm" data-act="unsick" data-id="${w.id}" title="Ziek gemeld: ${esc(ds.map(d=>fdate(d,{day:'numeric',month:'short'})).join(', '))}">Ziekmelding intrekken</button>`:''}`}
+  return`<button class="btn sm" data-act="sick" data-id="${w.id}">Ziek melden</button>${lg?`<button class="btn sm" data-act="sickview" data-id="${lg.id}">${!lg.type||lg.type==='ziek'?'Ziekmelding':'Afwezigheid'} bekijken</button>`:''}${ds.length?`<button class="btn sm" data-act="unsick" data-id="${w.id}" title="Ziek gemeld: ${esc(ds.map(d=>fdate(d,{day:'numeric',month:'short'})).join(', '))}">Ziekmelding intrekken</button>`:''}`}
 function openUnsick(wid){
   const w=WRK[wid];if(!w)return;const ds=sickDates(w);if(!ds.length){toast(`Er staat geen ziekmelding voor ${w.name}.`);return}
   const cur=ds.includes(S.date)?S.date:(ds.find(d=>d>=todayIso())||ds[0]);let from=cur,to=cur;while(ds.includes(addDays(from,-1)))from=addDays(from,-1);while(ds.includes(addDays(to,1)))to=addDays(to,1);
@@ -972,7 +1126,7 @@ function unsick(wid,from,to,mode){
   const w=WRK[wid];let back=0,moved=0,days=0,ovr=0;
   for(let d=from;d<=to;d=addDays(d,1)){
     if(!(w.absent||[]).includes(d))continue;days++;
-    w.absent=w.absent.filter(x=>x!==d);if(w.absentNote)delete w.absentNote[d];
+    removeAbsenceDates(wid,d,d);syncAbsences();
     D.workers.forEach(x=>{if(x.id!==wid&&x.overrides&&x.overrides[d]&&/Incidenteel|Extra werkdag/.test(x.overrides[d].note||''))ovr++});
     if(mode!=='orig')continue;
     const log=[...(D.sickLog||[])].reverse().find(x=>x.wid===wid&&x.orig&&x.orig[d]);if(!log)continue;
@@ -980,11 +1134,12 @@ function unsick(wid,from,to,mode){
     for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));
     P.routes[wid]=[...ids,...(P.routes[wid]||[]).filter(id=>!ids.includes(id))];ids.forEach(id=>P.pinned[id]=wid);P.edited=Date.now();if(!P.auto)P.auto=Date.now();back+=ids.length;
   }
+  D.sickLog=(D.sickLog||[]).map(x=>{if(x.wid!==wid||!x.orig)return x;for(let d=from;d<=to;d=addDays(d,1)){delete x.orig[d];if(x.before)delete x.before[d]}return x}).filter(x=>x.wid!==wid||Object.keys(x.orig||{}).length);
   if(!days){toast('In deze periode stond geen ziekmelding.');return}
   save();render();
   toast(`Ziekmelding van ${w.name} ingetrokken (${days} dag${days>1?'en':''}).${mode==='orig'?` ${back} afspraken staan weer bij ${w.name.split(' ')[0]}.`:''}${moved?` ${moved} afspraak/afspraken waren al naar een andere dag verplaatst en blijven daar.`:''}${ovr?' Afwijkende werktijden van collega’s blijven staan; pas die zo nodig aan via "Werktijd deze dag".':''}${SERVER?' Publiceer opnieuw voor de medewerker-app.':''}`);
 }
-function sickUndo(){const K=SICK;if(!K||!K.snap)return;const s=JSON.parse(K.snap);D.jobs=s.jobs;D.plans=s.plans;D.workers=s.workers;D.sickLog=(D.sickLog||[]).filter(x=>x.id!==K.id);delete SICKAI[K.id];index();
+function sickUndo(){const K=SICK;if(!K||!K.snap)return;const s=JSON.parse(K.snap);D.jobs=s.jobs;D.plans=s.plans;D.workers=s.workers;if(s.absences)D.absences=s.absences;D.sickLog=(D.sickLog||[]).filter(x=>x.id!==K.id);delete SICKAI[K.id];index();
   SICK=null;closeForm();save();render();toast('Ziekmelding ongedaan gemaakt. De oorspronkelijke planning is terug.')}
 function sickOptions(g){
   const cands=proposeFor(g.ids,g.date).map(c=>({...c}));
@@ -1104,7 +1259,7 @@ Antwoord met alleen een JSON-object, zonder andere tekst, in het Nederlands, kor
 /* ---------- weergave ---------- */
 let toastT;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
-const TABS=[['planning','Planning'],['opdrachten','Opdrachten'],['klanten','Klanten & locaties'],['medewerkers','Medewerkers'],['instellingen','Instellingen']];
+const TABS=[['planning','Planning'],['opdrachten','Opdrachten'],['klanten','Klanten & locaties'],['medewerkers','Medewerkers'],['afwezigheid','Afwezigheid'],['instellingen','Instellingen']];
 function render(){
   const nIss=SERVER?openIssues(S.date):0;
   $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab" data-act="tab" data-k="${k}" aria-pressed="${S.tab===k}">${l}${k==='planning'&&nIss?` <span class="tabbadge" title="${nIss} open melding(en) van medewerkers">${nIss}</span>`:''}</button>`).join('');
@@ -1114,6 +1269,7 @@ function render(){
   else if(S.tab==='opdrachten')v.innerHTML=viewJobs();
   else if(S.tab==='klanten')v.innerHTML=viewCustomers();
   else if(S.tab==='medewerkers')v.innerHTML=viewWorkers();
+  else if(S.tab==='afwezigheid')v.innerHTML=viewAbsence();
   else v.innerHTML=viewSettings();
 }
 function dayState(){
@@ -1517,17 +1673,17 @@ function fixGeo(v,old){
 /* ---------- beheer: medewerkers ---------- */
 function allSkills(){return[...new Set([...D.types.map(t=>t.skill).filter(Boolean),...D.workers.flatMap(w=>w.skills||[])])]}
 function viewWorkers(){
-  const r=D.workers.map(w=>`<tr><td><b style="display:flex;gap:7px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w.name)}</b></td><td>${esc(w.postcode)} ${esc(w.city)}</td><td class="mono">${esc(w.start)}–${esc(w.end)}</td><td>${DAYS.filter(([n])=>(w.days||[]).includes(n)).map(d=>d[1]).join(' ')}</td><td class="small">${(w.absent||[]).length?w.absent.map(d=>esc(fdate(d,{day:'numeric',month:'short'}))).join(', '):'<span class="muted">—</span>'}</td><td class="small">${Object.entries(w.overrides||{}).filter(([d])=>d>=new Date().toISOString().slice(0,10)).sort().map(([d,o])=>`<span class="chip warn" title="${esc(o.note||'')}">${esc(fdate(d,{day:'numeric',month:'short'}))} ${esc(o.start)}–${esc(o.end)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${(w.skills||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${avail(w,S.date)?'<span class="chip ok">Beschikbaar</span>':`<span class="chip bad">${esc(availWhy(w,S.date))}</span>`}</td><td><div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="wlink" data-id="${w.id}">${I.copy} Kopieer link</button>${sickBtns(w,S.date)}</div></td><td class="act"><button class="btn ghost" data-act="editw" data-id="${w.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
+  const r=D.workers.map(w=>`<tr><td><b style="display:flex;gap:7px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w.name)}</b></td><td>${esc(w.postcode)} ${esc(w.city)}</td><td class="mono">${esc(w.start)}–${esc(w.end)}</td><td>${DAYS.filter(([n])=>(w.days||[]).includes(n)).map(d=>d[1]).join(' ')}</td><td class="small">${(()=>{const up=(D.absences||[]).filter(a=>a.wid===w.id&&a.to>=todayIso()).sort((a,b)=>a.from.localeCompare(b.from));const b=leaveBalance(w,+todayIso().slice(0,4));return(up.length?up.slice(0,3).map(a=>`<div>${absChip(a)} ${esc(absPeriod(a))}</div>`).join('')+(up.length>3?`<div class="muted">+${up.length-3} meer</div>`:''):'<span class="muted">—</span>')+(b.total?`<div class="muted" style="margin-top:3px">Verlof ${todayIso().slice(0,4)}: nog ${b.left} van ${b.total}</div>`:'')})()}</td><td class="small">${Object.entries(w.overrides||{}).filter(([d])=>d>=new Date().toISOString().slice(0,10)).sort().map(([d,o])=>`<span class="chip warn" title="${esc(o.note||'')}">${esc(fdate(d,{day:'numeric',month:'short'}))} ${esc(o.start)}–${esc(o.end)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${(w.skills||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${avail(w,S.date)?'<span class="chip ok">Beschikbaar</span>':`<span class="chip bad">${esc(availWhy(w,S.date))}</span>`}</td><td><div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="wlink" data-id="${w.id}">${I.copy} Kopieer link</button>${sickBtns(w,S.date)}</div></td><td class="act"><button class="btn ghost" data-act="editw" data-id="${w.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
   return`<section class="panel"><div class="toolbar"><h2>Medewerkers</h2><span class="sp"></span><button class="btn primary" data-act="neww">${I.plus} Nieuwe medewerker</button></div>
   <div class="tbl-wrap"><table><thead><tr><th>Medewerker</th><th>Standplaats</th><th>Werktijd</th><th>Werkdagen</th><th>Afwezig</th><th>Afwijkende werktijd</th><th>Vaardigheden</th><th>${esc(fdate(S.date,{day:'numeric',month:'short'}))}</th><th>Medewerker-app</th><th></th></tr></thead><tbody>${r||'<tr><td colspan="10" class="empty">Nog geen medewerkers</td></tr>'}</tbody></table></div>
   <p class="hint">Vaardigheden koppelen aan reinigingstypes (Instellingen). Een opdracht die een vaardigheid vraagt, gaat alleen naar medewerkers die die vaardigheid hebben.</p></section>`;
 }
 function editW(id){
   const w=id?WRK[id]:{name:'',postcode:'',city:'',lat:'',lng:'',start:'08:00',end:'16:30',days:[1,2,3,4,5],absent:[],skills:[],color:D.workers.length%6};
-  const vals={...w,absent:(w.absent||[]).join(', '),color:String(w.color)};
-  openForm({title:id?'Medewerker bewerken':'Nieuwe medewerker',fields:[{k:'name',label:'Naam',req:1},{k:'color',label:'Kleur in planning',type:'select',options:COLORS.map((c,i)=>[String(i),c])},{k:'postcode',label:'Standplaats postcode',req:1},{k:'city',label:'Plaats'},{k:'lat',label:'Breedtegraad (optioneel)',type:'number',step:'any'},{k:'lng',label:'Lengtegraad (optioneel)',type:'number',step:'any'},{k:'start',label:'Begintijd',type:'time',req:1},{k:'end',label:'Eindtijd',type:'time',req:1},{k:'days',label:'Werkdagen',type:'checks',num:1,options:DAYS},{k:'skills',label:'Vaardigheden',type:'checks',options:allSkills().map(s=>[s,s])},{k:'absent',label:'Afwezig op (datums, komma-gescheiden, jjjj-mm-dd)',wide:1,ph:'2026-11-03, 2026-11-04'}].concat(id?[{k:'newtoken',label:'Persoonlijke link voor de medewerker-app',type:'select',wide:1,options:[['','Huidige link behouden'],['1','Nieuwe link maken (de oude link werkt na publiceren niet meer)']]}]:[]),values:vals,
+  const vals={...w,color:String(w.color)};
+  openForm({title:id?'Medewerker bewerken':'Nieuwe medewerker',fields:[{k:'name',label:'Naam',req:1},{k:'color',label:'Kleur in planning',type:'select',options:COLORS.map((c,i)=>[String(i),c])},{k:'postcode',label:'Standplaats postcode',req:1},{k:'city',label:'Plaats'},{k:'lat',label:'Breedtegraad (optioneel)',type:'number',step:'any'},{k:'lng',label:'Lengtegraad (optioneel)',type:'number',step:'any'},{k:'start',label:'Begintijd',type:'time',req:1},{k:'end',label:'Eindtijd',type:'time',req:1},{k:'days',label:'Werkdagen',type:'checks',num:1,options:DAYS},{k:'skills',label:'Vaardigheden',type:'checks',options:allSkills().map(s=>[s,s])},{k:'leaveDays',label:'Verlofdagen per jaar',type:'number',ph:'bijv. 25'}].concat(id?[{k:'newtoken',label:'Persoonlijke link voor de medewerker-app',type:'select',wide:1,options:[['','Huidige link behouden'],['1','Nieuwe link maken (de oude link werkt na publiceren niet meer)']]}]:[]),values:vals,
     onSave:v=>{if(t2m(v.end)<=t2m(v.start))return'Eindtijd moet na begintijd liggen.';const ge=fixGeo(v,w);if(ge)return ge;
-      v.absent=v.absent.split(/[,\s]+/).map(x=>x.trim()).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x));v.color=+v.color;
+      v.color=+v.color;
       const nt=v.newtoken;delete v.newtoken;if(id){Object.assign(w,v);if(nt){D.revokeTokens=(D.revokeTokens||[]).concat(w.token||[]);w.token=randTok()}}else D.workers.push({id:uid('w'),token:randTok(),...v});replan([S.date]);toast('Medewerker opgeslagen, planning herberekend.')},
     onDelete:id?()=>{D.workers=D.workers.filter(x=>x.id!==id);replan(Object.keys(D.plans));toast('Medewerker verwijderd.')}:null});
 }
@@ -1897,6 +2053,12 @@ function onClick(e){
     case'orsfetch':fetchORS(el.dataset.date?[el.dataset.date]:null);break;
     case'pdok':pdokImprove();break;
     case'orsclear':D.ors={};D.orsAt=null;save();render();toast('Opgehaalde rijtijden gewist; de schatting wordt weer gebruikt.');break;
+    case'absnew':openAbs(null,{wid:el.dataset.wid,date:el.dataset.date});break;
+    case'absedit':openAbs(el.dataset.id);break;
+    case'absmonth':{const ym=S.absMonth||S.date.slice(0,7);S.absMonth=addDays(ym+'-15',+el.dataset.d*30).slice(0,7);render();break}
+    case'absscope':S.absScope=el.dataset.k;render();break;
+    case'absgo':{const P=ABSPEND;ABSPEND=null;if(!P)break;closeForm();if(el.dataset.mode==='redis'){runSick(P.rec.wid,P.rec.from,P.rec.to,ABS[P.rec.type].name+(P.rec.note?' \u2013 '+P.rec.note:''),{rec:P.rec})}else absStore(P.rec,P.old);break}
+    case'absredis':{const a=(D.absences||[]).find(x=>x.id===el.dataset.id);if(a)runSick(a.wid,a.from<todayIso()?todayIso():a.from,a.to,ABS[a.type].name+(a.note?' \u2013 '+a.note:''),{existing:true,type:a.type});break}
     case'propose':{const fs=!!$('#skT');openPropose(el.dataset.ids.split(','));if(PROP)PROP.fromSick=fs;break}
     case'extend':{const w=WRK[el.dataset.wid],d=PROP.date,ids=PROP.ids;w.overrides=w.overrides||{};w.overrides[d]={start:el.dataset.start,end:el.dataset.end,note:'Incidenteel langer'};
       const P=getPlan(d);for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));
@@ -1924,6 +2086,7 @@ function onChange(e){
   if(el.id==='xf'&&el.files&&el.files[0])return readXlsx(el.files[0]);
   if((el.id==='xclear'||el.id==='xfuture')&&XIMP)return renderXPrev();
   if(el.id==='logM'){LOGF.m=el.value;return logRefresh()}
+  if(el.dataset.absf){if(el.dataset.absf==='w')S.absW=el.value;else S.absT=el.value;return render()}
   if(el.id==='dateIn'&&el.value){S.date=el.value;S.selLoc=null;save();render();return}
   if(el.dataset.act==='moveto'&&el.value){const ids=el.dataset.ids.split(',');let w=el.value;
     if(w==='__un')return moveJobs(ids,null);

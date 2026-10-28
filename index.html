@@ -367,7 +367,7 @@ const skillOk=(w,j)=>{const s=jobSkill(j);return !s||(w.skills||[]).includes(s)}
 /* Incidentele afwijking van de werktijd op één datum: w.overrides[datum] = {start,end,note} */
 const ovr=(w,date)=>(date&&w.overrides&&w.overrides[date])||null;
 function shiftOf(w,date){const o=ovr(w,date);return{start:(o&&o.start)||w.start,end:(o&&o.end)||w.end,o}}
-function availWhy(w,date){if((w.absent||[]).includes(date))return'Afwezig';if(ovr(w,date))return'';if(!(w.days||[]).includes(wday(date)))return'Werkt niet op '+fdate(date,{weekday:'long'});return''}
+function availWhy(w,date){if((w.absent||[]).includes(date))return(w.absentNote&&w.absentNote[date])||'Afwezig';if(ovr(w,date))return'';if(!(w.days||[]).includes(wday(date)))return'Werkt niet op '+fdate(date,{weekday:'long'});return''}
 const avail=(w,date)=>!availWhy(w,date);
 
 /* ---------- reistijd ---------- */
@@ -704,7 +704,7 @@ function proposeFor(ids,date){
 function verdict(w,ids,date,route){
   const why=availWhy(w,date),js=ids.map(id=>JOB[id]);
   const sk=js.map(jobSkill).find(s=>s&&!(w.skills||[]).includes(s));if(sk)return{ok:false,txt:why||`Mist vaardigheid "${sk}"`};
-  if(why==='Afwezig')return{ok:false,txt:why};
+  if((w.absent||[]).includes(date))return{ok:false,txt:why};
   const sh=shiftOf(w,date);let res=null;
   if(why)res={ok:false,txt:why};
   else{const s=simulate(w,ids),p=s.stops[0],last=s.stops[s.stops.length-1];
@@ -754,17 +754,127 @@ function openPropose(ids){
     <div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" data-act="dlgx">Sluiten</button></div></div>`;
   $('#modal').hidden=false;
 }
-function applyProp(i){
-  const c=PROP&&PROP.cands[i];if(!c)return;const ids=PROP.ids,old=PROP.date;
-  ids.forEach(id=>{const j=JOB[id],sg=c.segs[id];
+/* Een gekozen alternatief toepassen: tijdvak of datum aanpassen, of een collega incidenteel langer laten werken, en inplannen + vastzetten */
+function applyCand(ids,old,c){
+  ids.forEach(id=>{const j=JOB[id],sg=c.segs&&c.segs[id];
     if(c.kind==='shift'&&sg){const was=j.from||j.to?`${j.from||'—'}–${j.to||'—'}`:'hele dag';j.from=m2t(sg[0]);j.to=m2t(sg[1]);j.notes=((j.notes?j.notes+' · ':'')+`Tijdvak aangepast (was ${was})`)}
     else if(c.kind==='day'){j.date=c.date;j.notes=((j.notes?j.notes+' · ':'')+`Verplaatst van ${fdate(old,{day:'numeric',month:'short'})}`)}});
+  if(c.kind==='extend'){const w=WRK[c.wid];w.overrides=w.overrides||{};w.overrides[c.date]={start:c.xstart,end:c.xend,note:c.extraDay?'Extra werkdag':'Incidenteel langer'}}
   const Pold=getPlan(old);for(const k of Object.keys(Pold.routes))Pold.routes[k]=Pold.routes[k].filter(id=>!ids.includes(id));ids.forEach(id=>delete Pold.pinned[id]);
   const P=getPlan(c.date);for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));
-  P.routes[c.wid]=c.arr;ids.forEach(id=>P.pinned[id]=c.wid);P.edited=Date.now();if(!P.auto)P.auto=Date.now();
-  if(AICTL)AICTL.abort();closeForm();PROP=null;save();render();
-  toast(`Ingepland bij ${WRK[c.wid].name} op ${fdate(c.date,{weekday:'short',day:'numeric',month:'short'})} om ${m2t(c.start)} en vastgezet.`);
+  const w=WRK[c.wid],r=P.routes[c.wid]||[],b=bestPos(w,r,ids,true)||bestPos(w,r,ids,false);
+  P.routes[c.wid]=b.arr;ids.forEach(id=>P.pinned[id]=c.wid);P.edited=Date.now();if(!P.auto)P.auto=Date.now();
+  const g=b.s.seg.find(x=>x.k==='job'&&x.id===ids[0]);return g?g.a:null;
 }
+function applyProp(i){
+  const c=PROP&&PROP.cands[i];if(!c)return;const fs=PROP.fromSick;const t=applyCand(PROP.ids,PROP.date,c);
+  if(AICTL)AICTL.abort();closeForm();PROP=null;save();render();
+  toast(`Ingepland bij ${WRK[c.wid].name} op ${fdate(c.date,{weekday:'short',day:'numeric',month:'short'})} om ${m2t(t!=null?t:c.start)} en vastgezet.`);
+  if(fs&&SICK)setTimeout(openSickResult,0);
+}
+
+/* ---------- ziekmelding: afspraken herverdelen en de rest met AI oplossen ---------- */
+let SICK=null;
+function openSick(wid){
+  const w=WRK[wid];if(!w)return;
+  openForm({title:`${w.name} ziek melden`,note:'De afspraken van deze medewerker op deze dag(en) worden automatisch herverdeeld over collega’s, zonder hun bestaande planning om te gooien. Wat niet past los je daarna op met AI-advies of het Slim voorstel. Je kunt alles ongedaan maken.',
+    fields:[{k:'from',label:'Vanaf',type:'date',req:1},{k:'to',label:'Tot en met',type:'date',req:1},{k:'note',label:'Reden',wide:1,ph:'Ziek'}],values:{from:S.date,to:S.date,note:'Ziek'},okLabel:'Ziek melden en herplannen',
+    onSave:v=>{if(v.to<v.from)return'"Tot en met" moet op of na "Vanaf" liggen.';if((new Date(v.to)-new Date(v.from))/864e5>30)return'Kies maximaal 31 dagen.';setTimeout(()=>runSick(wid,v.from,v.to,v.note||'Ziek'),0);return''}});
+}
+function runSick(wid,from,to,note){
+  const w=WRK[wid],dates=[];for(let d=from;d<=to;d=addDays(d,1))dates.push(d);
+  for(const d of dates)if(jobsOn(d).length&&!hasPlan(d))autoPlan(d);
+  const snap=JSON.stringify({jobs:D.jobs,plans:D.plans,workers:D.workers});
+  const days=dates.map(d=>{const P=getPlan(d),before={};D.workers.forEach(x=>{if(x.id!==wid&&P.routes[x.id])before[x.id]=simulate(x,P.routes[x.id],d)});return{date:d,aff:(P.routes[wid]||[]).filter(id=>JOB[id]),before}});
+  w.absent=[...new Set([...(w.absent||[]),...dates])];w.absentNote=Object.assign({},w.absentNote||{});dates.forEach(d=>w.absentNote[d]=note);
+  for(const day of days){
+    const d=day.date,P=getPlan(d);delete P.routes[wid];day.aff.forEach(id=>{if(P.pinned[id]===wid)delete P.pinned[id]});
+    if(!day.aff.length)continue;
+    const ws=D.workers.filter(x=>avail(x,d)),R={};ws.forEach(x=>R[x.id]=[...(P.routes[x.id]||[])]);
+    insertLoop(day.aff,R,ws);eject(R,ws,P.pinned,day.aff.map(id=>JOB[id]));
+    Object.assign(P.routes,R);day.aff.forEach(id=>{for(const k in R)if(R[k].includes(id))P.pinned[id]=k});P.edited=Date.now();if(!P.auto)P.auto=Date.now();
+  }
+  SICK={wid,from,to,note,snap,days,ai:null};save();render();openSickResult();
+}
+function whereIs(id){const j=JOB[id];if(!j)return null;const P=D.plans[j.date];let wid=null;if(P&&P.routes)for(const k in P.routes)if(P.routes[k].includes(id))wid=k;
+  if(!wid||!WRK[wid])return{date:j.date};const s=simulate(WRK[wid],P.routes[wid],j.date),g=s.seg.find(x=>x.k==='job'&&x.id===id);return{date:j.date,wid,start:g?g.a:null,late:g&&g.late}}
+function openSickResult(){
+  const K=SICK;if(!K)return;const w=WRK[K.wid];if(!w){SICK=null;return}FORM=null;PROP=null;
+  let tot=0,ok=0;const unGroups=[];
+  const sections=K.days.filter(x=>x.aff.length).map(day=>{
+    const d=day.date,P=getPlan(d),groups={};day.aff.forEach(id=>{const j=JOB[id];if(j)(groups[j.locationId]=groups[j.locationId]||[]).push(id)});
+    const rows=Object.entries(groups).map(([lid,ids])=>{const l=LOC[lid]||{},cu=CUS[l.customerId]||{};tot+=ids.length;
+      const pl=ids.map(whereIs),byW={};ids.forEach((id,i)=>{const p=pl[i];if(p&&p.wid){ok++;const k=p.wid+'|'+p.date;(byW[k]=byW[k]||{p,n:0}).n++}});
+      const res=Object.values(byW).map(({p,n})=>`<span class="chip ${p.late?'warn':'ok'}"><i class="dot" style="background:${wc(WRK[p.wid])}"></i>${esc(WRK[p.wid].name)}${p.date!==d?' '+esc(fdate(p.date,{weekday:'short',day:'numeric',month:'short'})):''} ${p.start!=null?m2t(p.start):''}${n<ids.length?` (${n})`:''}</span>`).join(' ');
+      const un=ids.filter((id,i)=>!(pl[i]&&pl[i].wid));if(un.length)unGroups.push({date:JOB[un[0]].date,ids:un,lid});
+      const win=[...new Set(ids.map(id=>JOB[id]).map(j=>j.from||j.to?`${j.from||'—'}–${j.to||'—'}`:'hele dag'))].join(', ');
+      return`<tr><td><b>${esc(cu.name||'')}</b><div class="small muted">${esc(l.city||'')}</div></td><td>${ids.map(id=>plateBtn(JOB[id])).join(' ')}</td><td class="small mono">${esc(win)}</td><td>${res}${un.length?` <span class="chip bad">${un.length} niet ingepland</span> <button class="btn sm" data-act="propose" data-ids="${un.join(',')}">${I.auto} Slim voorstel</button>`:''}</td></tr>`}).join('');
+    const load=Object.keys(P.routes).filter(x=>WRK[x]&&x!==K.wid).map(x=>{const b=day.before[x],a=simulate(WRK[x],P.routes[x],d);const extra=(a.serv+a.trav)-(b?b.serv+b.trav:0);return extra>.5?`${esc(WRK[x].name)} +${fdur(extra)} (terug ${m2t(a.finish)})`:''}).filter(Boolean).join(' · ');
+    return`<h4 class="ph">${esc(fdate(d,{weekday:'long',day:'numeric',month:'long'}))}</h4><div class="tbl-wrap"><table><thead><tr><th>Klant</th><th>Auto's</th><th>Tijdvak</th><th>Nieuwe planning</th></tr></thead><tbody>${rows}</tbody></table></div>${load?`<p class="small muted" style="margin:6px 0 0">Extra werk voor collega's: ${load}</p>`:''}`}).join('');
+  K.unGroups=unGroups;const mode=aiMode();
+  const period=K.from===K.to?fdate(K.from,{weekday:'long',day:'numeric',month:'long'}):`${fdate(K.from,{day:'numeric',month:'short'})} t/m ${fdate(K.to,{day:'numeric',month:'short'})}`;
+  $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="skT" style="width:min(920px,100%)"><h3 id="skT">Ziekmelding ${esc(w.name)}</h3>
+    <p class="note">${esc(K.note)} · ${esc(period)}. ${tot?`<b>${ok} van ${tot}</b> auto's zijn ingepland bij collega's en vastgezet.`:'Er stonden geen afspraken op deze dag(en).'}${SERVER&&tot?' Publiceer daarna opnieuw, zodat de collega’s het in hun app zien.':''}</p>
+    ${sections}
+    ${unGroups.length?`<h4 class="ph">Plan voor wat niet past</h4><div id="sickAi"><p class="small muted" id="sickNote" style="margin:0 0 8px">${mode?`Claude kiest voor ${unGroups.length===1?'de afspraak':`elk van de ${unGroups.length} afspraken`} die niet past het beste alternatief: een ander tijdstip, een andere dag of een collega die incidenteel langer werkt. Daarna pas je het met één klik toe.`:'AI-advies is hier niet beschikbaar. Gebruik per afspraak het Slim voorstel.'}</p>${mode?`<div class="row"><button class="btn primary" id="sickBtn" data-act="sickai">${I.auto} Laat Claude een plan maken</button></div>`:''}<div id="sickOut"></div></div>`:tot?'<p class="ok-line">Alle afspraken zijn herverdeeld.</p>':''}
+    <div class="dlg-foot"><button class="btn danger" data-act="sickundo" title="Ziekmelding, herverdeling en toegepaste AI-keuzes terugdraaien">Ongedaan maken</button><span class="sp"></span>${SERVER&&tot?`<button class="btn" data-act="publish">${I.send} Publiceer</button>`:''}<button class="btn primary" data-act="sickclose">Klaar</button></div></div>`;
+  $('#modal').hidden=false;if(K.ai)renderSickAI();
+}
+function sickUndo(){const K=SICK;if(!K)return;const s=JSON.parse(K.snap);D.jobs=s.jobs;D.plans=s.plans;D.workers=s.workers;index();
+  SICK=null;closeForm();save();render();toast('Ziekmelding ongedaan gemaakt. De oorspronkelijke planning is terug.')}
+function sickOptions(g){
+  const cands=proposeFor(g.ids,g.date).map(c=>({...c}));
+  const P=D.plans[g.date]||{routes:{}};
+  for(const w of D.workers){const v=verdict(w,g.ids,g.date,((P.routes||{})[w.id]||[]).filter(id=>!g.ids.includes(id)));
+    if(v.extend)cands.push({kind:'extend',date:g.date,wid:w.id,xstart:v.extend.start,xend:v.extend.end,extra:v.extend.extra,extraDay:v.extend.extraDay,dev:0,dtrav:0,dkm:0})}
+  return cands;
+}
+function candText(c){const w=WRK[c.wid]||{name:'?'};
+  if(c.kind==='extend')return`${w.name} ${c.extraDay?`werkt extra (${c.xstart}–${c.xend})`:`werkt incidenteel tot ${c.xend} (+${fdur(c.extra)})`}, op het gevraagde tijdstip`;
+  return`${w.name}, ${fdate(c.date,{weekday:'short',day:'numeric',month:'short'})} ${m2t(c.start)}–${m2t(c.end)}${c.kind==='day'?' (andere dag)':c.dev>.5?` (${fdur(c.dev)} ${c.early?'eerder':'later'} dan tijdvak)`:''}`}
+async function sickAI(){
+  const K=SICK,mode=aiMode();if(!K||!mode||!K.unGroups.length)return;const out=$('#sickOut'),btn=$('#sickBtn'),note=$('#sickNote');
+  const groups=K.unGroups.map(g=>({...g,opts:sickOptions(g)}));
+  const data=groups.map((g,gi)=>{const l=LOC[g.lid]||{},cu=CUS[l.customerId]||{},js=g.ids.map(id=>JOB[id]);
+    return{groep:gi+1,klant:cu.name,plaats:l.city,datum:fdate(g.date,{weekday:'long',day:'numeric',month:'long'}),kentekens:js.map(j=>j.plate),tijdvak:[...new Set(js.map(j=>(j.from||'?')+'-'+(j.to||'?')))].join(', '),
+      opties:g.opts.map((c,i)=>({optie:i+1,soort:c.kind==='shift'?'zelfde dag, ander tijdstip':c.kind==='day'?'andere dag, zelfde tijdvak':'collega werkt incidenteel langer, op gevraagde tijdstip',omschrijving:candText(c),afwijking_tijdvak_min:Math.round(c.dev||0),extra_rijtijd_min:Math.round(c.dtrav||0),extra_werktijd_min:c.kind==='extend'?c.extra:0}))}});
+  const prompt=`Je bent ervaren planner bij een bedrijf dat auto's reinigt op de locatie van klanten. Medewerker ${WRK[K.wid].name} heeft zich ziek gemeld (${K.from} t/m ${K.to}). De meeste afspraken zijn al herverdeeld; de afspraken hieronder passen nog niet. De planningssoftware heeft per afspraak de mogelijke opties doorgerekend. Kies per groep precies één optie uit de lijst en verzin niets anders.
+
+Afwegingen, in volgorde: de afspraak met de klant zo veel mogelijk nakomen (zelfde dag en tijdvak), daarna zo weinig mogelijk overwerk, daarna zo weinig mogelijk extra rijtijd. Een collega incidenteel langer laten werken is acceptabel als het om maximaal circa een uur gaat. Een andere dag is de laatste keus. Groepen zonder opties sla je over.
+
+Groepen (JSON):
+${JSON.stringify(data.filter(g=>g.opties.length))}
+
+Antwoord met alleen een JSON-object, in het Nederlands:
+{"samenvatting":"<2 tot 3 zinnen voor de planner>","keuzes":[{"groep":<nummer>,"optie":<nummer>,"waarom":"<1 korte zin>"}],"berichten":[{"groep":<nummer>,"bericht":"<kort, vriendelijk bericht aan de klant (max 50 woorden), alleen als datum of tijd verandert>"}]}`;
+  AICTL=new AbortController();btn.disabled=true;out.className='ai-out';out.hidden=false;out.textContent='Claude maakt een plan…';
+  let res=null,raw='';
+  try{if(mode==='claude')res=await SAMPLE.json(prompt,{signal:AICTL.signal});else{raw=await serverAI(prompt,AICTL.signal);const a=raw.indexOf('{'),b=raw.lastIndexOf('}');res=JSON.parse(raw.slice(a,b+1))}}
+  catch(err){const e=err&&err.name==='AbortError'?{code:'cancelled'}:err instanceof SyntaxError?{code:'invalid_json'}:(err||{});
+    const msg={not_granted:'Je hebt Claude niet toegestaan voor deze pagina.',rate_limited:'Even te veel verzoeken of je tegoed is op. Probeer het later opnieuw.',invalid_json:'Het plan kwam niet in de verwachte vorm. Klik nog een keer.',pw:'Vul het app-wachtwoord in (via AI-advies of publiceren) en probeer opnieuw.',nofn:'De AI-functie is niet gevonden op deze site.',srv:e.message||'De AI-functie gaf geen antwoord.'};
+    out.textContent=e.code==='cancelled'?'':(msg[e.code]||'Het plan kon niet worden gemaakt. Probeer het opnieuw.');btn.disabled=false;AICTL=null;return}
+  btn.disabled=false;AICTL=null;
+  const picks=(res.keuzes||[]).map(k=>({g:Math.round(+k.groep)-1,o:Math.round(+k.optie)-1,why:String(k.waarom||'')})).filter(k=>groups[k.g]&&groups[k.g].opts[k.o]);
+  const msgs={};(res.berichten||[]).forEach(m=>{const g=Math.round(+m.groep)-1;if(groups[g]&&m.bericht)msgs[g]=String(m.bericht)});
+  K.ai={summary:String(res.samenvatting||''),groups,picks,msgs,done:{}};renderSickAI();
+}
+function renderSickAI(){
+  const K=SICK,A=K&&K.ai,out=$('#sickOut');if(!A||!out)return;out.hidden=false;out.className='ai-out ai-card';
+  const open=A.picks.filter(p=>!A.done[p.g]);
+  out.innerHTML=`<div class="row"><span class="chip acc">${I.auto} AI-plan</span>${A.summary?`<span>${esc(A.summary)}</span>`:''}</div>
+    ${A.picks.map(p=>{const g=A.groups[p.g],c=g.opts[p.o],l=LOC[g.lid]||{},cu=CUS[l.customerId]||{};
+      return`<div class="ai-alt"><div class="row"><b>${esc(cu.name||'')}</b><span class="muted small">${esc(l.city||'')}</span>${g.ids.map(id=>plateHtml(JOB[id].plate)).join(' ')}<span class="sp"></span>${A.done[p.g]?`<span class="chip ok">${I.check} Toegepast</span>`:`<button class="btn sm primary" data-act="sickapply" data-g="${p.g}">Toepassen</button>`}</div>
+        <p><b>${esc(candText(c))}</b>${p.why?' — '+esc(p.why):''}</p>
+        ${A.msgs[p.g]?`<div class="ai-msg" style="border:0;padding:0"><p>${esc(A.msgs[p.g])}</p><button class="btn sm" data-act="sickcopy" data-g="${p.g}">${I.copy} Kopieer bericht</button></div>`:''}</div>`}).join('')}
+    ${A.picks.length<A.groups.length?`<p class="small muted">Voor ${A.groups.length-A.picks.length} afspraak/afspraken kon Claude geen optie kiezen. Gebruik daarvoor het Slim voorstel.</p>`:''}
+    ${open.length>1?`<div class="row"><button class="btn primary" data-act="sickapplyall">${I.check} Alles toepassen (${open.length})</button></div>`:''}`;
+}
+function sickApply(gs){
+  const A=SICK&&SICK.ai;if(!A)return;let n=0;
+  for(const gi of gs){const p=A.picks.find(x=>x.g===gi);if(!p||A.done[gi])continue;const g=A.groups[gi];applyCand(g.ids,g.date,g.opts[p.o]);A.done[gi]=1;n++}
+  save();render();openSickResult();toast(`${n} afspraak/afspraken ingepland volgens het AI-plan en vastgezet.`);
+}
+
 /* AI-route: binnen Claude via de sample-capability, op een eigen site (bijv. Netlify) via de serverfunctie /api/ai-advies met de API-sleutel uit de omgeving */
 function aiMode(){if(SAMPLE)return'claude';try{if(!window.claude&&/^https?:$/.test(location.protocol))return'server'}catch(e){}return null}
 const PWKEY='wasroute.aipw';
@@ -963,7 +1073,7 @@ function routePanel(st){
   li+=`<li><span></span><div class="rt-end" data-drop="end:${w.id}">Sleep hierheen om achteraan de rit toe te voegen</div></li>`;
   const util=s.n?Math.round(s.serv/Math.max(1,s.end-s.start)*100):0;
   return`<section class="panel">${chips}
-  <div class="rt-head"><div class="row"><h2>Rit ${esc(w.name)}</h2><span class="sp"></span><button class="btn sm" data-act="ovr" data-wid="${w.id}">${I.edit} Werktijd deze dag</button><button class="btn sm" data-act="seqopt" data-wid="${w.id}">${I.route} Volgorde optimaliseren</button></div>
+  <div class="rt-head"><div class="row"><h2>Rit ${esc(w.name)}</h2><span class="sp"></span><button class="btn sm" data-act="sick" data-id="${w.id}">Ziek melden</button><button class="btn sm" data-act="ovr" data-wid="${w.id}">${I.edit} Werktijd deze dag</button><button class="btn sm" data-act="seqopt" data-wid="${w.id}">${I.route} Volgorde optimaliseren</button></div>
   <div class="sub">Standplaats ${esc(w.postcode)} ${esc(w.city)} · werktijd ${esc(shiftOf(w,date).start)}–${esc(shiftOf(w,date).end)}${ovr(w,date)?` <span class="chip warn">Afwijkend vandaag${ovr(w,date).note?': '+esc(ovr(w,date).note):''} · normaal ${esc(w.start)}–${esc(w.end)}</span>`:''}${(w.skills||[]).length?' · '+esc(w.skills.join(', ')):''}${why?` · <b style="color:var(--bad)">${esc(why)}</b>`:''}</div>
   <dl class="stats"><div><dt>Vertrek</dt><dd>${m2t(s.depart)}</dd></div><div><dt>Terug</dt><dd>${m2t(s.finish)}</dd></div><div><dt>Voertuigen</dt><dd>${s.n}</dd></div><div><dt>Rijtijd</dt><dd>${fdur(s.trav)}</dd></div><div><dt>Afstand</dt><dd>${fkm(s.km)}</dd></div><div><dt>Benutting</dt><dd>${util}%</dd></div></dl></div>
   <ol class="rt">${li}</ol></section>`;
@@ -1096,7 +1206,7 @@ function fixGeo(v,old){
 /* ---------- beheer: medewerkers ---------- */
 function allSkills(){return[...new Set([...D.types.map(t=>t.skill).filter(Boolean),...D.workers.flatMap(w=>w.skills||[])])]}
 function viewWorkers(){
-  const r=D.workers.map(w=>`<tr><td><b style="display:flex;gap:7px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w.name)}</b></td><td>${esc(w.postcode)} ${esc(w.city)}</td><td class="mono">${esc(w.start)}–${esc(w.end)}</td><td>${DAYS.filter(([n])=>(w.days||[]).includes(n)).map(d=>d[1]).join(' ')}</td><td class="small">${(w.absent||[]).length?w.absent.map(d=>esc(fdate(d,{day:'numeric',month:'short'}))).join(', '):'<span class="muted">—</span>'}</td><td class="small">${Object.entries(w.overrides||{}).filter(([d])=>d>=new Date().toISOString().slice(0,10)).sort().map(([d,o])=>`<span class="chip warn" title="${esc(o.note||'')}">${esc(fdate(d,{day:'numeric',month:'short'}))} ${esc(o.start)}–${esc(o.end)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${(w.skills||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${avail(w,S.date)?'<span class="chip ok">Beschikbaar</span>':`<span class="chip bad">${esc(availWhy(w,S.date))}</span>`}</td><td><button class="btn sm" data-act="wlink" data-id="${w.id}">${I.copy} Kopieer link</button></td><td class="act"><button class="btn ghost" data-act="editw" data-id="${w.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
+  const r=D.workers.map(w=>`<tr><td><b style="display:flex;gap:7px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w.name)}</b></td><td>${esc(w.postcode)} ${esc(w.city)}</td><td class="mono">${esc(w.start)}–${esc(w.end)}</td><td>${DAYS.filter(([n])=>(w.days||[]).includes(n)).map(d=>d[1]).join(' ')}</td><td class="small">${(w.absent||[]).length?w.absent.map(d=>esc(fdate(d,{day:'numeric',month:'short'}))).join(', '):'<span class="muted">—</span>'}</td><td class="small">${Object.entries(w.overrides||{}).filter(([d])=>d>=new Date().toISOString().slice(0,10)).sort().map(([d,o])=>`<span class="chip warn" title="${esc(o.note||'')}">${esc(fdate(d,{day:'numeric',month:'short'}))} ${esc(o.start)}–${esc(o.end)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${(w.skills||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${avail(w,S.date)?'<span class="chip ok">Beschikbaar</span>':`<span class="chip bad">${esc(availWhy(w,S.date))}</span>`}</td><td><div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="wlink" data-id="${w.id}">${I.copy} Kopieer link</button><button class="btn sm" data-act="sick" data-id="${w.id}">Ziek melden</button></div></td><td class="act"><button class="btn ghost" data-act="editw" data-id="${w.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
   return`<section class="panel"><div class="toolbar"><h2>Medewerkers</h2><span class="sp"></span><button class="btn primary" data-act="neww">${I.plus} Nieuwe medewerker</button></div>
   <div class="tbl-wrap"><table><thead><tr><th>Medewerker</th><th>Standplaats</th><th>Werktijd</th><th>Werkdagen</th><th>Afwezig</th><th>Afwijkende werktijd</th><th>Vaardigheden</th><th>${esc(fdate(S.date,{day:'numeric',month:'short'}))}</th><th>Medewerker-app</th><th></th></tr></thead><tbody>${r||'<tr><td colspan="10" class="empty">Nog geen medewerkers</td></tr>'}</tbody></table></div>
   <p class="hint">Vaardigheden koppelen aan reinigingstypes (Instellingen). Een opdracht die een vaardigheid vraagt, gaat alleen naar medewerkers die die vaardigheid hebben.</p></section>`;
@@ -1423,7 +1533,14 @@ function onClick(e){
     case'handled':{D.handled=D.handled||{};if(D.handled[el.dataset.id])delete D.handled[el.dataset.id];else D.handled[el.dataset.id]=Date.now();save();render();break}
     case'refreshst':fetchStatus(S.date,true).then(()=>{render();toast('Meldingen bijgewerkt.')});break;
     case'copymsg':if(PROP&&PROP.ai)copyText(PROP.ai.msg,'Bericht gekopieerd.');break;
-    case'propose':openPropose(el.dataset.ids.split(','));break;
+    case'sick':openSick(el.dataset.id);break;
+    case'sickundo':sickUndo();break;
+    case'sickclose':SICK=null;closeForm();break;
+    case'sickai':sickAI();break;
+    case'sickapply':sickApply([+el.dataset.g]);break;
+    case'sickapplyall':sickApply(SICK&&SICK.ai?SICK.ai.picks.map(p=>p.g):[]);break;
+    case'sickcopy':if(SICK&&SICK.ai)copyText(SICK.ai.msgs[+el.dataset.g]||'','Bericht gekopieerd.');break;
+    case'propose':{const fs=!!$('#skT');openPropose(el.dataset.ids.split(','));if(PROP)PROP.fromSick=fs;break}
     case'extend':{const w=WRK[el.dataset.wid],d=PROP.date,ids=PROP.ids;w.overrides=w.overrides||{};w.overrides[d]={start:el.dataset.start,end:el.dataset.end,note:'Incidenteel langer'};
       const P=getPlan(d);for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));
       const b=bestPos(w,P.routes[w.id]||[],ids,true)||bestPos(w,P.routes[w.id]||[],ids,false);P.routes[w.id]=b.arr;ids.forEach(id=>P.pinned[id]=w.id);P.edited=Date.now();if(!P.auto)P.auto=Date.now();
@@ -1441,7 +1558,7 @@ function onClick(e){
     case'export':copyText(JSON.stringify(D),'Back-up gekopieerd naar het klembord.');break;
     case'restore':openForm({title:'Back-up terugzetten',okLabel:'Terugzetten',note:'Plak een eerder gekopieerde back-up. Dit vervangt alle huidige gegevens.',fields:[{k:'csv',label:'Back-up (JSON)',type:'textarea'}],values:{},onSave:v=>{try{const x=JSON.parse(v.csv);if(!x.version||!x.jobs)throw 0;D=x;save();render();toast('Back-up teruggezet.')}catch(e){return'Dit is geen geldige back-up.'}}});break;
     case'reset':if(el.dataset.armed){D=sample();S.date='2026-10-29';save();render();toast('Voorbeelddata hersteld.')}else{el.dataset.armed='1';el.textContent='Klik nogmaals: alles wordt vervangen';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.textContent='Voorbeelddata herstellen'}},4000)}break;
-    case'dlgx':if(AICTL)AICTL.abort();closeForm();break;
+    case'dlgx':if(AICTL)AICTL.abort();if(PROP&&PROP.fromSick&&SICK){PROP=null;openSickResult();break}closeForm();break;
     case'dlgdel':if(el.dataset.armed){const f=FORM.onDelete;closeForm();f()}else{el.dataset.armed='1';el.textContent='Klik nogmaals om te verwijderen';if(FORM.delNote)showErr(FORM.delNote)}break;
   }
 }

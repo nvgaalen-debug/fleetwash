@@ -189,6 +189,20 @@ td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}
 tr:hover td{background:color-mix(in srgb,var(--accent-soft) 40%,transparent)}
 td.act{white-space:nowrap;text-align:right}
 .sec{display:grid;gap:12px}
+.reps{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.rep{display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:8px 10px}
+.rep time{font:600 15px var(--f-disp)}
+.rep-main{display:grid;gap:3px;min-width:0;font-size:14px}
+.rep-act{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.rep-probleem{border-left-color:var(--bad);background:color-mix(in srgb,var(--bad-soft) 55%,transparent)}
+.rep-opmerking{border-left-color:var(--accent)}
+.rep-gereed{border-left-color:var(--ok)}
+.rep.handled{opacity:.6;background:none}
+.btn.on{border-color:var(--ok);color:var(--ok)}
+@media (max-width:640px){.rep{grid-template-columns:44px minmax(0,1fr)}.rep-act{grid-column:1/-1;justify-content:flex-start}}
+.tabbadge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--bad);color:#fff;font:700 11px var(--f-body);margin-left:4px;vertical-align:1px}
+.bmark{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;background:var(--surface);color:var(--ink);font-size:11px;margin-right:4px;vertical-align:0}
+.bmark.bad{background:var(--bad);color:#fff}.bmark.ok{background:var(--surface);color:var(--ok)}
 .platebtn{all:unset;cursor:pointer;border-radius:4px;display:inline-flex}
 .platebtn:hover .plate{box-shadow:0 0 0 2px var(--accent)}
 .platebtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
@@ -562,7 +576,7 @@ const STATUS={};
 const stMap=date=>(STATUS[date]&&STATUS[date].map)||{};
 const hm=t=>{try{return new Date(t).toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'})}catch(e){return''}};
 function stChip(id,date){const s=stMap(date)[id];if(!s)return'';
-  return s.st==='done'?`<span class="chip ok" title="Gemeld door ${esc(s.name||'')}">${I.check} Gereed ${esc(hm(s.at))}</span>`
+  return s.st==='done'?`<span class="chip ok" title="Gemeld door ${esc(s.name||'')}">${I.check} Gereed ${esc(hm(s.at))}</span>${s.note?`<span class="chip acc" title="Opmerking van ${esc(s.name||'medewerker')}">Opmerking: ${esc(s.note)}</span>`:''}`
     :`<span class="chip bad" title="Gemeld door ${esc(s.name||'')} om ${esc(hm(s.at))}">Probleem: ${esc(s.reason||'')}${s.note?' · '+esc(s.note):''}</span>`}
 function stKpi(date,rows,P){if(!SERVER)return'';const ids=rows.flatMap(w=>P.routes[w.id]||[]);if(!ids.length)return'';const m=stMap(date);
   const done=ids.filter(id=>m[id]&&m[id].st==='done').length,iss=ids.filter(id=>m[id]&&m[id].st==='issue').length;
@@ -623,6 +637,32 @@ async function registerLinks(){
   catch(e){if(e.code==='pw'){askPw(registerLinks);return}toast('Link gekopieerd, maar nog niet geactiveerd: '+apiErr(e))}
 }
 
+
+/* ---------- meldingen van medewerkers in één overzicht ---------- */
+const repKind=s=>s.st==='issue'?'probleem':s.note?'opmerking':'gereed';
+const isHandled=id=>!!(D.handled&&D.handled[id]);
+function openIssues(date){const m=stMap(date);return Object.keys(m).filter(id=>JOB[id]&&!isHandled(id)&&(m[id].st==='issue'||m[id].note)).length}
+function reportsPanel(st){
+  if(!SERVER)return'';
+  const m=stMap(st.date),items=[];
+  for(const w of st.rows)for(const id of (st.P.routes[w.id]||[])){const s=m[id],j=JOB[id];if(s&&j)items.push({id,w,j,l:LOC[j.locationId]||{},s,k:repKind(s),h:isHandled(id)})}
+  const refresh=`<button class="btn sm" data-act="refreshst">Ververs</button>`;
+  const last=STATUS[st.date]&&STATUS[st.date].at?`<span class="small muted">bijgewerkt ${esc(hm(STATUS[st.date].at))}</span>`:'';
+  if(!items.length)return`<section class="panel reports"><div class="row"><h2>Meldingen van medewerkers</h2><span class="small muted">Nog geen meldingen voor deze dag.</span><span class="sp"></span>${last}${refresh}</div></section>`;
+  const cnt={aandacht:items.filter(i=>!i.h&&i.k!=='gereed').length,probleem:items.filter(i=>i.k==='probleem').length,opmerking:items.filter(i=>i.k==='opmerking').length,gereed:items.filter(i=>i.k==='gereed').length,alle:items.length};
+  const f=S.repF||'aandacht';
+  const shown=items.filter(i=>f==='alle'||(f==='aandacht'?!i.h&&i.k!=='gereed':i.k===f)).sort((a,b)=>String(b.s.at).localeCompare(String(a.s.at)));
+  const lab={aandacht:'Aandacht nodig',probleem:'Problemen',opmerking:'Opmerkingen',gereed:'Alleen gereed',alle:'Alles'};
+  const chips=Object.keys(lab).map(k=>`<button class="fchip" data-act="repf" data-k="${k}" aria-pressed="${f===k}">${lab[k]} <span>${cnt[k]}</span></button>`).join('');
+  const rows=shown.map(i=>{const cu=CUS[i.l.customerId]||{};
+    const txt=i.k==='probleem'?`<b style="color:var(--bad)">${esc(i.s.reason||'Probleem')}</b>${i.s.note?' · '+esc(i.s.note):''}`:i.k==='opmerking'?`<b style="color:var(--ok)">Gereed</b> · ${esc(i.s.note)}`:'<span style="color:var(--ok)">Gereed</span>';
+    return`<li class="rep rep-${i.k}${i.h?' handled':''}"><time>${esc(hm(i.s.at))}</time>
+      <div class="rep-main"><div class="row"><i class="dot" style="background:${wc(i.w)}"></i><b>${esc(i.w.name)}</b>${plateBtn(i.j)}<span class="muted">${esc(cu.name||'')}, ${esc(i.l.city||'')}</span></div><div>${txt}</div></div>
+      <div class="rep-act"><button class="btn sm" data-act="visit" data-wid="${i.w.id}" data-loc="${i.l.id}">Bekijk</button>${i.k!=='gereed'?`<button class="btn sm${i.h?' on':''}" data-act="handled" data-id="${i.id}" title="${i.h?'Weer als open markeren':'Markeren als afgehandeld'}">${I.check} ${i.h?'Afgehandeld':'Afhandelen'}</button>`:''}</div></li>`}).join('');
+  return`<section class="panel reports"><div class="row"><h2>Meldingen van medewerkers</h2>${cnt.aandacht?`<span class="chip bad">${cnt.aandacht} open</span>`:''}<span class="sp"></span>${last}${refresh}</div>
+    <div class="row" style="margin:10px 0">${chips}</div>
+    ${rows?`<ul class="reps">${rows}</ul>`:`<p class="small muted" style="margin:0">${f==='aandacht'?'Alles is afgehandeld.':'Geen meldingen in deze selectie.'}</p>`}</section>`;
+}
 /* ---------- slim voorstel: doorrekenen van alternatieven ---------- */
 let PROP=null,SAMPLE=null,AICTL=null;
 function proposeFor(ids,date){
@@ -753,7 +793,8 @@ let toastT;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
 const TABS=[['planning','Planning'],['opdrachten','Opdrachten'],['klanten','Klanten & locaties'],['medewerkers','Medewerkers'],['instellingen','Instellingen']];
 function render(){
-  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab" data-act="tab" data-k="${k}" aria-pressed="${S.tab===k}">${l}</button>`).join('');
+  const nIss=SERVER?openIssues(S.date):0;
+  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab" data-act="tab" data-k="${k}" aria-pressed="${S.tab===k}">${l}${k==='planning'&&nIss?` <span class="tabbadge" title="${nIss} open melding(en) van medewerkers">${nIss}</span>`:''}</button>`).join('');
   $('#dateIn').value=S.date;$('#dayName').textContent=fdate(S.date,{weekday:'long'});
   const v=$('#view');
   if(S.tab==='planning')v.innerHTML=viewPlanning();
@@ -791,7 +832,7 @@ function viewPlanning(){
     <div class="acts">${edited}${pubChip(st.date)}<button class="btn" data-act="publish" title="Ritten klaarzetten in de medewerker-app">${I.send} Publiceer naar medewerkers</button><button class="btn" data-act="unpinall" title="Alle handmatige vastzettingen voor deze dag opheffen">${I.unlock} Vastzetten opheffen</button><button class="btn primary" data-act="auto">${I.auto} Automatisch plannen</button></div>
   </section>`;
   if(!jobs.length)return kpis+`<section class="panel empty"><h2>Geen opdrachten op ${esc(fdate(st.date))}</h2><p>Voeg opdrachten toe onder Opdrachten of kies een andere datum.</p><button class="btn primary" data-act="newjob">${I.plus} Nieuwe opdracht</button></section>`;
-  return kpis+timeline(st)+`<div class="split">${mapPanel(st)}${routePanel(st)}</div>`+unplannedPanel(st)
+  return kpis+reportsPanel(st)+timeline(st)+`<div class="split">${mapPanel(st)}${routePanel(st)}</div>`+unplannedPanel(st)
     +(off.length?`<p class="small muted">Niet beschikbaar: ${off.map(w=>esc(w.name)+' ('+esc(availWhy(w,st.date).toLowerCase())+')').join(', ')}.</p>`:'');
 }
 function timeline(st){
@@ -810,7 +851,7 @@ function timeline(st){
       else if(g.k==='pause')blk+=`<div class="blk pause" style="left:${pc(g.a)};width:${wd(g.a,g.b)}" title="Pauze ${m2t(g.a)}–${m2t(g.b)}">P</div>`;
     }
     s.stops.forEach((p,i)=>{const cu=CUS[p.loc.customerId]||{};const sel=S.selLoc===p.loc.id&&S.wid===w.id;
-      blk+=`<div class="blk job${p.late?' late':''}${sel?' sel':''}" draggable="true" data-drag="${p.jobs.join(',')}" data-act="visit" title="Klik voor details" data-wid="${w.id}" data-loc="${p.loc.id}" style="left:${pc(p.start)};width:${wd(p.start,p.end)};--c:${c}" title="${esc(cu.name)} · ${p.jobs.length} voertuig(en) · ${m2t(p.start)}–${m2t(p.end)}${p.late?' · TE LAAT':''}">${i+1}. ${esc(cu.name||'')}<small>${p.jobs.length}× · ${m2t(p.start)}</small></div>`});
+      blk+=`<div class="blk job${p.late?' late':''}${sel?' sel':''}" draggable="true" data-drag="${p.jobs.join(',')}" data-act="visit" title="Klik voor details" data-wid="${w.id}" data-loc="${p.loc.id}" style="left:${pc(p.start)};width:${wd(p.start,p.end)};--c:${c}" title="${esc(cu.name)} · ${p.jobs.length} voertuig(en) · ${m2t(p.start)}–${m2t(p.end)}${p.late?' · TE LAAT':''}">${(()=>{const m=stMap(date),ss=p.jobs.map(id=>m[id]).filter(Boolean);return ss.some(x=>x.st==='issue')?'<b class="bmark bad">!</b>':ss.length===p.jobs.length&&ss.length?'<b class="bmark ok">✓</b>':ss.some(x=>x.note)?'<b class="bmark">…</b>':''})()}${i+1}. ${esc(cu.name||'')}<small>${p.jobs.length}× · ${m2t(p.start)}</small></div>`});
     blk+=`<i class="endmark" style="left:${pc(s.finish)}" title="Terug ${m2t(s.finish)}"></i>`;
     return`<div class="tl-row"><button class="tl-who${S.wid===w.id?' sel':''}${why?' na':''}" data-act="selw" data-wid="${w.id}"><b><i class="dot" style="background:${c}"></i>${esc(w.name)}</b><small>${esc(w.postcode)} ${esc(w.city)} · ${esc(shiftOf(w,date).start)}–${esc(shiftOf(w,date).end)}</small>${ovr(w,date)?`<small><span class="chip warn">Afwijkende werktijd</span></small>`:''}<small>${why?`<span style="color:var(--bad)">${esc(why)}</span>`:`${s.n} voert. · ${fkm(s.km)} · ${fdur(s.trav)} rijden`}</small></button><div class="tl-track" data-drop="row:${w.id}">${grid}${blk}</div></div>`}).join('');
   return`<section class="panel"><div class="tl-head"><h2>Dagplanning ${esc(fdate(date,{day:'numeric',month:'long'}))}</h2><div class="legend"><span><i class="lg job"></i>Reinigen</span><span><i class="lg drive"></i>Rijden</span><span><i class="lg wait"></i>Wachten op venster</span><span><i class="lg pause"></i>Pauze</span></div><span class="sp"></span><span class="small muted">Sleep een blok naar een andere medewerker om te herplannen</span></div>
@@ -1339,6 +1380,9 @@ function onClick(e){
     case'publish':openPublish();break;
     case'wlink':copyWorkerLink(el.dataset.id);break;
     case'visit':S.wid=el.dataset.wid;S.selLoc=el.dataset.loc;openVisit(el.dataset.wid,el.dataset.loc);break;
+    case'repf':S.repF=el.dataset.k;render();break;
+    case'handled':{D.handled=D.handled||{};if(D.handled[el.dataset.id])delete D.handled[el.dataset.id];else D.handled[el.dataset.id]=Date.now();save();render();break}
+    case'refreshst':fetchStatus(S.date,true).then(()=>{render();toast('Meldingen bijgewerkt.')});break;
     case'propose':openPropose(el.dataset.ids.split(','));break;
     case'extend':{const w=WRK[el.dataset.wid],d=PROP.date,ids=PROP.ids;w.overrides=w.overrides||{};w.overrides[d]={start:el.dataset.start,end:el.dataset.end,note:'Incidenteel langer'};
       const P=getPlan(d);for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));

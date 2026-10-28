@@ -93,6 +93,9 @@ code{background:var(--sunk);padding:2px 6px;border-radius:5px;font-size:14px}
 .car-meta span{font-size:14px;color:var(--muted)}
 .note{margin:0;font-size:14px;background:var(--sunk);border-radius:8px;padding:7px 9px}
 .acts{display:grid;grid-template-columns:1fr auto;gap:8px}
+.acts.three{grid-template-columns:1fr 1fr}
+.acts.three .ok{grid-column:1/-1}
+.row2{display:flex;gap:18px;flex-wrap:wrap}
 .big{border:0;border-radius:12px;padding:14px;font:600 18px var(--f-disp);letter-spacing:.03em;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;min-height:52px}
 .big.ok{background:var(--ok);color:#fff}
 .big.alt{background:var(--sunk);color:var(--ink);font-size:16px;padding:14px 12px}
@@ -140,6 +143,7 @@ const hhmm=isoT=>{try{return new Date(isoT).toLocaleTimeString('nl-NL',{hour:'2-
 const TODAY=iso(new Date());
 const IC={check:'<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="m3 8.5 3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   warn:'<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2 14.5 13.5h-13z"/><path d="M8 6.5v3M8 11.6v.1"/></g></svg>',
+  note:'<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></g></svg>',
   nav:'<svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M14 2 2 7.2l5 1.8 1.8 5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>'};
 
 /* Verbinding: op de eigen site via /api, anders (bijv. als voorbeeld in Claude) met fictieve gegevens */
@@ -219,14 +223,17 @@ const REASONS=['Auto niet aanwezig','Geen toegang tot de locatie','Schade of nie
 function carHtml(j,st){
   const s=st[j.id];
   let act;
-  if(S.form===j.id){
+  if(S.form===j.id&&S.mode==='note'){
+    act=`<textarea id="note" placeholder="Opmerking voor de planner, bijv. lichte kras linksvoor of extra vuil interieur">${esc(s&&s.note||'')}</textarea>
+      <div class="acts"><button class="big ok" data-act="sendnote" data-id="${esc(j.id)}">${IC.check} Gereed met opmerking</button><button class="big alt" data-act="cancel">Annuleren</button></div>`;
+  }else if(S.form===j.id){
     act=`<div class="reasons" role="radiogroup" aria-label="Wat is er aan de hand?">${REASONS.map((r,i)=>`<label><input type="radio" name="rs" value="${esc(r)}"${i===0?' checked':''}> ${esc(r)}</label>`).join('')}</div>
       <textarea id="note" placeholder="Toelichting (optioneel)"></textarea>
       <div class="acts"><button class="big bad" data-act="sendissue" data-id="${esc(j.id)}">${IC.warn} Probleem melden</button><button class="big alt" data-act="cancel">Annuleren</button></div>`;
   }else if(!s){
-    act=`<div class="acts"><button class="big ok" data-act="done" data-id="${esc(j.id)}">${IC.check} Gereed</button><button class="big alt" data-act="issue" data-id="${esc(j.id)}">Probleem</button></div>`;
+    act=`<div class="acts three"><button class="big ok" data-act="done" data-id="${esc(j.id)}">${IC.check} Gereed</button><button class="big alt" data-act="note" data-id="${esc(j.id)}">${IC.note} Opmerking</button><button class="big alt" data-act="issue" data-id="${esc(j.id)}">${IC.warn} Probleem</button></div>`;
   }else if(s.st==='done'){
-    act=`<div class="state ok">${IC.check} Gereed om ${esc(hhmm(s.at))}${s.pending?' <small>wordt verstuurd…</small>':''}</div><button class="linkbtn" data-act="undo" data-id="${esc(j.id)}">Ongedaan maken</button>`;
+    act=`<div class="state ok">${IC.check} Gereed om ${esc(hhmm(s.at))}${s.pending?' <small>wordt verstuurd…</small>':''}</div>${s.note?`<p class="note"><b>Jouw opmerking:</b> ${esc(s.note)}</p>`:''}<div class="row2"><button class="linkbtn" data-act="note" data-id="${esc(j.id)}">${s.note?'Opmerking wijzigen':'Opmerking toevoegen'}</button><button class="linkbtn" data-act="undo" data-id="${esc(j.id)}">Ongedaan maken</button></div>`;
   }else{
     act=`<div class="state bad">${IC.warn} ${esc(s.reason||'Probleem gemeld')}${s.pending?' <small>wordt verstuurd…</small>':''}</div>${s.note?`<p class="note">${esc(s.note)}</p>`:''}<button class="linkbtn" data-act="undo" data-id="${esc(j.id)}">Ongedaan maken</button>`;
   }
@@ -278,7 +285,9 @@ document.addEventListener('click',e=>{
     case'goto':S.date=el.dataset.date;S.form=null;load();break;
     case'reload':load();break;
     case'done':report(id,'done');break;
-    case'issue':S.form=id;render();break;
+    case'issue':S.form=id;S.mode='issue';render();break;
+    case'note':S.form=id;S.mode='note';render();{const t=$('#note');if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length)}}break;
+    case'sendnote':report(id,'done','',($('#note')||{}).value||'');break;
     case'cancel':S.form=null;render();break;
     case'sendissue':{const r=(document.querySelector('input[name="rs"]:checked')||{}).value||'Probleem';report(id,'issue',r,($('#note')||{}).value||'');break}
     case'undo':report(id,'open');break;

@@ -87,7 +87,7 @@ export default async (req) => {
     // ---- medewerker: eigen rit ----
     if (path.endsWith("/mijn-planning")) {
       const who = await worker(store, url.searchParams.get("t"));
-      if (!who) return json({ error: "Deze link is niet (meer) geldig. Vraag de planner om je persoonlijke link." }, 401);
+      if (!who) return json({ error: "Deze link is nog niet actief of niet meer geldig. Vraag de planner om de planning te publiceren of om een nieuwe link." }, 401);
       const date = url.searchParams.get("date");
       if (!isDate(date)) return json({ error: "Ongeldige datum." }, 400);
       const route = await store.get(`route/${who.wid}/${date}`, { type: "json" });

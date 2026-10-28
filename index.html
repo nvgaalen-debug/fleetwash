@@ -189,6 +189,12 @@ td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}
 tr:hover td{background:color-mix(in srgb,var(--accent-soft) 40%,transparent)}
 td.act{white-space:nowrap;text-align:right}
 .sec{display:grid;gap:12px}
+.platebtn{all:unset;cursor:pointer;border-radius:4px;display:inline-flex}
+.platebtn:hover .plate{box-shadow:0 0 0 2px var(--accent)}
+.platebtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.blk.job:hover{filter:brightness(1.08)}
+.vjobs{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.vjob{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:grid;gap:6px}
 .logbar{display:flex;flex-wrap:wrap;gap:8px 16px;justify-content:space-between;align-items:center;margin:10px 0}
 .fchip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;font-size:13px;cursor:pointer;color:var(--ink)}
 .fchip span{color:var(--muted);font-variant-numeric:tabular-nums;margin-left:2px}
@@ -609,7 +615,13 @@ async function doPublish(n){
 }
 function copyWorkerLink(id){const w=WRK[id];if(!w)return;if(!w.token){w.token=randTok();save()}
   if(!SERVER){toast('De medewerker-app werkt in de Netlify-versie. Kopieer de link daar.');return}
-  copyText(`${location.origin}/medewerker.html?t=${w.token}`,`Link voor ${w.name} gekopieerd. Stuur hem naar de medewerker en publiceer de planning.`)}
+  copyText(`${location.origin}/medewerker.html?t=${w.token}`,`Link voor ${w.name} gekopieerd. Stuur hem naar de medewerker en publiceer de planning.`);
+  registerLinks()}
+/* Persoonlijke links direct op de server activeren, ook als er nog niets is gepubliceerd */
+async function registerLinks(){
+  try{await api('/api/publiceer',{method:'POST',body:JSON.stringify({tokens:D.workers.map(w=>({token:w.token,wid:w.id,name:w.name})),revoke:D.revokeTokens||[],days:[]})});D.revokeTokens=[];save()}
+  catch(e){if(e.code==='pw'){askPw(registerLinks);return}toast('Link gekopieerd, maar nog niet geactiveerd: '+apiErr(e))}
+}
 
 /* ---------- slim voorstel: doorrekenen van alternatieven ---------- */
 let PROP=null,SAMPLE=null,AICTL=null;
@@ -798,7 +810,7 @@ function timeline(st){
       else if(g.k==='pause')blk+=`<div class="blk pause" style="left:${pc(g.a)};width:${wd(g.a,g.b)}" title="Pauze ${m2t(g.a)}–${m2t(g.b)}">P</div>`;
     }
     s.stops.forEach((p,i)=>{const cu=CUS[p.loc.customerId]||{};const sel=S.selLoc===p.loc.id&&S.wid===w.id;
-      blk+=`<div class="blk job${p.late?' late':''}${sel?' sel':''}" draggable="true" data-drag="${p.jobs.join(',')}" data-act="sel" data-wid="${w.id}" data-loc="${p.loc.id}" style="left:${pc(p.start)};width:${wd(p.start,p.end)};--c:${c}" title="${esc(cu.name)} · ${p.jobs.length} voertuig(en) · ${m2t(p.start)}–${m2t(p.end)}${p.late?' · TE LAAT':''}">${i+1}. ${esc(cu.name||'')}<small>${p.jobs.length}× · ${m2t(p.start)}</small></div>`});
+      blk+=`<div class="blk job${p.late?' late':''}${sel?' sel':''}" draggable="true" data-drag="${p.jobs.join(',')}" data-act="visit" title="Klik voor details" data-wid="${w.id}" data-loc="${p.loc.id}" style="left:${pc(p.start)};width:${wd(p.start,p.end)};--c:${c}" title="${esc(cu.name)} · ${p.jobs.length} voertuig(en) · ${m2t(p.start)}–${m2t(p.end)}${p.late?' · TE LAAT':''}">${i+1}. ${esc(cu.name||'')}<small>${p.jobs.length}× · ${m2t(p.start)}</small></div>`});
     blk+=`<i class="endmark" style="left:${pc(s.finish)}" title="Terug ${m2t(s.finish)}"></i>`;
     return`<div class="tl-row"><button class="tl-who${S.wid===w.id?' sel':''}${why?' na':''}" data-act="selw" data-wid="${w.id}"><b><i class="dot" style="background:${c}"></i>${esc(w.name)}</b><small>${esc(w.postcode)} ${esc(w.city)} · ${esc(shiftOf(w,date).start)}–${esc(shiftOf(w,date).end)}</small>${ovr(w,date)?`<small><span class="chip warn">Afwijkende werktijd</span></small>`:''}<small>${why?`<span style="color:var(--bad)">${esc(why)}</span>`:`${s.n} voert. · ${fkm(s.km)} · ${fdur(s.trav)} rijden`}</small></button><div class="tl-track" data-drop="row:${w.id}">${grid}${blk}</div></div>`}).join('');
   return`<section class="panel"><div class="tl-head"><h2>Dagplanning ${esc(fdate(date,{day:'numeric',month:'long'}))}</h2><div class="legend"><span><i class="lg job"></i>Reinigen</span><span><i class="lg drive"></i>Rijden</span><span><i class="lg wait"></i>Wachten op venster</span><span><i class="lg pause"></i>Pauze</span></div><span class="sp"></span><span class="small muted">Sleep een blok naar een andere medewerker om te herplannen</span></div>
@@ -856,13 +868,13 @@ function routePanel(st){
       const p=s.stops.find(x=>x.jobs.includes(g.id));if(!p||seenStop.has(p))continue;seenStop.add(p);stopIdx++;
       const cu=CUS[p.loc.customerId]||{},l=p.loc,pinned=p.jobs.every(id=>P.pinned[id]===w.id);
       const wins=[...new Set(p.jobs.map(id=>{const j=JOB[id];return j.from||j.to?`${j.from||'—'}–${j.to||'—'}`:''}).filter(Boolean))];
-      const jobsLi=p.jobs.map(id=>{const j=JOB[id];const sg=s.seg.find(x=>x.k==='job'&&x.id===id);return`<li draggable="true" data-drag="${id}">${plateHtml(j.plate)}<span>${esc(j.vehicle||'')}</span><span class="muted">${esc((TYP[j.type]||{}).name||j.type)} · ${jobDur(j)} min</span><span class="mono${sg&&sg.late?' late':''}">${m2t(sg.a)}–${m2t(sg.b)}${sg&&sg.late?' te laat':''}</span>${+j.priority===3?'<span class="chip warn">Hoge prio</span>':''}${stChip(id,date)}<span class="sp"></span>${moveSel([id])}</li>`}).join('');
+      const jobsLi=p.jobs.map(id=>{const j=JOB[id];const sg=s.seg.find(x=>x.k==='job'&&x.id===id);return`<li draggable="true" data-drag="${id}">${plateBtn(j)}<span>${esc(j.vehicle||'')}</span><span class="muted">${esc((TYP[j.type]||{}).name||j.type)} · ${jobDur(j)} min</span><span class="mono${sg&&sg.late?' late':''}">${m2t(sg.a)}–${m2t(sg.b)}${sg&&sg.late?' te laat':''}</span>${+j.priority===3?'<span class="chip warn">Hoge prio</span>':''}${stChip(id,date)}<span class="sp"></span>${moveSel([id])}</li>`}).join('');
       li+=`<li><time>${m2t(p.arrive)}</time><div class="stop${S.selLoc===l.id?' sel':''}" style="--c:${c}" draggable="true" data-drag="${p.jobs.join(',')}" data-drop="before:${w.id}:${p.jobs[0]}" data-act="sel" data-wid="${w.id}" data-loc="${l.id}">
         <div class="stop-top"><span class="num">${stopIdx}</span><b>${esc(cu.name||'Onbekende klant')}</b><span class="chip">${p.jobs.length} ${p.jobs.length===1?'auto':"auto's"}</span>${p.late?'<span class="chip bad">Buiten tijdvenster</span>':''}${pinned?`<span class="chip acc">${I.pin} vast</span>`:''}${SERVER&&p.jobs.every(id=>(stMap(date)[id]||{}).st==='done')?'<span class="chip ok">Afgerond</span>':''}</div>
         <div class="sub">${esc([l.address,[l.postcode,l.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))}${wins.length?' · venster '+wins.join(', '):' · hele dag'}${cu.contact?' · '+esc(cu.contact):''}${cu.login?' · inlog '+esc(cu.login):''}</div>${l.info?`<div class="sub" style="color:var(--ink)"><b>Locatie-info:</b> ${esc(l.info)}</div>`:''}
         <div class="sub mono">Aankomst ${m2t(p.arrive)}${pendingWait?` · wacht ${fdur(pendingWait)} op venster`:''} · reinigen ${m2t(p.start)}–${m2t(p.end)} (${fdur(p.end-p.start)}) · vertrek ${m2t(p.end)}</div>
         <ul class="jobs">${jobsLi}</ul>
-        <div class="stop-act"><button class="iconbtn" data-act="mv" data-dir="-1" data-wid="${w.id}" data-ids="${p.jobs.join(',')}" aria-label="Bezoek eerder" title="Bezoek eerder">${I.up}</button><button class="iconbtn" data-act="mv" data-dir="1" data-wid="${w.id}" data-ids="${p.jobs.join(',')}" aria-label="Bezoek later" title="Bezoek later">${I.down}</button><button class="iconbtn${pinned?' on':''}" data-act="pin" data-wid="${w.id}" data-ids="${p.jobs.join(',')}" aria-label="${pinned?'Losmaken':'Vastzetten bij deze medewerker'}" title="${pinned?'Losmaken':'Vastzetten bij deze medewerker'}">${I.pin}</button>${moveSel(p.jobs)}</div>
+        <div class="stop-act"><button class="iconbtn" data-act="mv" data-dir="-1" data-wid="${w.id}" data-ids="${p.jobs.join(',')}" aria-label="Bezoek eerder" title="Bezoek eerder">${I.up}</button><button class="iconbtn" data-act="mv" data-dir="1" data-wid="${w.id}" data-ids="${p.jobs.join(',')}" aria-label="Bezoek later" title="Bezoek later">${I.down}</button><button class="iconbtn${pinned?' on':''}" data-act="pin" data-wid="${w.id}" data-ids="${p.jobs.join(',')}" aria-label="${pinned?'Losmaken':'Vastzetten bij deze medewerker'}" title="${pinned?'Losmaken':'Vastzetten bij deze medewerker'}">${I.pin}</button>${moveSel(p.jobs)}<button class="btn sm" data-act="visit" data-wid="${w.id}" data-loc="${l.id}">Details</button></div>
       </div></li>`;pendingWait=0;
     }
   }
@@ -884,7 +896,7 @@ function unplannedPanel(st){
     const reasons=[...new Set(js.map(j=>whyUnplanned(j,date)))];
     return`<div class="uncard" draggable="true" data-drag="${ids.join(',')}"><div class="stop-top"><b style="font:600 16px var(--f-disp)">${esc(cu.name)}</b><span class="chip">${js.length} ${js.length===1?'auto':"auto's"}</span></div>
     <div class="sub">${esc(l.postcode)} ${esc(l.city)} · ${js.map(j=>`${esc((TYP[j.type]||{}).name||j.type)}${j.from||j.to?` ${esc(j.from||'')}–${esc(j.to||'')}`:''}`).filter((x,i,a)=>a.indexOf(x)===i).join(', ')}</div>
-    <div class="row">${js.map(j=>plateHtml(j.plate)).join(' ')}</div>
+    <div class="row">${js.map(j=>plateBtn(j)).join(' ')}</div>
     <div class="small" style="color:var(--warn)">${reasons.map(esc).join(' · ')}</div>
     <div class="row"><button class="btn sm" data-act="propose" data-ids="${ids.join(',')}">${I.auto} Slim voorstel</button><select class="mini" data-act="moveto" data-ids="${ids.join(',')}" aria-label="Inplannen bij"><option value="">Inplannen bij…</option><option value="__best">Beste medewerker (automatisch)</option>${rows.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div></div>`}).join('');
   return`<section class="panel"><div class="row"><h2>Niet ingepland</h2><span class="chip warn">${un.length} ${un.length===1?'voertuig':'voertuigen'}</span><span class="sp"></span><span class="small muted">Sleep naar een medewerker in de dagplanning of kies hieronder. Handmatig inplannen mag ook als het niet past; de app toont dan de overschrijding.</span></div><div class="un-zone" data-drop="un">${cards}</div></section>`;
@@ -928,12 +940,43 @@ function editJob(id){
   if(!D.locations.length){toast('Voeg eerst een klant met locatie toe.');S.tab='klanten';render();return}
   const j=id?JOB[id]:{plate:'',vehicle:'',locationId:D.locations[0].id,date:S.date,type:D.types[0]?.id,from:'',to:'',duration:'',priority:2,notes:''};
   const old=id?j.date:null;
-  openForm({title:id?'Opdracht bewerken':'Nieuwe opdracht',fields:jobFields(),values:j,
+  openForm({title:id?'Opdracht '+j.plate:'Nieuwe opdracht',note:id?jobPlanNote(j):'',fields:jobFields(),values:j,
     onSave:v=>{if(v.from&&v.to&&t2m(v.to)<=t2m(v.from))return'"Uiterlijk gereed" moet later zijn dan "Vanaf".';
       if(id)Object.assign(j,v);else D.jobs.push({id:uid('j'),...v});replan([v.date,old]);toast(id?'Opdracht opgeslagen, planning herberekend.':'Opdracht toegevoegd en ingepland.')},
     onDelete:id?()=>{D.jobs=D.jobs.filter(x=>x.id!==id);replan([old]);toast('Opdracht verwijderd.')}:null});
 }
-function replan(dates){index();for(const d of new Set(dates.filter(Boolean)))if(jobsOn(d).length||D.plans[d])autoPlan(d);save();render()}
+function replan(dates){index();for(const d of new Set(dates.filter(Boolean))){if(D.plans[d]&&D.plans[d].edited)cleanPlan(d);else if(jobsOn(d).length||D.plans[d])autoPlan(d)}save();render()}
+/* ---------- doorklikken vanuit de planning: bezoek bekijken en opdrachten wijzigen ---------- */
+const plateBtn=j=>`<button type="button" class="platebtn" data-act="editjob" data-id="${j.id}" title="Opdracht ${esc(j.plate)} bekijken of wijzigen">${plateHtml(j.plate)}</button>`;
+function jobPlanNote(j){
+  const P=D.plans[j.date],l=LOC[j.locationId]||{},cu=CUS[l.customerId]||{};let wid=null;
+  if(P&&P.routes)for(const k in P.routes)if(P.routes[k].includes(j.id))wid=k;
+  let t=`${cu.name||''}, ${[l.address,l.city].filter(Boolean).join(', ')}. `;
+  if(wid&&WRK[wid]){const s=simulate(WRK[wid],P.routes[wid],j.date),g=s.seg.find(x=>x.k==='job'&&x.id===j.id);t+=`Gepland bij ${WRK[wid].name} op ${fdate(j.date,{weekday:'short',day:'numeric',month:'short'})}${g?`, ${m2t(g.a)}–${m2t(g.b)}${g.late?' (buiten tijdvak)':''}`:''}.`}
+  else t+='Nog niet ingepland.';
+  if(P&&P.edited)t+=' Deze dag is handmatig aangepast: na opslaan worden de tijden herberekend en blijft de rest van de planning staan.';
+  return t;
+}
+function openVisit(wid,lid){
+  const date=S.date,P=getPlan(date),w=WRK[wid],l=LOC[lid];if(!w||!l)return;const cu=CUS[l.customerId]||{};
+  const s=simulate(w,P.routes[wid]||[],date),idx=s.stops.findIndex(x=>x.loc.id===lid),p=s.stops[idx];if(!p)return;
+  const rows=p.jobs.map(id=>{const j=JOB[id],g=s.seg.find(x=>x.k==='job'&&x.id===id);
+    return`<li class="vjob"><div class="row">${plateBtn(j)}<b>${esc((TYP[j.type]||{}).name||j.type)}</b><span class="muted">${esc(j.vehicle||'')}</span><span class="sp"></span>${stChip(id,date)}${+j.priority===3?'<span class="chip warn">Hoge prio</span>':''}</div>
+      <div class="small muted">Gepland ${g?m2t(g.a)+'–'+m2t(g.b):''} (${jobDur(j)} min) · tijdvak klant ${j.from||j.to?esc((j.from||'—')+'–'+(j.to||'—')):'hele dag'}${g&&g.late?' · <b style="color:var(--bad)">buiten tijdvak</b>':''}</div>
+      ${j.notes?`<div class="small">${esc(j.notes)}</div>`:''}
+      <div class="row"><button class="btn sm" data-act="editjob" data-id="${id}">${I.edit} Opdracht wijzigen</button>${g&&g.late?`<button class="btn sm" data-act="propose" data-ids="${id}">${I.auto} Slim voorstel</button>`:''}</div></li>`}).join('');
+  FORM=null;
+  $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="vT" style="width:min(680px,100%)">
+    <div class="row"><span class="num" style="--c:${wc(w)}">${idx+1}</span><h3 id="vT" style="margin:0">${esc(cu.name||'Onbekende klant')}</h3><span class="chip">${p.jobs.length} ${p.jobs.length===1?'auto':"auto's"}</span></div>
+    <p class="note" style="margin:8px 0">${esc([l.address,[l.postcode,l.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))}</p>
+    <div class="row small" style="margin-bottom:10px"><i class="dot" style="background:${wc(w)}"></i><b>${esc(w.name)}</b><span>${esc(fdate(date,{weekday:'short',day:'numeric',month:'short'}))} · aankomst ${m2t(p.arrive)} · reinigen ${m2t(p.start)}–${m2t(p.end)} · ${fdur(p.travel)} rijden ernaartoe</span></div>
+    ${l.info?`<div class="small" style="background:var(--warn-soft);border-left:3px solid var(--warn);padding:8px 10px;border-radius:6px;margin-bottom:10px"><b>Locatie-info:</b> ${esc(l.info)}</div>`:''}
+    ${cu.contact||cu.phone||cu.email||cu.login?`<p class="small" style="margin:0 0 10px">${[cu.contact,cu.phone,cu.email,cu.login?'inlog '+cu.login:''].filter(Boolean).map(esc).join(' · ')}</p>`:''}
+    <ul class="vjobs">${rows}</ul>
+    <div class="dlg-foot"><button class="btn sm" data-act="editcus" data-id="${cu.id||''}">${I.edit} Klant</button><button class="btn sm" data-act="editloc" data-id="${l.id}">${I.edit} Locatie</button><span class="sp"></span><button type="button" class="btn" data-act="dlgx">Sluiten</button></div></div>`;
+  $('#modal').hidden=false;
+}
+
 
 /* ---------- beheer: klanten & locaties ---------- */
 function viewCustomers(){
@@ -1295,6 +1338,7 @@ function onClick(e){
     case'xlog':{const box=$('#xlogBox');if(box.innerHTML){box.innerHTML='';el.textContent=`Bekijk alle regels per voertuig (${XIMP.log.length})`}else{LOGSRC={entries:XIMP.log,preview:true};LOGF={st:'alle',q:'',m:''};box.innerHTML=logShell();logRefresh();el.textContent='Verberg regels'}break}
     case'publish':openPublish();break;
     case'wlink':copyWorkerLink(el.dataset.id);break;
+    case'visit':S.wid=el.dataset.wid;S.selLoc=el.dataset.loc;openVisit(el.dataset.wid,el.dataset.loc);break;
     case'propose':openPropose(el.dataset.ids.split(','));break;
     case'extend':{const w=WRK[el.dataset.wid],d=PROP.date,ids=PROP.ids;w.overrides=w.overrides||{};w.overrides[d]={start:el.dataset.start,end:el.dataset.end,note:'Incidenteel langer'};
       const P=getPlan(d);for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));

@@ -189,6 +189,14 @@ td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}
 tr:hover td{background:color-mix(in srgb,var(--accent-soft) 40%,transparent)}
 td.act{white-space:nowrap;text-align:right}
 .sec{display:grid;gap:12px}
+.steps{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:8px}
+.steps li{display:grid;gap:2px;border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:9px 12px}
+.steps li span{font-size:13px;color:var(--muted)}
+.steps .st-bezig{border-left-color:var(--accent);background:var(--accent-soft)}
+.steps .st-klaar{border-left-color:var(--ok)}
+.steps .st-fout{border-left-color:var(--warn)}
+.steps .st-fout span{color:var(--warn)}
+.steps .st-uit{opacity:.6}
 .chat{display:grid;gap:8px;max-height:min(46vh,420px);overflow:auto;padding:10px;background:var(--sunk);border-radius:10px}
 .msg-u{justify-self:end;max-width:85%;background:var(--accent);color:var(--on-accent);border-radius:12px 12px 2px 12px;padding:8px 11px;font-size:14px}
 .msg-a{justify-self:start;max-width:100%;background:var(--surface);border:1px solid var(--line);border-radius:12px 12px 12px 2px;padding:9px 11px;font-size:14px;display:grid;gap:8px}
@@ -323,7 +331,7 @@ const CITY={"AMSTERDAM":[52.370,4.895],"ROTTERDAM":[51.922,4.479],"DEN HAAG":[52
 const CITY_ALIAS={"DEN BOSCH":"'S-HERTOGENBOSCH","S-HERTOGENBOSCH":"'S-HERTOGENBOSCH","'S HERTOGENBOSCH":"'S-HERTOGENBOSCH","'S-GRAVENHAGE":"DEN HAAG","S-GRAVENHAGE":"DEN HAAG","THE HAGUE":"DEN HAAG"};
 function cityGeo(city){const c=String(city||'').replace(/\u00a0/g,' ').trim().toUpperCase().replace(/\s+/g,' ');if(!c)return null;const k=CITY_ALIAS[c]||c;if(CITY[k])return CITY[k];for(const w of k.split(/[\s\/,]+/).reverse())if(CITY[w])return CITY[w];return null}
 function geocode(pc,city){const p=String(pc||'').replace(/\s/g,'').toUpperCase();const p4=p.slice(0,4);if(PC4[p4])return{lat:PC4[p4][0],lng:PC4[p4][1],geo:'pc4'};const g=cityGeo(city);if(g)return{lat:g[0],lng:g[1],geo:'plaats'};const p2=+p.slice(0,2);if(p.length>=2&&PC2[p2])return{lat:PC2[p2][0],lng:PC2[p2][1],geo:'pc2'};return null}
-const GEO_LABEL={manual:'Exact',pc4:'Postcodegebied (4 cijfers)',plaats:'Plaats (schatting)',pc2:'Regio (schatting)'};
+const GEO_LABEL={manual:'Exact',pdok:'Exact adres (PDOK)',pc4:'Postcodegebied (4 cijfers)',plaats:'Plaats (schatting)',pc2:'Regio (schatting)'};
 
 /* ---------- data ---------- */
 const KEY='wasroute.v1';
@@ -337,7 +345,7 @@ function sample(){
   const plate=()=>r()<.55?`${L()}${L()}-${N()}${N()}${N()}-${L()}`:`${N()}-${L()}${L()}${L()}-${N()}${N()}`;
   const CARS=['VW Golf','Toyota Corolla','Kia Niro','Skoda Octavia','Peugeot 308','Volvo XC40','Tesla Model 3','Renault Clio','BMW 3-serie','Audi A4'];
   const VANS=['Renault Master','VW Crafter','Ford Transit','Mercedes Sprinter','Citroën Jumper'];
-  const d={version:1,settings:{urbanKm:6,urbanSpeed:35,roadSpeed:80,roadFactor:1.3,parkMin:5,minTravel:6,pauseMin:30,pauseAt:'12:00',pauseMinDay:330,kmWeight:0.3,startAtFirst:true,endAtLast:false},
+  const d={version:1,settings:{urbanKm:6,urbanSpeed:35,roadSpeed:80,roadFactor:1.3,parkMin:5,minTravel:6,pauseMin:30,pauseAt:'12:00',pauseMinDay:330,kmWeight:0.3,startAtFirst:true,endAtLast:false,maxPreTravel:60},
     types:[{id:'buiten',name:'Buitenwas',dur:20,skill:''},{id:'interieur',name:'Interieur',dur:30,skill:''},{id:'compleet',name:'Compleet in + uit',dur:45,skill:''},{id:'bedrijfswagen',name:'Bedrijfswagen / bus',dur:40,skill:'bedrijfswagens'},{id:'coating',name:'Lak & coating',dur:90,skill:'coating'}],
     customers:[],locations:[],jobs:[],workers:[],plans:{}};
   const A='2026-10-29',B='2026-10-30';
@@ -372,6 +380,7 @@ function sample(){
   return d;
 }
 function load(){try{const raw=typeof localStorage!=='undefined'&&localStorage.getItem(KEY);if(raw){const x=JSON.parse(raw);if(x&&x.version)D=x}}catch(e){}if(!D)D=sample();if(D.ui&&D.ui.date)S.date=D.ui.date;index();D.workers.forEach(w=>{if(!w.token)w.token=randTok()});
+  if(D.settings.maxPreTravel===undefined)D.settings.maxPreTravel=60;if(!D.settings.travelSource)D.settings.travelSource='schatting';
   if(D.settings.startAtFirst===undefined){D.settings.startAtFirst=true;D.settings.endAtLast=false;for(const d of Object.keys(D.plans))if(!D.plans[d].edited&&jobsOn(d).length)autoPlan(d);save()}}
 function save(){D.ui={date:S.date};LEGS.clear();index();try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}}
 
@@ -394,9 +403,104 @@ const lPt=l=>({key:'L'+l.id,lat:+l.lat,lng:+l.lng});
 function leg(a,b){
   if(a.key===b.key)return{km:0,min:0};
   const k=a.key+'|'+b.key;if(LEGS.has(k))return LEGS.get(k);
-  const s=D.settings;const km=hav(a,b)*s.roadFactor;
+  const s=D.settings;
+  if(s.travelSource==='ors'&&D.ors){const v=D.ors[orsKey(a,b)];if(v){const r={km:v[0],min:Math.max(s.minTravel,Math.round(v[1])),ors:true};LEGS.set(k,r);return r}}
+  const km=hav(a,b)*s.roadFactor;
   const u=Math.min(km,s.urbanKm);let min=(u/s.urbanSpeed+Math.max(km-u,0)/s.roadSpeed)*60;
   min=Math.max(s.minTravel,min);const r={km,min:Math.round(min)};LEGS.set(k,r);return r;
+}
+
+/* ---------- reistijdbron: schatting of OpenRouteService (echte rijtijden, via /api/reistijden) ---------- */
+const orsKey=(a,b)=>`${(+a.lat).toFixed(5)},${(+a.lng).toFixed(5)}>${(+b.lat).toFixed(5)},${(+b.lng).toFixed(5)}`;
+const useORS=()=>D.settings.travelSource==='ors';
+function orsPointsFor(dates){
+  const pts=new Map(),add=p=>{if(isFinite(+p.lat)&&isFinite(+p.lng))pts.set(`${(+p.lat).toFixed(5)},${(+p.lng).toFixed(5)}`,{lat:+p.lat,lng:+p.lng})};
+  D.workers.forEach(w=>add(w));
+  const ds=dates?new Set(dates):null,today=todayIso();
+  D.jobs.forEach(j=>{if(ds?ds.has(j.date):j.date>=today){const l=LOC[j.locationId];if(l)add(l)}});
+  return[...pts.values()];
+}
+function orsMissing(pts){let n=0;const c=D.ors||{};for(const a of pts)for(const b of pts){if(a===b)continue;if(!c[orsKey(a,b)])n++}return n}
+let ORSBUSY=false;
+async function fetchORS(dates,opts={}){
+  const q=!!opts.quiet,say=m=>{if(!q)toast(m)};
+  if(!SERVER){say('OpenRouteService werkt in de Netlify-versie, met ORS_API_KEY in Netlify.');return{got:0}}
+  if(ORSBUSY)return{got:0};const pts=orsPointsFor(dates);if(pts.length<2){say('Er zijn nog geen locaties om rijtijden voor op te halen.');return{got:0}}
+  D.ors=D.ors||{};const B=40,blocks=[];
+  for(let i=0;i<pts.length;i+=B)for(let j=0;j<pts.length;j+=B){const I=pts.slice(i,i+B),J=pts.slice(j,j+B);if(I.some(a=>J.some(b=>a!==b&&!D.ors[orsKey(a,b)])))blocks.push([I,J])}
+  if(!blocks.length){say('Alle rijtijden zijn al opgehaald.');return{got:0}}
+  ORSBUSY=true;let done=0,got=0;
+  try{
+    for(const [I,J] of blocks){
+      say(`Rijtijden ophalen bij OpenRouteService… ${done+1} van ${blocks.length}`);if(opts.onProgress)opts.onProgress(done+1,blocks.length);
+      const locs=[],ix=p=>{let k=locs.indexOf(p);if(k<0){locs.push(p);k=locs.length-1}return k};
+      const src=I.map(ix),dst=J.map(ix);
+      const d=await api('/api/reistijden',{method:'POST',body:JSON.stringify({locations:locs.map(p=>[p.lng,p.lat]),sources:src,destinations:dst})});
+      I.forEach((a,r)=>J.forEach((b,c)=>{if(a===b)return;const sec=d.durations&&d.durations[r]&&d.durations[r][c],km=d.distances&&d.distances[r]&&d.distances[r][c];if(sec!=null&&km!=null){D.ors[orsKey(a,b)]=[Math.round(km*10)/10,Math.round(sec/6)/10];got++}}));
+      done++;if(done<blocks.length)await new Promise(r=>setTimeout(r,1600));
+    }
+    D.orsAt=Date.now();LEGS.clear();save();if(!q){render();toast(`${got} rijtijden opgehaald bij OpenRouteService. Klik op Automatisch plannen om de planning erop af te stemmen.`)}return{got};
+  }catch(e){
+    save();if(q)return{got,error:e};render();
+    if(e.code==='pw'){askPw(()=>fetchORS(dates));return{got}}
+    toast((done?`${done} van ${blocks.length} delen opgehaald. `:'')+(e.code==='nofn'?'De functie /api/reistijden is niet gevonden. Deploy de site via GitHub, inclusief netlify/functions/reistijden.mjs.':(e.message||'OpenRouteService gaf geen antwoord.'))+' Ontbrekende rijtijden worden geschat.');return{got,error:e};
+  }finally{ORSBUSY=false}
+}
+/* ---------- PDOK: exacte posities van adressen (via /api/adres) ---------- */
+const needsPdok=l=>!!l&&l.geo!=='manual'&&l.geo!=='pdok'&&(!!l.address||String(l.postcode||'').replace(/\s/g,'').length===6);
+function pdokQuery(l){const pc=String(l.postcode||'').replace(/\s/g,'').toUpperCase();return l.address?{q:[l.address,pc,l.city].filter(Boolean).join(' '),type:'adres'}:{q:pc,type:'postcode'}}
+async function pdokLocations(locs,onProgress){
+  const todo=locs.filter(needsPdok),fail=[];let ok=0;
+  for(let i=0;i<todo.length;i+=20){
+    const part=todo.slice(i,i+20);if(onProgress)onProgress(i,todo.length);
+    const d=await api('/api/adres',{method:'POST',body:JSON.stringify({items:part.map(l=>({id:l.id,...pdokQuery(l)}))})});
+    for(const r of d.results||[]){
+      const l=part.find(x=>x.id===r.id);if(!l)continue;
+      const a=normTxt(l.city),b=normTxt(r.city),cityOk=!a||!b||a===b||a.includes(b)||b.includes(a);
+      if(r.ok&&cityOk&&r.lat>50&&r.lat<54&&r.lng>3&&r.lng<8){l.lat=r.lat;l.lng=r.lng;l.geo='pdok';l.pdokLabel=r.label;delete l.pdokFail;if(!l.postcode&&r.postcode)l.postcode=r.postcode;ok++}
+      else{l.pdokFail=r.ok?`PDOK vond "${r.label}", in een andere plaats`:(r.error||'Niet gevonden');fail.push(l)}
+    }
+  }
+  if(onProgress)onProgress(todo.length,todo.length);
+  LEGS.clear();return{ok,fail,total:todo.length};
+}
+function pdokAfterSave(loc){
+  if(!SERVER||!needsPdok(loc))return;
+  pdokLocations([loc]).then(r=>{save();render();toast(r.ok?`Exacte positie gevonden via PDOK: ${loc.pdokLabel}.`:'PDOK kon dit adres niet vinden; de geschatte positie blijft staan.')})
+    .catch(e=>{if(e&&e.code==='pw')askPw(()=>pdokAfterSave(loc))});
+}
+async function pdokImprove(){
+  if(!SERVER){toast('PDOK werkt in de Netlify-versie.');return}
+  const locs=D.locations.filter(needsPdok);if(!locs.length){toast('Alle locaties hebben al een exacte positie.');return}
+  try{const r=await pdokLocations(locs,(a,b)=>toast(`Posities opzoeken via PDOK… ${a} van ${b}`));save();render();
+    toast(`${r.ok} van ${r.total} locaties hebben nu een exacte positie.${r.fail.length?` ${r.fail.length} niet gevonden; controleer het adres (zie kolom Positie).`:''}${useORS()&&r.ok?' Haal daarna de rijtijden opnieuw op.':''}`)}
+  catch(e){save();render();if(e&&e.code==='pw'){askPw(pdokImprove);return}toast(apiErr(e))}
+}
+async function withPw(fn){try{return await fn()}catch(e){if(e&&e.code==='pw'){await new Promise(res=>askPw(res));return await fn()}throw e}}
+/* Na een Excel-import: exacte posities -> echte rijtijden -> planning, met voortgang */
+async function importPipeline(ds,newLocs,msg){
+  const steps=[['pdok','Exacte posities opzoeken via PDOK'],['ors','Echte rijtijden ophalen via OpenRouteService'],['plan','Planning maken']];
+  const st={pdok:'wacht',ors:useORS()?'wacht':'uit',plan:'wacht'},info={};
+  const lab={wacht:'Wacht…',bezig:'Bezig…',klaar:'Klaar',fout:'Niet gelukt',uit:'Overgeslagen'};
+  const show=()=>{FORM=null;$('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="ipT" style="width:min(560px,100%)"><h3 id="ipT">Import verwerken</h3><p class="note">${esc(msg)}</p>
+    <ol class="steps">${steps.map(([k,l])=>`<li class="st-${st[k]}"><b>${l}</b><span>${esc(info[k]||lab[st[k]])}</span></li>`).join('')}</ol>
+    <p class="hint">Dit venster sluit vanzelf en toont daarna het importlog.</p></div>`;$('#modal').hidden=false};
+  const run=async(k,fn)=>{st[k]='bezig';show();try{await withPw(fn);st[k]='klaar'}catch(e){st[k]='fout';info[k]=apiErr(e)+' De app rekent hier verder met de schatting.'}show()};
+  await run('pdok',async()=>{
+    const locs=[...new Set([...newLocs,...D.locations.filter(l=>D.jobs.some(j=>j.locationId===l.id&&ds.includes(j.date)))])].filter(needsPdok);
+    if(!locs.length){info.pdok='Alle posities waren al exact';return}
+    const r=await pdokLocations(locs,(a,b)=>{info.pdok=`${a} van ${b} adressen…`;show()});
+    info.pdok=`${r.ok} van ${r.total} adressen exact gevonden${r.fail.length?`; ${r.fail.length} niet gevonden, daar blijft de geschatte positie`:''}`;save()});
+  if(useORS())await run('ors',async()=>{const r=await fetchORS(ds,{quiet:true,onProgress:(a,b)=>{info.ors=`Deel ${a} van ${b}…`;show()}});if(r.error)throw r.error;info.ors=r.got?`${r.got} rijtijden opgehaald`:'Alle rijtijden waren al bekend'});
+  else info.ors='Staat uit (Instellingen > Bron voor reistijden)';
+  await run('plan',async()=>{replan(ds);info.plan=`${ds.length} dag(en) gepland`});
+  await new Promise(r=>setTimeout(r,900));
+  toast(msg+'.');openLog();
+}
+
+function orsChip(date,rows){
+  if(!useORS())return'';const pts=orsPointsFor([date]);const miss=orsMissing(pts);
+  return miss?`<button class="btn sm" data-act="orsfetch" data-date="${date}" title="Voor ${miss} trajecten is nog geen echte rijtijd bekend; daar wordt geschat">${I.route} ${miss} rijtijden ophalen</button>`:'<span class="chip ok" title="Rijtijden van OpenRouteService">Echte rijtijden</span>';
 }
 
 /* ---------- dagsimulatie ---------- */
@@ -404,7 +508,7 @@ function simulate(w,ids,date){
   const dt=date||(ids.length&&JOB[ids[0]]?JOB[ids[0]].date:null),sh=shiftOf(w,dt);
   const st=D.settings,start=t2m(sh.start)??480,end=t2m(sh.end)??1020,pAt=t2m(st.pauseAt)??720,pm=+st.pauseMin||0;
   let t=start,pos=wPt(w),km=0,trav=0,wait=0,serv=0,pauseDone=pm<=0,late=0,cur=null,depart=start,lastEnd=start;
-  if(st.startAtFirst!==false&&ids.length){const j0=JOB[ids[0]],l0=j0&&LOC[j0.locationId];if(l0){const arr=Math.max(start,t2m(j0.from)??start);depart=arr-leg(pos,lPt(l0)).min-(+st.parkMin||0);t=depart}}
+  if(st.startAtFirst!==false&&ids.length){const j0=JOB[ids[0]],l0=j0&&LOC[j0.locationId];if(l0){const arr=Math.max(start,t2m(j0.from)??start);depart=arr-leg(pos,lPt(l0)).min-(+st.parkMin||0);const mp=st.maxPreTravel==null||st.maxPreTravel===''?60:+st.maxPreTravel;depart=Math.max(depart,start-mp);t=depart}}
   const seg=[],stops=[],lateJobs=[],skillBad=[];
   const pause=()=>{seg.push({k:'pause',a:t,b:t+pm});t+=pm;pauseDone=true};
   /* Pauze is flexibel: alleen nemen als de volgende klussen daardoor niet buiten hun tijdvak vallen */
@@ -1038,7 +1142,7 @@ function viewPlanning(){
     <div class="kpi"><b>${nUtil?Math.round(util/nUtil*100):0}%</b><span>benutting werktijd</span></div>
     <div class="kpi ${warn?'bad':'okk'}"><b>${warn}</b><span>waarschuwingen</span></div>
     ${stKpi(st.date,rows,P)}
-    <div class="acts">${edited}${pubChip(st.date)}<button class="btn" data-act="publish" title="Ritten klaarzetten in de medewerker-app">${I.send} Publiceer naar medewerkers</button><button class="btn" data-act="unpinall" title="Alle handmatige vastzettingen voor deze dag opheffen">${I.unlock} Vastzetten opheffen</button><button class="btn primary" data-act="auto">${I.auto} Automatisch plannen</button></div>
+    <div class="acts">${orsChip(st.date,rows)}${edited}${pubChip(st.date)}<button class="btn" data-act="publish" title="Ritten klaarzetten in de medewerker-app">${I.send} Publiceer naar medewerkers</button><button class="btn" data-act="unpinall" title="Alle handmatige vastzettingen voor deze dag opheffen">${I.unlock} Vastzetten opheffen</button><button class="btn primary" data-act="auto">${I.auto} Automatisch plannen</button></div>
   </section>`;
   if(!jobs.length)return kpis+`<section class="panel empty"><h2>Geen opdrachten op ${esc(fdate(st.date))}</h2><p>Voeg opdrachten toe onder Opdrachten of kies een andere datum.</p><button class="btn primary" data-act="newjob">${I.plus} Nieuwe opdracht</button></section>`;
   return kpis+sickBanner()+reportsPanel(st)+timeline(st)+`<div class="split">${mapPanel(st)}${routePanel(st)}</div>`+unplannedPanel(st)
@@ -1096,7 +1200,7 @@ function mapPanel(st){
   }
   if(S.mapMode!=='focus'){const seen={};un.forEach(j=>{seen[j.locationId]=(seen[j.locationId]||0)+1});
     for(const lid in seen){const l=LOC[lid];if(!l)continue;const[x,y]=P(+l.lat,+l.lng);const cu=CUS[l.customerId]||{};g+=`<g class="mk mk-un"><title>Niet gepland: ${esc(cu.name)} – ${seen[lid]} voertuig(en)</title><circle cx="${x}" cy="${y}" r="12"/><text x="${x}" y="${y}">!</text></g>`}}
-  g+=`<text class="note" x="12" y="${H-12}">Schematische kaart · lijnen hemelsbreed, reistijd berekend met wegfactor</text>`;
+  g+=`<text class="note" x="12" y="${H-12}">Schematische kaart · lijnen hemelsbreed · ${useORS()?'reistijd via OpenRouteService':'reistijd berekend met wegfactor'}</text>`;
   const b=(k,l)=>`<button data-act="mapmode" data-k="${k}" aria-pressed="${S.mapMode===k}">${l}</button>`;
   return`<section class="panel"><div class="row"><h2>Routekaart</h2><span class="sp"></span></div><div class="map-ctl"><div class="seg">${b('routes','Alle routes')}${b('focus','Alleen geselecteerd')}${b('nl','Heel Nederland')}</div></div><div class="map-wrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kaart met routes per medewerker">${g}</svg></div></section>`;
 }
@@ -1365,10 +1469,10 @@ function openVisit(wid,lid){
 /* ---------- beheer: klanten & locaties ---------- */
 function viewCustomers(){
   const cr=D.customers.map(c=>{const n=D.locations.filter(l=>l.customerId===c.id).length;return`<tr><td><b>${esc(c.name)}</b>${c.notes?`<div class="small muted" style="max-width:40ch">${esc(c.notes)}</div>`:''}</td><td>${esc(c.contact)}</td><td class="mono">${esc(c.phone)}</td><td>${esc(c.email)}</td><td>${n}</td><td class="act"><button class="btn ghost" data-act="editcus" data-id="${c.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('');
-  const lr=D.locations.map(l=>{const c=CUS[l.customerId]||{};const n=D.jobs.filter(j=>j.locationId===l.id).length;return`<tr><td><b>${esc(c.name)}</b><div class="small muted">${esc(l.name)}</div></td><td>${esc(l.address)}</td><td class="mono">${esc(l.postcode)}</td><td>${esc(l.city)}</td><td><span class="chip ${l.geo==='manual'?'ok':l.geo==='pc4'?'acc':'warn'}">${GEO_LABEL[l.geo]||'Onbekend'}</span></td><td>${n}</td><td class="act"><button class="btn ghost" data-act="editloc" data-id="${l.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('');
+  const lr=D.locations.map(l=>{const c=CUS[l.customerId]||{};const n=D.jobs.filter(j=>j.locationId===l.id).length;return`<tr><td><b>${esc(c.name)}</b><div class="small muted">${esc(l.name)}</div></td><td>${esc(l.address)}</td><td class="mono">${esc(l.postcode)}</td><td>${esc(l.city)}</td><td><span class="chip ${l.geo==='manual'||l.geo==='pdok'?'ok':l.geo==='pc4'?'acc':'warn'}" title="${esc(l.pdokLabel||l.pdokFail||'')}">${GEO_LABEL[l.geo]||'Onbekend'}</span>${l.pdokFail&&l.geo!=='pdok'?`<div class="small" style="color:var(--warn)">PDOK: ${esc(l.pdokFail)}</div>`:''}</td><td>${n}</td><td class="act"><button class="btn ghost" data-act="editloc" data-id="${l.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('');
   return`<section class="panel sec"><div class="toolbar"><h2>Klanten</h2><span class="sp"></span><button class="btn primary" data-act="newcus">${I.plus} Nieuwe klant</button></div>
   <div class="tbl-wrap"><table><thead><tr><th>Klant</th><th>Contactpersoon</th><th>Telefoon</th><th>E-mail</th><th>Locaties</th><th></th></tr></thead><tbody>${cr||'<tr><td colspan="6" class="empty">Nog geen klanten</td></tr>'}</tbody></table></div></section>
-  <section class="panel sec"><div class="toolbar"><h2>Locaties</h2><span class="sp"></span><button class="btn primary" data-act="newloc">${I.plus} Nieuwe locatie</button></div>
+  <section class="panel sec"><div class="toolbar"><h2>Locaties</h2><span class="sp"></span>${(()=>{const n=D.locations.filter(needsPdok).length;return n?`<button class="btn" data-act="pdok"${SERVER?'':' disabled title="Werkt in de Netlify-versie"'}>${I.route} Posities verbeteren via PDOK (${n})</button>`:''})()}<button class="btn primary" data-act="newloc">${I.plus} Nieuwe locatie</button></div>
   <div class="tbl-wrap"><table><thead><tr><th>Klant · locatie</th><th>Adres</th><th>Postcode</th><th>Plaats</th><th>Positie</th><th>Opdrachten</th><th></th></tr></thead><tbody>${lr||'<tr><td colspan="7" class="empty">Nog geen locaties</td></tr>'}</tbody></table></div>
   <p class="hint">Zonder coördinaten schat de app de positie uit de postcode. Vul voor de beste reistijden de exacte breedte- en lengtegraad in (bijv. uit Google Maps: rechtsklik op de plek).</p></section>`;
 }
@@ -1387,7 +1491,7 @@ function editCus(id){
       const hasAddr=v.address||v.postcode||v.city;let loc=null;
       if(hasAddr){loc={name:v.locName||'Hoofdlocatie',address:v.address,postcode:v.postcode,city:v.city,info:v.info,lat:'',lng:''};const ge=fixGeo(loc,null);if(ge)return ge}
       const nid=uid('c');D.customers.push({id:nid,...cust});
-      if(loc)D.locations.push({id:uid('l'),customerId:nid,...loc});
+      let newLoc=null;if(loc){newLoc={id:uid('l'),customerId:nid,...loc};D.locations.push(newLoc)}setTimeout(()=>pdokAfterSave(newLoc),50);
       save();render();toast(loc?`Klant en locatie opgeslagen${loc.geo!=='manual'?' (positie geschat uit '+(loc.geo==='plaats'?'de plaats':'de postcode')+')':''}.`:'Klant opgeslagen. Voeg nog een locatie toe om opdrachten te kunnen plannen.');
     },
     onDelete:id?()=>{const lids=new Set(nl.map(l=>l.id));const ds=D.jobs.filter(j=>lids.has(j.locationId)).map(j=>j.date);D.customers=D.customers.filter(x=>x.id!==id);D.locations=D.locations.filter(l=>!lids.has(l.id));D.jobs=D.jobs.filter(j=>!lids.has(j.locationId));replan(ds);toast('Klant verwijderd.')}:null,
@@ -1399,12 +1503,12 @@ function editLoc(id,custId){
   const nj=id?D.jobs.filter(j=>j.locationId===id).length:0;
   openForm({title:id?'Locatie bewerken':'Nieuwe locatie',fields:[{k:'customerId',label:'Klant',type:'select',wide:1,options:D.customers.map(c=>[c.id,c.name])},{k:'name',label:'Naam locatie',req:1},{k:'address',label:'Straat en huisnummer'},{k:'postcode',label:'Postcode',ph:'5301 LK'},{k:'city',label:'Plaats'},{k:'lat',label:'Breedtegraad (optioneel)',type:'number',step:'any',ph:'51.8175'},{k:'lng',label:'Lengtegraad (optioneel)',type:'number',step:'any',ph:'5.2620'},{k:'info',label:'Locatie-informatie',wide:1,ph:'bijv. parkeergarage P2, melden bij receptie'}],values:l,
     note:'Laat de coördinaten leeg om ze te schatten uit de postcode of plaats.',
-    onSave:v=>{const geo=fixGeo(v,l);if(geo)return geo;if(id)Object.assign(l,v);else D.locations.push({id:uid('l'),...v});replan(D.jobs.filter(j=>j.locationId===id).map(j=>j.date));toast('Locatie opgeslagen'+(v.geo!=='manual'?' (positie geschat uit postcode).':'.'))},
+    onSave:v=>{const geo=fixGeo(v,l);if(geo)return geo;let tgt=l;if(id)Object.assign(l,v);else{tgt={id:uid('l'),...v};D.locations.push(tgt)}setTimeout(()=>pdokAfterSave(tgt),50);replan(D.jobs.filter(j=>j.locationId===id).map(j=>j.date));toast('Locatie opgeslagen'+(v.geo!=='manual'?' (positie geschat uit postcode).':'.'))},
     onDelete:id?()=>{const ds=D.jobs.filter(j=>j.locationId===id).map(j=>j.date);D.locations=D.locations.filter(x=>x.id!==id);D.jobs=D.jobs.filter(j=>j.locationId!==id);replan(ds);toast('Locatie verwijderd.')}:null,
     delNote:nj?`Dit verwijdert ook ${nj} opdracht(en) op deze locatie.`:''});
 }
 function fixGeo(v,old){
-  const pcChanged=old&&((old.postcode||'')!==(v.postcode||'')||(v.city!==undefined&&(old.city||'')!==(v.city||'')));
+  const pcChanged=old&&((v.address!==undefined&&(old.address||'')!==(v.address||''))||(old.postcode||'')!==(v.postcode||'')||(v.city!==undefined&&(old.city||'')!==(v.city||'')));
   if(v.lat!==''&&v.lng!==''&&!(pcChanged&&old.geo!=='manual'&&+v.lat===+old.lat)){v.lat=+v.lat;v.lng=+v.lng;v.geo=(old&&old.geo&&+old.lat===v.lat&&+old.lng===v.lng)?old.geo:'manual';if(v.lat<50||v.lat>54||v.lng<3||v.lng>8)return'Coördinaten liggen buiten Nederland. Controleer breedte- en lengtegraad.';return''}
   const g=geocode(v.postcode,v.city);if(!g)return'Postcode en plaats niet herkend. Vul een Nederlandse postcode in (bijv. 5301 LK) of geef coördinaten op.';
   Object.assign(v,g);return'';
@@ -1442,8 +1546,12 @@ function viewSettings(){
   const s=D.settings;
   const num=(k,l,h,step=1)=>`<label class="fld"><span>${l}</span><input type="number" step="${step}" id="set_${k}" data-set="${k}" value="${esc(s[k])}"><small class="muted">${h}</small></label>`;
   const tr=D.types.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td class="mono">${t.dur} min</td><td>${t.skill?`<span class="chip">${esc(t.skill)}</span>`:'<span class="muted">iedereen</span>'}</td><td class="act"><button class="btn ghost" data-act="edittype" data-id="${t.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
+  const orsPts=orsPointsFor(null),orsMiss=orsMissing(orsPts),orsTot=orsPts.length*(orsPts.length-1);
   return`<section class="panel sec"><h2>Reistijd en werkdag</h2>
+  <div class="settings"><label class="fld"><span>Bron voor reistijden</span><select id="set_travelSource" data-set="travelSource"><option value="schatting"${!useORS()?' selected':''}>Schatting (hemelsbreed × wegfactor)</option><option value="ors"${useORS()?' selected':''}>OpenRouteService (echte wegen)</option></select><small class="muted">Bij OpenRouteService gebruikt de app echte rijtijden over de weg. Waar die nog niet zijn opgehaald, wordt geschat.</small></label>
+  <div class="fld"><span>OpenRouteService</span><div class="small">${SERVER?`${orsTot?`${orsTot-orsMiss} van ${orsTot} rijtijden opgehaald`:'Nog geen locaties'}${D.orsAt?` · bijgewerkt ${esc(new Date(D.orsAt).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}`:''}`:'Werkt in de Netlify-versie, met ORS_API_KEY in Netlify.'}</div><div class="row" style="margin-top:6px"><button class="btn sm" data-act="orsfetch"${SERVER?'':' disabled'}>${I.route} Rijtijden ophalen</button>${D.ors&&Object.keys(D.ors).length?'<button class="btn sm ghost" data-act="orsclear">Opgehaalde rijtijden wissen</button>':''}</div><small class="muted">Haalt rijtijden op tussen alle standplaatsen en locaties met opdrachten vanaf vandaag. Nieuwe locaties? Klik opnieuw; alleen wat ontbreekt wordt opgehaald.</small></div></div>
   <div class="settings">${num('urbanSpeed','Snelheid in de bebouwde kom (km/u)','Geldt voor de eerste kilometers van elke rit')}${num('urbanKm','Kilometers stadsverkeer per rit','Daarna rekent de app met de snelheid buiten de kom',1)}${num('roadSpeed','Snelheid buiten de kom (km/u)','Gemiddelde inclusief snelweg')}${num('roadFactor','Wegfactor','Hemelsbrede afstand × factor = rijafstand',.05)}${num('parkMin','Parkeren en opstarten (min)','Per aankomst op een klantlocatie')}${num('minTravel','Minimale rijtijd tussen locaties (min)','Voorkomt 0 min bij geschatte posities')}${num('pauseMin','Pauze (min)','0 = geen pauze inplannen')}<label class="fld"><span>Pauze vanaf</span><input type="time" id="set_pauseAt" data-set="pauseAt" value="${esc(s.pauseAt)}"><small class="muted">Eerste moment hierna waarop de pauze geen tijdvak laat missen</small></label>${num('kmWeight','Weging kilometers','Minuten "kosten" per km naast reistijd',.05)}</div>
+  <div class="settings">${num('maxPreTravel','Maximale aanrijtijd vóór de begintijd (min)','Rijtijd naar de eerste klant die buiten werktijd valt. Is de rit langer, dan begint de eerste klus later.')}</div>
   <div style="display:grid;gap:8px"><label class="chk"><input type="checkbox" id="set_startAtFirst" data-set="startAtFirst"${s.startAtFirst!==false?' checked':''}> Begintijd = aanwezig bij de eerste klant (aanrijden vanaf standplaats valt vóór de begintijd)</label><label class="chk"><input type="checkbox" id="set_endAtLast" data-set="endAtLast"${s.endAtLast===true?' checked':''}> Eindtijd = klaar bij de laatste klant (terugrit naar standplaats valt na de eindtijd)</label></div>
   <div class="row"><button class="btn primary" data-act="saveset">Opslaan en opnieuw plannen</button></div></section>
   <section class="panel sec"><div class="toolbar"><h2>Reinigingstypes</h2><span class="sp"></span><button class="btn" data-act="edittype">${I.plus} Nieuw type</button></div>
@@ -1663,14 +1771,14 @@ function doXImport(){
   log.forEach(e=>{if(e.status==='ok'&&fut0&&e.date<today0){e.status='past';e.reason='Datum ligt voor vandaag'}});
   const type=$('#xtype').value,slack=+$('#xslack').value||0,slotDur=$('#xslot').checked;
   if($('#xclear').checked)removeSample();
-  let n=0,dup=0,newC=0,newL=0;const dates=new Set();
+  let n=0,dup=0,newC=0,newL=0;const dates=new Set(),newLocs=[];
   for(const it of items){
     let cu=D.customers.find(x=>clean(x.name).toLowerCase()===it.cust.toLowerCase());
     if(!cu){cu={id:uid('c'),name:it.cust,contact:'',phone:'',email:it.mail||'',login:it.login||''};D.customers.push(cu);newC++}
     else{if(!cu.email&&it.mail)cu.email=it.mail;if(!cu.login&&it.login)cu.login=it.login}
     const npc=it.pc.replace(/\s/g,''),na=it.addr.toLowerCase(),nc=it.city.toLowerCase();
     let lo=D.locations.find(l=>l.customerId===cu.id&&(npc?String(l.postcode||'').replace(/\s/g,'').toUpperCase()===npc&&(!it.addr||!l.address||clean(l.address).toLowerCase()===na):clean(l.address).toLowerCase()===na&&clean(l.city).toLowerCase()===nc));
-    if(!lo){const city=it.city?it.city.charAt(0)+it.city.slice(1).toLowerCase().replace(/(^|[\s-])(\S)/g,(m,a,b)=>a+b.toUpperCase()):'';lo={id:uid('l'),customerId:cu.id,name:it.addr||'Locatie',address:it.addr,postcode:it.pc,city,info:it.info||'',...geocode(it.pc,it.city)};D.locations.push(lo);newL++}
+    if(!lo){const city=it.city?it.city.charAt(0)+it.city.slice(1).toLowerCase().replace(/(^|[\s-])(\S)/g,(m,a,b)=>a+b.toUpperCase()):'';lo={id:uid('l'),customerId:cu.id,name:it.addr||'Locatie',address:it.addr,postcode:it.pc,city,info:it.info||'',...geocode(it.pc,it.city)};D.locations.push(lo);newLocs.push(lo);newL++}
     else if(!lo.info&&it.info)lo.info=it.info;
     if(D.jobs.some(j=>j.plate===it.plate&&j.date===it.date&&j.locationId===lo.id)){dup++;if(log[it.li]){log[it.li].status='dup';log[it.li].reason='Bestaat al (zelfde kenteken, datum en locatie)'}continue}
     let from=it.from,to=it.to;const len=from&&to?t2m(to)-t2m(from):0;
@@ -1682,8 +1790,10 @@ function doXImport(){
   const ds=[...dates].sort(),today=todayIso();
   if(ds.length){S.date=ds.find(d=>d>=today)||ds[0];S.tab='planning';S.selLoc=null}
   D.importLog={file:fileName,at:Date.now(),entries:log};
+  const msg=`${n} opdrachten geïmporteerd (${newC} nieuwe klanten, ${newL} nieuwe locaties)${dup?`, ${dup} dubbele overgeslagen`:''}`;
+  if(SERVER&&n){save();importPipeline(ds,newLocs,msg);return}
   replan(ds);
-  toast(`${n} opdrachten geïmporteerd (${newC} nieuwe klanten, ${newL} nieuwe locaties)${dup?`, ${dup} dubbele overgeslagen`:''}. Planning gemaakt voor ${ds.length} datum(s).`);
+  toast(`${msg}. Planning gemaakt voor ${ds.length} datum(s).`);
   openLog();
 }
 /* ---------- importlog: per voertuig per periode wat er met de afspraak gebeurde ---------- */
@@ -1784,6 +1894,9 @@ function onClick(e){
     case'chat':openChat(el.dataset.id);break;
     case'chatquick':chatSend(el.dataset.q);break;
     case'chatapply':chatApply(+el.dataset.m,+el.dataset.i);break;
+    case'orsfetch':fetchORS(el.dataset.date?[el.dataset.date]:null);break;
+    case'pdok':pdokImprove();break;
+    case'orsclear':D.ors={};D.orsAt=null;save();render();toast('Opgehaalde rijtijden gewist; de schatting wordt weer gebruikt.');break;
     case'propose':{const fs=!!$('#skT');openPropose(el.dataset.ids.split(','));if(PROP)PROP.fromSick=fs;break}
     case'extend':{const w=WRK[el.dataset.wid],d=PROP.date,ids=PROP.ids;w.overrides=w.overrides||{};w.overrides[d]={start:el.dataset.start,end:el.dataset.end,note:'Incidenteel langer'};
       const P=getPlan(d);for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));

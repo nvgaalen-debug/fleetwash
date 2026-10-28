@@ -5,6 +5,8 @@
 - `medewerker.html`: de mobiele app voor medewerkers
 - `netlify/functions/planning.mjs`: publiceren van ritten en gereed-/probleemmeldingen (opslag in Netlify Blobs)
 - `netlify/functions/ai-advies.mjs`: AI-advies via je Claude API-sleutel
+- `netlify/functions/reistijden.mjs`: echte rijtijden via OpenRouteService (optioneel)
+- `netlify/functions/adres.mjs`: exacte posities van adressen via PDOK (gratis, geen sleutel nodig)
 - `package.json`: vertelt Netlify dat `@netlify/blobs` nodig is
 - `netlify.toml`: waar de app en de functies staan
 
@@ -14,6 +16,7 @@
 3. Netlify: Site configuration > Environment variables:
    - `APP_PASSWORD` = een wachtwoord voor planners. Sterk aangeraden: zonder wachtwoord kan iedereen met het adres ritten publiceren en meldingen lezen.
    - `ANTHROPIC_API_KEY` = je Claude API-sleutel (alleen nodig voor AI-advies)
+   - `ORS_API_KEY` = sleutel van openrouteservice.org (alleen nodig voor echte rijtijden; gratis account)
 4. Deploys > Trigger deploy > Deploy site.
 
 Netlify Blobs hoef je niet apart aan te zetten; het werkt automatisch op elke Netlify-site.
@@ -28,3 +31,18 @@ Netlify Blobs hoef je niet apart aan te zetten; het werkt automatisch op elke Ne
 4. Planner: meldingen verschijnen automatisch (elke minuut) in de rit, de dagplanning en de opdrachtenlijst.
 
 Telefoon kwijt of medewerker uit dienst? Medewerker bewerken > "Nieuwe link maken", en daarna publiceren.
+
+## Echte rijtijden met OpenRouteService (optioneel)
+1. Maak een gratis account op https://openrouteservice.org en kopieer je API-sleutel.
+2. Netlify: voeg `ORS_API_KEY` toe en deploy opnieuw.
+3. Planner: Instellingen > Bron voor reistijden > OpenRouteService > Opslaan, en klik op "Rijtijden ophalen".
+4. Klik in Planning op "Automatisch plannen" om de planning op de echte rijtijden af te stemmen.
+Nieuwe locaties? Op de Planning-pagina verschijnt "… rijtijden ophalen"; alleen wat ontbreekt wordt opgevraagd.
+Het gratis abonnement heeft een daglimiet; de app haalt per keer alleen ontbrekende rijtijden op en bewaart ze.
+
+## Exacte posities met PDOK
+Werkt automatisch, zonder sleutel:
+- Nieuwe locaties (formulier of klant aanmaken) krijgen na opslaan hun exacte positie via PDOK.
+- Na een Excel-import loopt de app automatisch door: exacte posities (PDOK) > echte rijtijden (OpenRouteService, als die aan staat) > planning.
+- Bestaande locaties: Klanten & locaties > "Posities verbeteren via PDOK".
+Vindt PDOK een adres niet, dan blijft de geschatte positie staan en zie je bij de locatie waarom.

@@ -1949,6 +1949,11 @@ function splitAddr(addr,city,pc){
 const geoKey=(addr,city)=>normTxt(addr)+'|'+normTxt(city);
 const pdokAddr=a=>String(a||'').split(/\s+\/\s+|\s+en\s+|;/)[0].trim();
 let XGEO={};
+function parseAny(rows,opts={}){
+  const hi=rows.findIndex(r=>r&&r.some(c=>/kenteken/i.test(clean(c))));
+  const hasKlant=hi>=0&&rows[hi].some(c=>/klant|bedrijf|debiteur|relatie/i.test(clean(c))&&!/mail/i.test(clean(c)));
+  return hasKlant?parseSheet(rows,opts):parseBlocks(rows,opts);
+}
 function parseSheet(rows,opts={}){
   const hi=rows.findIndex(r=>r&&r.some(c=>/kenteken/i.test(clean(c))));
   if(hi<0)return{error:'Geen kolom "Kenteken" gevonden. Zorg dat er een rij met kolomnamen boven de gegevens staat.'};
@@ -1999,7 +2004,7 @@ const locKey=i=>i.cust.toLowerCase()+'|'+(i.pc?i.pc.replace(/\s/g,''):(i.addr+'|
 function openXlsxImport(){
   XIMP=null;FORM=null;const m=$('#modal');
   m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="xT"><h3 id="xT">Opdrachten importeren uit Excel</h3>
-  <p class="note">Eén rij per voertuig met Kenteken, Klant, Adres en Postcode en/of Plaats (ook "Straat 1, Plaats" in één kolom). Ontbreekt de postcode, dan zoekt de app die op via PDOK; ontbreekt de kolom Klant, dan wordt de klantnaam uit de titel boven de lijst gehaald. Verder plus per maand een kolom Datum met daarna Tijd (bijv. "08.30 tot 09.00"), en eventueel Informatie en Geannuleerd. Cellen als "Niet beschikbaar" of een ingevulde Geannuleerd worden overgeslagen. Mailadres, Inlog en Locatie informatie worden bij de klant en locatie bewaard.</p>
+  <p class="note">Werkt ook met lijsten met meerdere klanten onder elkaar (titelregel, kolomnamen, voertuigen; steeds herhaald): elke titel wordt een klant. Eén rij per voertuig met Kenteken, Klant, Adres en Postcode en/of Plaats (ook "Straat 1, Plaats" in één kolom). Ontbreekt de postcode, dan zoekt de app die op via PDOK; ontbreekt de kolom Klant, dan wordt de klantnaam uit de titel boven de lijst gehaald. Verder plus per maand een kolom Datum met daarna Tijd (bijv. "08.30 tot 09.00"), en eventueel Informatie en Geannuleerd. Cellen als "Niet beschikbaar" of een ingevulde Geannuleerd worden overgeslagen. Mailadres, Inlog en Locatie informatie worden bij de klant en locatie bewaard.</p>
   <div class="fgrid">
     <label class="fld wide"><span>Bestand (.xlsx, .xls of .csv)</span><input type="file" id="xf" accept=".xlsx,.xls,.csv"></label>
     <label class="fld"><span>Type reiniging</span><select id="xtype">${D.types.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} (${t.dur} min)</option>`).join('')}</select></label>
@@ -2019,7 +2024,7 @@ function readXlsx(file){
   const fr=new FileReader();
   fr.onload=()=>{try{
     const wb=XLSX.read(new Uint8Array(fr.result),{type:'array'});let res=null;
-    for(const n of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:false});const r=parseSheet(rows);if(!res||((r.items&&r.items.length||r.lookups&&r.lookups.length)&&!(res.items&&res.items.length)))res={...r,sheet:n,rows};if(r.items&&r.items.length)break}
+    for(const n of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true});const r=parseAny(rows);if(!res||((r.items&&r.items.length||r.lookups&&r.lookups.length)&&!(res.items&&res.items.length)))res={...r,sheet:n,rows};if(r.items&&r.items.length)break}
     if(res.error){out.innerHTML=`<p class="hint" style="color:var(--bad)">${esc(res.error)}</p>`;$('#xgo').disabled=true;return}
     XIMP={...res,file:file.name};xLookup();
   }catch(e){out.innerHTML='<p class="hint" style="color:var(--bad)">Dit bestand kon niet gelezen worden. Is het een Excel- of CSV-bestand?</p>'}};
@@ -2045,7 +2050,7 @@ async function xLookup(){
   }catch(e){X.geoErr=apiErr(e)}
   if(XIMP!==X)return;xReparse();
 }
-function xReparse(){const X=XIMP;if(!X)return;const r=parseSheet(X.rows,{cust:X.custEdit});XIMP={...X,...r};renderXPrev()}
+function xReparse(){const X=XIMP;if(!X)return;const r=parseAny(X.rows,{cust:X.custEdit,names:X.names});XIMP={...X,...r};renderXPrev()}
 function renderXPrev(){
   const X=XIMP,out=$('#xprev'),clear=$('#xclear').checked,items=xItems(),past=X.items.length-items.length;
   const custs=D.customers.filter(c=>!(clear&&/^c\d+$/.test(c.id))).map(c=>clean(c.name).toLowerCase());
@@ -2072,8 +2077,9 @@ function renderXPrev(){
   if(gr.length)geoH=`<details${gr.length-grOk?' open':''}><summary class="small"><b>${grOk} van ${gr.length}</b> adressen zonder postcode gevonden via PDOK${gr.length-grOk?`, <span style="color:var(--bad)">${gr.length-grOk} niet gevonden</span>`:''}</summary><div class="tbl-wrap" style="max-height:180px;overflow:auto;margin-top:6px"><table><thead><tr><th>Adres in de lijst</th><th>Gevonden</th></tr></thead><tbody>${gr.map(g=>`<tr><td class="small">${esc(g.addr)}, ${esc(g.city)}</td><td class="small">${g.ok?`<span class="chip ok">${esc(g.postcode)}</span> ${esc(g.label)}`:`<span style="color:var(--bad)">${esc(g.why)}</span>`}</td></tr>`).join('')}</tbody></table></div></details>`;
   else if(X.geoErr)geoH=`<p class="hint" style="color:var(--bad);margin:0">Postcodes opzoeken via PDOK lukte niet: ${esc(X.geoErr)} De app schat de positie op basis van de plaats.</p>`;
   else if(!SERVER&&X.lookups&&X.lookups.length)geoH=`<p class="hint" style="margin:0">${X.lookups.length} adres(sen) zonder postcode. In de Netlify-versie zoekt de app de postcode op via PDOK; hier wordt de positie geschat op basis van de plaats.</p>`;
+  const blkH=X.multi&&X.blocks?`<div class="tbl-wrap" style="max-height:260px;overflow:auto"><table><thead><tr><th>Klant (aan te passen)</th><th>Voertuigen</th><th>Afspraken</th><th>Vanaf vandaag</th></tr></thead><tbody>${X.blocks.map(b=>`<tr><td><input class="mini" data-xname="${b.i}" value="${esc(b.cust)}" aria-label="Klantnaam blok rij ${b.row}" style="width:100%;min-width:180px"><div class="small muted">rij ${b.row}${b.meta.info.length?' \u00b7 '+esc(b.meta.info.filter(x=>!/^datum/i.test(x)).slice(0,2).join(' \u00b7 ')):''}</div></td><td>${b.plates}</td><td>${b.ok}</td><td><b>${b.future}</b></td></tr>`).join('')}</tbody></table></div>`:'';
   const custH=X.noCust?`<label class="fld" style="max-width:360px"><span>Klant (geen kolom Klant in de lijst${X.meta&&X.meta.cust?', gevonden in de titel':''})</span><input id="xcust" value="${esc(X.custEdit!=null?X.custEdit:X.cust)}" placeholder="Naam van de klant"></label>`:'';
-  out.innerHTML=`<div style="margin-top:14px;display:grid;gap:8px"><p style="margin:0"><b>${esc(X.file)}</b> <span class="muted small">(blad "${esc(X.sheet)}")</span></p>${custH}${geoH}
+  out.innerHTML=`<div style="margin-top:14px;display:grid;gap:8px"><p style="margin:0"><b>${esc(X.file)}</b> <span class="muted small">(blad "${esc(X.sheet)}")</span></p>${custH}${blkH}${geoH}
   <p style="margin:0">${plates.size} voertuigen · ${cu.size} klanten (${newC} nieuw) · ${locs.size} locaties · <b>${items.length} opdrachten</b> op ${dates.length} datum(s)</p>
   ${items.length?`<div class="tbl-wrap" style="max-height:240px;overflow:auto"><table><thead><tr><th>Datum</th><th>Voertuigen</th><th>Tijden</th><th>Plaatsen</th></tr></thead><tbody>${rowsH}</tbody></table></div>`:'<p class="hint" style="margin:0">Geen opdrachten om te importeren met deze instellingen.</p>'}${warn}
   <div class="row"><button class="btn sm" data-act="xlog">Bekijk alle regels per voertuig (${X.log.length})</button></div><div id="xlogBox"></div>
@@ -2087,6 +2093,7 @@ function doXImport(){
   const type=$('#xtype').value,slack=+$('#xslack').value||0,slotDur=$('#xslot').checked;
   if($('#xclear').checked)removeSample();
   let n=0,dup=0,newC=0,newL=0;const dates=new Set(),newLocs=[];
+  const share={};items.forEach(it=>{if(it.from&&it.to){const k=locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to;share[k]=(share[k]||0)+1}});
   for(const it of items){
     let cu=D.customers.find(x=>clean(x.name).toLowerCase()===it.cust.toLowerCase());
     if(!cu){cu={id:uid('c'),name:it.cust,contact:'',phone:it.phone||'',email:it.mail||'',login:it.login||''};D.customers.push(cu);newC++}
@@ -2099,7 +2106,7 @@ function doXImport(){
     let from=it.from,to=it.to;const len=from&&to?t2m(to)-t2m(from):0;
     if(slack){if(from)from=m2t(Math.max(0,t2m(from)-slack));if(to)to=m2t(Math.min(1439,t2m(to)+slack))}
     const jid=uid('j');if(log[it.li]){log[it.li].status='imp';log[it.li].jobId=jid}
-    D.jobs.push({id:jid,plate:it.plate,vehicle:it.veh,locationId:lo.id,date:it.date,from,to,type,duration:slotDur&&len>0?len:'',priority:2,notes:it.note});n++;dates.add(it.date);
+    D.jobs.push({id:jid,plate:it.plate,vehicle:it.veh,locationId:lo.id,date:it.date,from,to,type,duration:slotDur&&len>0&&!it.win?Math.max(10,Math.floor(len/(share[locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to]||1))):'',priority:2,notes:it.note});n++;dates.add(it.date);
   }
   index();closeForm();XIMP=null;
   const ds=[...dates].sort(),today=todayIso();
@@ -2111,6 +2118,125 @@ function doXImport(){
   toast(`${msg}. Planning gemaakt voor ${ds.length} datum(s).`);
   openLog();
 }
+/* ---------- Excel met meerdere klantblokken: titelregel, kolomnamen, voertuigregels (herhaald) ---------- */
+const PLATE_RE=/^(?=.*\d)(?=.*[A-Z])[A-Z0-9]{1,3}-[A-Z0-9]{1,3}-[A-Z0-9]{1,3}$/;
+const isPlate=v=>{const p=clean(v).toUpperCase().replace(/\s/g,'');return PLATE_RE.test(p)||(/^[A-Z0-9]{6}$/.test(p)&&/\d/.test(p)&&/[A-Z]/.test(p))};
+const MONTHS_RE=/\b(jan|feb|mrt|maa|apr|mei|jun|jul|aug|sep|okt|nov|dec)[a-z]*\b\s*,/i;
+function custFromTitle(t,login){
+  let c=clean(t).replace(/^overzicht\s+(gereinigde\s+)?(auto['’]?s|voertuigen|wagens)?\s*(van|voor)?\s*/i,'').split(':')[0].split(/\s[-\u2013]\s/)[0].trim();
+  if(!c&&login){const m=/@([\w.-]+)/.exec(login);if(m)c=m[1].length<=4?m[1].toUpperCase():m[1].charAt(0).toUpperCase()+m[1].slice(1)}
+  if(c&&c===c.toLowerCase())c=c.replace(/(^|\s)(\S)/g,(m,a,b)=>a+b.toUpperCase());
+  return c;
+}
+let CITY_KEYS=null;
+function cityFromText(t){
+  if(!CITY_KEYS)CITY_KEYS=Object.keys(CITY).concat(Object.keys(CITY_ALIAS)).sort((a,b)=>b.length-a.length);
+  const u=' '+clean(t).toUpperCase().replace(/[^A-ZÀ-ſ' -]/g,' ').replace(/\s+/g,' ')+' ';
+  const k=CITY_KEYS.find(k=>k.length>3&&u.includes(' '+k+' '));if(!k)return'';
+  const n=CITY_ALIAS[k]||k;return n.toLowerCase().replace(/(^|[\s-])(\S)/g,(m,a,b)=>a+b.toUpperCase()).replace(/^'S-/i,"'s-");
+}
+function parseAddrCell(a,c,fallbackCity){
+  a=clean(a).replace(/\s+[&+]\s+/g,' & ');c=clean(c);let pc='';
+  const pm=/\b(\d{4})\s?([A-Za-z]{2})\b/.exec(a);
+  if(pm){pc=(pm[1]+' '+pm[2]).toUpperCase();const after=a.slice(pm.index+pm[0].length).replace(/^[\s,]+/,'').trim();a=a.slice(0,pm.index).replace(/[\s,]+$/,'').trim();if(!c)c=after}
+  else if(!c&&a.includes(',')){c=a.slice(a.lastIndexOf(',')+1).trim();a=a.slice(0,a.lastIndexOf(',')).trim()}
+  if(!c){const fc=cityFromText(a);if(fc&&!/\d/.test(a)){c=fc}else c=fallbackCity||''}
+  return{addr:a,city:c,pc};
+}
+function xToken(v){
+  if(v==null||v==='')return{k:'empty'};
+  if(typeof v==='boolean')return{k:'mark'};
+  if(typeof v==='number'&&v>20000&&v<80000)return{k:'date',date:xDate(v),rest:''};
+  if(v instanceof Date)return{k:'date',date:xDate(v),rest:''};
+  const s=clean(v);if(!s)return{k:'empty'};
+  if(/^(true|false|waar|onwaar|x|v|ja|nee|✓)$/i.test(s))return{k:'mark'};
+  let m=/(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4}|\d{2})\b/.exec(s);
+  if(m){const y=m[3].length===2?'20'+m[3]:m[3];return{k:'date',date:`${y}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`,rest:(s.slice(0,m.index)+' '+s.slice(m.index+m[0].length)).replace(/^\s*(maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag)\b/i,'').trim()}}
+  m=/^(\d{1,2})-(\d{1,2})\s+([A-Za-z].*)$/.exec(s);
+  if(m&&!/annul|op\s/i.test(s)&&+m[2]<=12)return{k:'date',noYear:true,dm:[+m[1],+m[2]],rest:m[3]};
+  if(/^niet\s+beschikbaar/i.test(s))return{k:'nb',v:s};
+  if(/\d{1,2}[:.]\d{2}/.test(s)&&s.length<=60){const t=xTime(s);if(t.from)return{k:'time',win:/tussen/i.test(s),from:t.from,to:t.to||'',rest:s.replace(/(tussen\s*)?\d{1,2}[:.]\d{2}(\s*(tot|en|-|t\/m)\s*\d{1,2}[:.]\d{2})?/i,'').replace(/^[\s(\/]+|[\s)]+$/g,'').trim()}}
+  return{k:'text',v:s};
+}
+function restInfo(appt,rest){
+  if(!rest)return;const r=rest.replace(/^[\s(\/]+|[\s)]+$/g,'').trim();if(!r)return;
+  const t=/\d{1,2}[:.]\d{2}/.test(r)?xTime(r):{};if(t.from&&!appt.from){appt.from=t.from;appt.to=t.to||''}
+  const txt=r.replace(/(tussen\s*)?\d{1,2}[:.]\d{2}(\s*(tot|en|-)\s*\d{1,2}[:.]\d{2})?/i,'').replace(/^[\s(\/]+|[\s)]+$/g,'').trim();
+  if(/annul/i.test(txt))appt.cancel=txt;else if(txt)appt.notes.push(txt);
+}
+function parseBlocks(rows,opts={}){
+  const names=opts.names||{},items=[],skipped=[],stat={nb:0,cancel:0,reasons:{}},badCity={},log=[],lookups=new Map(),blocks=[];
+  let blk=null,group='',pendingTitle=[];
+  const isHeader=r=>r&&/kenteken/i.test(clean(r[0]));
+  for(let r=0;r<rows.length;r++){
+    const row=rows[r]||[];if(!row.some(v=>clean(v)))continue;
+    if(isHeader(row)){
+      const top=pendingTitle.length?pendingTitle:[],meta=sheetMeta(top.map(x=>x.row)),tcell=top.length?clean(top[0].row[0]):'';
+      const bi=blocks.length,auto=custFromTitle(tcell,meta.login)||`Klant (rij ${r})`;
+      const H=row.map(c=>clean(c).toLowerCase());const find=re=>H.findIndex((h,i)=>i>0&&re.test(h));
+      blk={i:bi,row:r+1,title:tcell,autoName:auto,cust:clean(names[bi]!=null?names[bi]:auto)||auto,meta,city:cityFromText(tcell),
+        addrIdx:find(/adres|locatie|straat/),cityIdx:find(/plaats|stad/),vehIdx:find(/voertuig|merk|model|type auto/),plates:0,ok:0,future:0,lookups:0};
+      if(blk.addrIdx<0&&blk.cityIdx>=0){blk.addrIdx=blk.cityIdx;blk.cityIdx=-1}
+      if(blk.addrIdx<0)blk.addrIdx=1;
+      blocks.push(blk);pendingTitle=[];group='';continue;
+    }
+    const c0=clean(row[0]);
+    if(!isPlate(c0)){
+      // titel van het volgende blok, of een groepsregel zoals "Samen met Athlon Leeuwarden"
+      const next=rows.slice(r+1).find(x=>x&&x.some(v=>clean(v)));
+      if(/^overzicht/i.test(c0)||isHeader(next)){pendingTitle.push({row,r});blk=blk&&isHeader(next)?blk:blk;continue}
+      if(blk){const t=row.map(clean).filter(Boolean).filter(v=>!/\d{1,2}[:.]\d{2}/.test(v)).join(' ');group=/samen met\s*$/i.test(t)?'':t}
+      continue;
+    }
+    if(!blk){skipped.push(`Rij ${r+1}: voertuig zonder kolomnamen erboven`);continue}
+    const plate=c0.toUpperCase().replace(/\s/g,''),cust=blk.cust;blk.plates++;
+    const cityCell=blk.cityIdx>=0?clean(row[blk.cityIdx]):'',cityOk=cityCell&&!/\d/.test(cityCell)&&!MONTHS_RE.test(cityCell+',')&&!/route|samen|bij\s/i.test(cityCell)&&cityCell.length<=40;
+    const used=new Set([0,blk.addrIdx,blk.vehIdx,cityOk?blk.cityIdx:-1]);
+    let{addr,city,pc}=parseAddrCell(row[blk.addrIdx],cityOk?cityCell:'',blk.city);
+    let exact=null;
+    if(!pc&&addr&&city&&/\d/.test(addr)){const k=geoKey(addr,city),g=XGEO[k];if(g&&g.ok){pc=g.postcode;exact=g;if(g.city)city=g.city}else if(!g){lookups.set(k,{key:k,addr,city,q:pdokAddr(addr)+' '+city});blk.lookups++}}
+    else if(!pc&&addr&&city&&!cityFromText(addr)){const k=geoKey(addr,city),g=XGEO[k];if(g&&g.ok){pc=g.postcode;exact=g;if(g.city)city=g.city}else if(!g){lookups.set(k,{key:k,addr,city,q:addr+' '+city});blk.lookups++}}
+    const veh=blk.vehIdx>=0?clean(row[blk.vehIdx]):'';
+    if(!exact&&!geocode(pc,city)){const k=city||addr||'(leeg)';badCity[k]=(badCity[k]||0)+1;skipped.push(`Rij ${r+1}: locatie "${k}" niet gevonden`);log.push({row:r+1,plate,cust,city:k,per:'',date:'',time:'',note:'',status:'city',reason:`Locatie "${addr||''}${city?', '+city:''}" niet gevonden; vul plaats of postcode aan`});continue}
+    // cellen na kenteken/adres: datums met hun tijd en opmerkingen
+    const appts=[],rowNotes=[];let cur=null,gap=0,lastDate='',prevNb=false,times=0,timeAfterLast=null;
+    const last=row.length;
+    for(let i=1;i<last;i++){
+      if(used.has(i))continue;
+      const t=xToken(row[i]);
+      if(t.k==='empty'){gap++;continue}
+      if(t.k==='mark'){continue}
+      if(t.k==='date'){
+        let date=t.date;if(t.noYear){const y=(lastDate||todayIso()).slice(0,4);date=`${y}-${String(t.dm[1]).padStart(2,'0')}-${String(t.dm[0]).padStart(2,'0')}`}
+        if(!date)continue;cur={date,from:'',to:'',notes:[],col:i};restInfo(cur,t.rest);appts.push(cur);lastDate=date;gap=0;prevNb=false;timeAfterLast=null;continue}
+      if(t.k==='time'){times++;
+        if(cur&&!cur.from&&gap<=1){cur.from=t.from;cur.to=t.to;cur.win=t.win;restInfo(cur,t.rest)}
+        else if(cur&&cur.from&&gap===0&&t.rest&&/annul/i.test(t.rest))cur.cancel=t.rest;
+        if(cur&&appts.length>1&&cur===appts[appts.length-1])timeAfterLast=timeAfterLast?'multi':t;
+        gap=0;continue}
+      if(t.k==='nb'){if(cur&&!cur.from&&gap===0&&!cur.nb)cur.nb=t.v;else if(!prevNb){stat.nb++;stat.reasons['Niet beschikbaar']=(stat.reasons['Niet beschikbaar']||0)+1;log.push({row:r+1,plate,cust,city,per:'',date:'',time:'',note:'',status:'nb',reason:'Niet beschikbaar (zonder datum)'})}prevNb=true;gap=0;continue}
+      prevNb=false;
+      if(cur&&gap===0){if(/annul/i.test(t.v))cur.cancel=t.v;else cur.notes.push(t.v)}else rowNotes.push(t.v);
+      gap=0;
+    }
+    // één tijd achter een reeks datums zonder eigen tijd: geldt voor al die datums
+    const noTime=appts.filter(a=>!a.from&&!a.nb&&!a.cancel);
+    if(timeAfterLast&&timeAfterLast!=='multi'&&noTime.length>0&&appts.length>1&&times===1)noTime.forEach(a=>{a.from=timeAfterLast.from;a.to=timeAfterLast.to});
+    const extra=[group,...rowNotes].filter(Boolean);
+    const base={plate,cust,addr,pc,city,veh,mail:'',login:blk.meta.login,phone:blk.meta.phone,info:blk.meta.info.filter(x=>!/^datum/i.test(x)).join(' · '),...(exact?{lat:exact.lat,lng:exact.lng,geoLabel:exact.label}:{})};
+    for(const a of appts){
+      const note=[...a.notes,...extra].join(' · '),per=fdate(a.date,{month:'short',year:'numeric'}),time=a.from?a.from+(a.to?'–'+a.to:''):'';
+      const L=(status,reason)=>log.push({row:r+1,plate,cust,city,per,date:a.date,time,note,status,reason});
+      if(a.cancel){stat.cancel++;L('cancel','Geannuleerd: '+a.cancel);continue}
+      if(a.nb){stat.nb++;stat.reasons[a.nb]=(stat.reasons[a.nb]||0)+1;L('nb',a.nb);continue}
+      items.push({...base,date:a.date,from:a.from,to:a.to,win:!!a.win,note,li:log.length});L('ok','');blk.ok++;if(a.date>=todayIso())blk.future++;
+    }
+    if(!appts.length)log.push({row:r+1,plate,cust,city,per:'',date:'',time:'',note:extra.join(' · '),status:'nb',reason:'Geen datum in de lijst'});
+  }
+  if(!blocks.length)return{error:'Geen rij met "Kenteken" gevonden.'};
+  return{items,skipped,stat,badCity,log,lookups:[...lookups.values()],blocks,multi:true};
+}
+
 /* ---------- importlog: per voertuig per periode wat er met de afspraak gebeurde ---------- */
 let LOGF={st:'probleem',q:'',m:''},LOGSRC=null;
 const LOGST={unplanned:['Niet ingepland','bad'],city:['Plaats onbekend','bad'],nb:['Niet beschikbaar','warn'],cancel:['Geannuleerd','warn'],planned:['Ingepland','ok'],imp:['Te importeren','acc'],past:['In het verleden',''],dup:['Bestaat al',''],gone:['Opdracht verwijderd','']};
@@ -2142,7 +2268,7 @@ function logRefresh(){
   const chips=[['probleem','Problemen',nP],['alle','Alles',all.length],...Object.keys(LOGST).filter(k=>cnt[k]).map(k=>[k,LOGST[k][0],cnt[k]])];
   $('#logChips').innerHTML=chips.map(([k,l,n])=>`<button class="fchip" data-act="logf" data-k="${k}" aria-pressed="${LOGF.st===k}">${esc(l)} <span>${n}</span></button>`).join('');
   const rows=logFiltered(all),shown=rows.slice(0,500);
-  const city=c=>c?c.charAt(0)+c.slice(1).toLowerCase():'';
+  const city=c=>c?(c===c.toUpperCase()?c.charAt(0)+c.slice(1).toLowerCase():c):'';
   $('#logTbl').innerHTML=rows.length?`<div class="tbl-wrap" style="max-height:${LOGSRC.preview?'300px':'56vh'};overflow:auto"><table><thead><tr><th>Rij</th><th>Kenteken</th><th>Klant · plaats</th><th>Datum</th><th>Tijdslot</th><th>Status</th><th>Toelichting</th><th></th></tr></thead><tbody>${shown.map(e=>{const s=LOGST[e.st]||[e.st,''];
       return`<tr><td class="mono small">${e.row}</td><td>${plateHtml(e.plate)}</td><td><b>${esc(e.cust)}</b><div class="small muted">${esc(city(e.city))}</div></td><td class="mono small">${e.date?esc(fdate(e.date,{weekday:'short',day:'numeric',month:'short'})):esc(e.per||'—')}</td><td class="mono small">${esc(e.time||'')}</td><td><span class="chip ${s[1]}">${esc(s[0])}</span></td><td class="small">${esc(e.reason||'')}${e.note&&e.note!==e.reason?`<div class="muted">${esc(e.note)}</div>`:''}</td><td class="act">${e.st==='unplanned'?`<button class="btn sm" data-act="propose" data-ids="${e.jobId}">${I.auto} Voorstel</button>`:''}</td></tr>`}).join('')}</tbody></table></div>${rows.length>500?`<p class="hint">De eerste 500 van ${rows.length} regels worden getoond. Verfijn het filter.</p>`:''}`
     :'<p class="empty">Geen regels voor dit filter.</p>';
@@ -2251,6 +2377,7 @@ function onChange(e){
   const el=e.target;
   if(el.id==='xf'&&el.files&&el.files[0])return readXlsx(el.files[0]);
   if((el.id==='xclear'||el.id==='xfuture')&&XIMP)return renderXPrev();
+  if(el.dataset.xname!=null&&XIMP){XIMP.names=Object.assign({},XIMP.names,{[el.dataset.xname]:el.value});return xReparse()}
   if(el.id==='xcust'&&XIMP){XIMP.custEdit=el.value;return xReparse()}
   if(el.id==='logM'){LOGF.m=el.value;return logRefresh()}
   if(el.dataset.msgsel&&MV){if(el.checked)MV.sel.add(el.dataset.msgsel);else MV.sel.delete(el.dataset.msgsel);return}

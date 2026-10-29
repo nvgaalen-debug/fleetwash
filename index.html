@@ -192,6 +192,27 @@ td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}
 tr:hover td{background:color-mix(in srgb,var(--accent-soft) 40%,transparent)}
 td.act{white-space:nowrap;text-align:right}
 .sec{display:grid;gap:12px}
+.msgdlg{width:min(980px,100%);display:grid;grid-template-columns:250px 1fr;gap:0;padding:0;overflow:hidden;max-height:min(88vh,820px)}
+.msgside{background:var(--sunk);border-right:1px solid var(--line);overflow:auto;padding:8px;display:grid;align-content:start;gap:4px}
+.mth{display:grid;gap:2px;text-align:left;border:0;background:none;border-radius:8px;padding:9px 10px;cursor:pointer;color:var(--ink);min-width:0}
+.mth b{display:flex;gap:7px;align-items:center;font-weight:600}.mth b .tabbadge{margin-left:auto}
+.mth small{color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mth:hover{background:var(--surface)}.mth.sel{background:var(--surface);box-shadow:inset 3px 0 0 var(--accent)}
+.msgmain{display:grid;gap:10px;padding:16px 18px;min-width:0;align-content:start;overflow:auto}
+.msgmain .chat{min-height:220px;max-height:min(42vh,400px);display:flex;flex-direction:column;gap:8px}
+.bub{max-width:80%;border-radius:12px;padding:8px 11px;font-size:14px;display:grid;gap:3px;white-space:pre-wrap;overflow-wrap:anywhere}
+.bub small{font-size:11.5px;opacity:.85;white-space:normal}
+.bub.me{align-self:flex-end;background:var(--accent);color:var(--on-accent);border-bottom-right-radius:3px}
+.bub.me small,.bub.me .muted,.bub.me small span[style]{color:inherit!important}
+.bub.them{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:3px}
+.bub.urg{box-shadow:0 0 0 2px var(--bad)}
+.mday{align-self:center;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-top:4px}
+.linkbtn{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font:inherit;text-decoration:underline}
+.msg-tpl,.msg-to{gap:6px}.msg-tpl{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}.msg-tpl .fchip{font-size:12.5px;flex:none;white-space:nowrap}
+.msg-to .fchip{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
+#msgTxt{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);resize:vertical;font:inherit;color:inherit}
+@media (max-width:720px){.msgdlg{grid-template-columns:1fr}.msgside{grid-auto-flow:column;grid-auto-columns:max-content;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}}
+
 .abschip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:999px;background:color-mix(in srgb,var(--ac) 16%,transparent);color:var(--ink);white-space:nowrap}
 .abschip::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ac)}
 .cal-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
@@ -344,7 +365,7 @@ const I={
   auto:ic('<path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3M3.4 3.4l2 2M10.6 10.6l2 2M12.6 3.4l-2 2M5.4 10.6l-2 2"/>'),
   route:ic('<circle cx="4" cy="12" r="2"/><circle cx="12" cy="4" r="2"/><path d="M6 12h3.5a2.5 2.5 0 0 0 0-5h-3a2.5 2.5 0 0 1 0-5H10"/>'),
   unlock:ic('<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1"/>'),
-  imp:ic('<path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 13.5h10"/>'),send:ic('<path d="M14 2 2 7.2l5 1.8 1.8 5z"/>'),check:ic('<path d="m3 8.5 3.2 3L13 4.5"/>'),copy:ic('<rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M3 10.5V3.5A1 1 0 0 1 4 2.5h6.5"/>')
+  imp:ic('<path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 13.5h10"/>'),chat:ic('<path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/>'),send:ic('<path d="M14 2 2 7.2l5 1.8 1.8 5z"/>'),check:ic('<path d="m3 8.5 3.2 3L13 4.5"/>'),copy:ic('<rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M3 10.5V3.5A1 1 0 0 1 4 2.5h6.5"/>')
 };
 const plateHtml=p=>`<span class="plate"><i>NL</i><span>${esc(p||'—')}</span></span>`;
 const wc=w=>`var(--w${(w&&w.color!=null?w.color:0)%6})`;
@@ -914,6 +935,92 @@ async function registerLinks(){
 }
 
 
+/* ---------- berichten: planner <-> medewerker-app ---------- */
+const MSG={list:[],at:0,err:'',loading:false};
+const MSGT=['Je planning is gewijzigd, kijk even in de app.','Bel even met kantoor als je kunt.','De volgende klant heeft afgezegd, ga door naar de klant daarna.','De klant is later aanwezig; je kunt pas na {tijd} terecht.','Neem extra tijd voor deze auto, de klant heeft extra wensen.'];
+let MV=null; // geopende berichtenweergave {wid|'all', draft, urgent, sel:Set, ref, date}
+function msgList(){return SERVER?MSG.list:(D.msgs||[])}
+const msgUnread=wid=>msgList().filter(m=>m.from==='worker'&&!m.readAt&&(!wid||m.wid===wid)).length;
+async function fetchMsgs(force){
+  if(!SERVER||MSG.loading)return;if(!force&&MSG.at&&Date.now()-MSG.at<20000)return;
+  MSG.loading=true;
+  try{const d=await api('/api/berichten');const before=JSON.stringify(MSG.list);MSG.list=d.messages||[];MSG.err='';MSG.at=Date.now();
+    if(JSON.stringify(MSG.list)!==before){if(MV)renderMsgs();else if(S.tab==='planning'&&$('#modal').hidden&&!DRAG)render()}}
+  catch(e){MSG.err=e.code||'srv';MSG.at=Date.now()}
+  MSG.loading=false;
+}
+function demoMsgs(){
+  if(D.msgs)return;const t=Date.now(),iso=x=>new Date(t-x*60000).toISOString();
+  D.msgs=[{id:'dm1',wid:'w2',from:'planner',text:'Goedemorgen Sanne, bij Autohuis Lage Weide staan vandaag 5 auto’s klaar in plaats van 3.',urgent:false,date:S.date,at:iso(140),readAt:iso(131)},
+    {id:'dm2',wid:'w2',from:'worker',name:'Sanne Jansen',text:'Top, ik neem extra doeken mee. Lukt het om Studio Glans iets later te doen?',at:iso(126),readAt:null},
+    {id:'dm3',wid:'w1',from:'planner',text:'Mark, de bus van Bouwbedrijf Merwede staat vandaag aan de achterkant van het terrein.',urgent:true,date:S.date,at:iso(65),readAt:null}];
+}
+function openMsgs(o={}){
+  if(!SERVER)demoMsgs();
+  const wid=o.wid||(MV&&MV.wid)||((D.workers.find(w=>msgUnread(w.id))||{}).id)||'all';
+  const planned=D.workers.filter(w=>((getPlan(S.date).routes||{})[w.id]||[]).length).map(w=>w.id);
+  MV={wid,draft:o.text||'',urgent:!!o.urgent,ref:o.ref||'',sel:new Set(planned.length?planned:D.workers.map(w=>w.id))};
+  FORM=null;renderMsgs(true);markSeen(wid);if(SERVER)fetchMsgs(true);
+}
+function markSeen(wid){
+  const items=msgList().filter(m=>m.from==='worker'&&!m.readAt&&(wid==='all'||m.wid===wid));if(!items.length)return;
+  const now=new Date().toISOString();items.forEach(m=>m.readAt=now);
+  if(SERVER)withPw(()=>api('/api/berichten',{method:'POST',body:JSON.stringify({action:'seen',items:items.map(m=>({wid:m.wid,id:m.id}))})})).catch(()=>{});else save();
+}
+function msgStatus(m){
+  if(m.from==='worker')return`${esc(hm(m.at))}`;
+  return m.readAt?`${esc(hm(m.at))} · <span style="color:var(--ok)">${I.check} gelezen ${esc(hm(m.readAt))}</span>`:`${esc(hm(m.at))} · ${SERVER?'nog niet gelezen':'voorbeeld, niet verstuurd'}`;
+}
+function msgDay(m){const d=String(m.at).slice(0,10);return d===todayIso()?'Vandaag':d===addDays(todayIso(),-1)?'Gisteren':fdate(d,{weekday:'short',day:'numeric',month:'short'})}
+function renderMsgs(first){
+  if(!MV)return;const m=$('#modal');const ta=$('#msgTxt');if(ta&&!first)MV.draft=ta.value;
+  const scrollEnd=first||(()=>{const c=$('#msgThread');return!c||c.scrollTop+c.clientHeight>=c.scrollHeight-30})();
+  const all=msgList(),wid=MV.wid;
+  const lastOf=w=>all.filter(x=>x.wid===w.id).slice(-1)[0];
+  const side=`<button class="mth${wid==='all'?' sel':''}" data-act="msgw" data-wid="all"><b>${I.send} Bericht aan meerdere</b><small>Iedereen of een selectie</small></button>`+
+    D.workers.map(w=>{const l=lastOf(w),n=msgUnread(w.id);return`<button class="mth${wid===w.id?' sel':''}" data-act="msgw" data-wid="${w.id}"><b><i class="dot" style="background:${wc(w)}"></i>${esc(w.name)}${n?`<span class="tabbadge">${n}</span>`:''}</b><small>${l?(l.from==='worker'?'':'Jij: ')+esc(l.text.slice(0,48)):'Nog geen berichten'}</small></button>`}).join('');
+  let thread='',head='',to='';
+  if(wid==='all'){
+    const recent=all.filter(x=>x.from==='planner').slice(-40);
+    const groups=[];for(const x of recent){const g=groups.find(g=>g.text===x.text&&Math.abs(new Date(g.at)-new Date(x.at))<5000);if(g)g.items.push(x);else groups.push({text:x.text,at:x.at,urgent:x.urgent,items:[x]})}
+    thread=groups.length?groups.map(g=>`<div class="bub me${g.urgent?' urg':''}"><div>${esc(g.text)}</div><small>${esc(msgDay(g))} ${esc(hm(g.at))} · ${g.items.map(x=>{const w=WRK[x.wid];return`<span title="${x.readAt?'Gelezen '+hm(x.readAt):'Nog niet gelezen'}">${esc(w?w.name.split(' ')[0]:'?')} ${x.readAt?'✓':'•'}</span>`}).join(', ')}</small></div>`).join(''):'<p class="muted small" style="margin:auto;text-align:center">Nog geen berichten verstuurd.</p>';
+    head='<h3 id="msT" style="margin:0">Bericht aan meerdere medewerkers</h3>';
+    to=`<div class="row msg-to"><span class="small muted">Aan:</span>${D.workers.map(w=>`<label class="fchip"><input type="checkbox" data-msgsel="${w.id}"${MV.sel.has(w.id)?' checked':''}> ${esc(w.name)}</label>`).join('')}</div>`;
+  }else{
+    const w=WRK[wid];const th=all.filter(x=>x.wid===wid);let lastDay='';
+    thread=th.length?th.map(x=>{const d=msgDay(x),sep=d!==lastDay?`<div class="mday">${esc(d)}</div>`:'';lastDay=d;
+      return sep+`<div class="bub ${x.from==='planner'?'me':'them'}${x.urgent?' urg':''}">${x.urgent?'<b class="small">Urgent</b>':''}${x.ref?`<span class="small muted">Over ${esc(x.ref)}</span>`:''}<div>${esc(x.text)}</div><small>${msgStatus(x)}</small></div>`}).join(''):`<p class="muted small" style="margin:auto;text-align:center">Nog geen berichten met ${esc(w?w.name:'deze medewerker')}.</p>`;
+    head=`<h3 id="msT" style="margin:0;display:flex;gap:8px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w?w.name:'')}</h3>${w&&w.phone?`<a class="small" href="tel:${esc(String(w.phone).replace(/[^\d+]/g,''))}">${esc(w.phone)}</a>`:''}`;
+  }
+  const tpl=MSGT.map((t,i)=>`<button class="fchip" data-act="msgtpl" data-i="${i}">${esc(t.length>34?t.slice(0,32)+'…':t)}</button>`).join('');
+  m.innerHTML=`<div class="dlg msgdlg" role="dialog" aria-modal="true" aria-labelledby="msT">
+    <div class="msgside">${side}</div>
+    <div class="msgmain"><div class="row">${head}<span class="sp"></span>${SERVER?`<button class="btn sm" data-act="msgref">Ververs</button>`:''}<button class="iconbtn" data-act="msgclose" aria-label="Sluiten"><svg class="ic" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
+      ${!SERVER?'<p class="small" style="margin:0;color:var(--warn)">Voorbeeld: berichten worden pas echt verstuurd in de Netlify-versie.</p>':MSG.err==='pw'?'<p class="small" style="margin:0;color:var(--bad)">Wachtwoord nodig om berichten op te halen. Klik op Ververs.</p>':''}
+      <div class="chat" id="msgThread">${thread}</div>
+      ${to}
+      <div class="row msg-tpl">${tpl}</div>
+      ${MV.ref?`<div class="small muted">Over: <b>${esc(MV.ref)}</b> <button class="linkbtn" data-act="msgnoref">weghalen</button></div>`:''}
+      <textarea id="msgTxt" rows="3" placeholder="Typ een bericht voor de app van de medewerker…" maxlength="1000">${esc(MV.draft)}</textarea>
+      <div class="row"><label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="msgUrg"${MV.urgent?' checked':''}> Urgent (valt extra op in de app)</label><span class="sp"></span><button class="btn primary" data-act="msgsend">${I.send} Versturen</button></div>
+    </div></div>`;
+  m.hidden=false;
+  const c=$('#msgThread');if(c&&scrollEnd)c.scrollTop=c.scrollHeight;
+  if(first){const t=$('#msgTxt');if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length)}}
+}
+async function sendMsg(){
+  const text=($('#msgTxt').value||'').trim();MV.draft=text;MV.urgent=$('#msgUrg').checked;
+  if(!text){toast('Schrijf eerst een bericht.');return}
+  const wids=MV.wid==='all'?[...MV.sel]:[MV.wid];if(!wids.length){toast('Kies minimaal één medewerker.');return}
+  const body={action:'send',wids,text,urgent:MV.urgent,date:S.date,ref:MV.ref};
+  if(!SERVER){const now=new Date().toISOString();D.msgs=(D.msgs||[]).concat(wids.map(w=>({id:uid('m'),wid:w,from:'planner',text,urgent:MV.urgent,date:S.date,ref:MV.ref,at:now,readAt:null})));save();MV.draft='';MV.ref='';$('#msgTxt').value='';renderMsgs();toast('Voorbeeld: in de Netlify-versie gaat dit naar de app.');return}
+  const btn=document.querySelector('[data-act="msgsend"]');if(btn)btn.disabled=true;
+  try{const d=await withPw(()=>api('/api/berichten',{method:'POST',body:JSON.stringify(body)}));MSG.list=MSG.list.concat(d.messages||[]);MV.draft='';{const t=$('#msgTxt');if(t)t.value=''}MV.ref='';MV.urgent=false;renderMsgs();
+    toast(wids.length>1?`Bericht verstuurd naar ${wids.length} medewerkers.`:`Bericht verstuurd naar ${WRK[wids[0]].name}.`)}
+  catch(e){toast(apiErr(e));if(btn)btn.disabled=false}
+}
+function msgBtn(){const n=msgUnread();return`<button class="btn" data-act="msgs" title="Berichten naar de app van medewerkers">${I.chat} Berichten${n?` <span class="tabbadge" title="${n} ongelezen antwoord(en)">${n}</span>`:''}</button>`}
+
 /* ---------- meldingen van medewerkers in één overzicht ---------- */
 const repKind=s=>s.st==='issue'?'probleem':s.note?'opmerking':'gereed';
 const isHandled=id=>!!(D.handled&&D.handled[id]);
@@ -1261,8 +1368,8 @@ let toastT;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
 const TABS=[['planning','Planning'],['opdrachten','Opdrachten'],['klanten','Klanten & locaties'],['medewerkers','Medewerkers'],['afwezigheid','Afwezigheid'],['instellingen','Instellingen']];
 function render(){
-  const nIss=SERVER?openIssues(S.date):0;
-  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab" data-act="tab" data-k="${k}" aria-pressed="${S.tab===k}">${l}${k==='planning'&&nIss?` <span class="tabbadge" title="${nIss} open melding(en) van medewerkers">${nIss}</span>`:''}</button>`).join('');
+  const nIss=SERVER?openIssues(S.date)+msgUnread():0;
+  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab" data-act="tab" data-k="${k}" aria-pressed="${S.tab===k}">${l}${k==='planning'&&nIss?` <span class="tabbadge" title="${nIss} open melding(en) en ongelezen berichten van medewerkers">${nIss}</span>`:''}</button>`).join('');
   $('#dateIn').value=S.date;$('#dayName').textContent=fdate(S.date,{weekday:'long'});
   const v=$('#view');
   if(S.tab==='planning')v.innerHTML=viewPlanning();
@@ -1285,6 +1392,7 @@ function dayState(){
 function viewPlanning(){
   const st=dayState(),{jobs,P,rows,sims,un,off}=st;
   if(SERVER&&!STATUS[st.date])fetchStatus(st.date,true);
+  if(SERVER&&!MSG.at)fetchMsgs(true);
   if(!S.wid||!rows.find(w=>w.id===S.wid))S.wid=(rows.find(w=>(P.routes[w.id]||[]).length)||rows[0]||{}).id||null;
   let km=0,tr=0,sv=0,late=0,over=0,util=0,nUtil=0;
   rows.forEach(w=>{const s=sims[w.id];km+=s.km;tr+=s.trav;sv+=s.serv;late+=s.lateJobs.length;if(s.over>.5)over++;if(s.n){util+=s.serv/Math.max(1,(s.end-s.start));nUtil++}});
@@ -1298,7 +1406,7 @@ function viewPlanning(){
     <div class="kpi"><b>${nUtil?Math.round(util/nUtil*100):0}%</b><span>benutting werktijd</span></div>
     <div class="kpi ${warn?'bad':'okk'}"><b>${warn}</b><span>waarschuwingen</span></div>
     ${stKpi(st.date,rows,P)}
-    <div class="acts">${orsChip(st.date,rows)}${edited}${pubChip(st.date)}<button class="btn" data-act="publish" title="Ritten klaarzetten in de medewerker-app">${I.send} Publiceer naar medewerkers</button><button class="btn" data-act="unpinall" title="Alle handmatige vastzettingen voor deze dag opheffen">${I.unlock} Vastzetten opheffen</button><button class="btn primary" data-act="auto">${I.auto} Automatisch plannen</button></div>
+    <div class="acts">${orsChip(st.date,rows)}${edited}${pubChip(st.date)}${msgBtn()}<button class="btn" data-act="publish" title="Ritten klaarzetten in de medewerker-app">${I.send} Publiceer naar medewerkers</button><button class="btn" data-act="unpinall" title="Alle handmatige vastzettingen voor deze dag opheffen">${I.unlock} Vastzetten opheffen</button><button class="btn primary" data-act="auto">${I.auto} Automatisch plannen</button></div>
   </section>`;
   if(!jobs.length)return kpis+`<section class="panel empty"><h2>Geen opdrachten op ${esc(fdate(st.date))}</h2><p>Voeg opdrachten toe onder Opdrachten of kies een andere datum.</p><button class="btn primary" data-act="newjob">${I.plus} Nieuwe opdracht</button></section>`;
   return kpis+sickBanner()+reportsPanel(st)+timeline(st)+`<div class="split">${mapPanel(st)}${routePanel(st)}</div>`+unplannedPanel(st)
@@ -1617,7 +1725,7 @@ function openVisit(wid,lid){
     ${cu.notes?`<div class="small" style="background:var(--sunk);padding:8px 10px;border-radius:6px;margin-bottom:10px"><b>Opmerkingen klant:</b> ${esc(cu.notes)}</div>`:''}
     ${cu.contact||cu.phone||cu.email||cu.login?`<p class="small" style="margin:0 0 10px">${[cu.contact,cu.phone,cu.email,cu.login?'inlog '+cu.login:''].filter(Boolean).map(esc).join(' · ')}</p>`:''}
     <ul class="vjobs">${rows}</ul>
-    <div class="dlg-foot"><button class="btn sm" data-act="editcus" data-id="${cu.id||''}">${I.edit} Klant</button><button class="btn sm" data-act="editloc" data-id="${l.id}">${I.edit} Locatie</button><span class="sp"></span><button type="button" class="btn" data-act="dlgx">Sluiten</button></div></div>`;
+    <div class="dlg-foot"><button class="btn sm" data-act="editcus" data-id="${cu.id||''}">${I.edit} Klant</button><button class="btn sm" data-act="editloc" data-id="${l.id}">${I.edit} Locatie</button><button class="btn sm" data-act="msgs" data-wid="${w.id}" data-ref="${esc((cu.name||'')+(l.city?', '+l.city:'')+' \u00b7 '+p.jobs.map(id=>JOB[id].plate).join(', '))}">${I.chat} Bericht aan ${esc(w.name.split(' ')[0])}</button><span class="sp"></span><button type="button" class="btn" data-act="dlgx">Sluiten</button></div></div>`;
   $('#modal').hidden=false;
 }
 
@@ -1769,7 +1877,7 @@ function fieldHtml(f,v){
   return`<label class="fld${w}"><span>${esc(f.label)}</span><input id="${id}" type="${f.type||'text'}" value="${esc(v??'')}"${f.ph?` placeholder="${esc(f.ph)}"`:''}${f.req?' required':''}${f.step?` step="${f.step}"`:''}></label>`;
 }
 function openForm(o){
-  FORM=o;const m=$('#modal');
+  FORM=o;MV=null;const m=$('#modal');
   m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT"><form id="dlgF" novalidate><h3 id="dlgT">${esc(o.title)}</h3>${o.note?`<p class="note">${esc(o.note)}</p>`:''}<div class="fgrid">${o.fields.map(f=>fieldHtml(f,o.values[f.k])).join('')}</div><p class="hint" id="dlgErr" style="color:var(--bad)" hidden></p><div class="dlg-foot">${o.onDelete?'<button type="button" class="btn danger" data-act="dlgdel">Verwijderen</button>':''}<span class="sp"></span><button type="button" class="btn" data-act="dlgx">Annuleren</button><button type="submit" class="btn primary">${esc(o.okLabel||'Opslaan')}</button></div></form></div>`;
   m.hidden=false;const first=m.querySelector('input,select,textarea');if(first)first.focus();
   $('#dlgF').addEventListener('submit',e=>{e.preventDefault();
@@ -1779,7 +1887,7 @@ function openForm(o){
     const err=o.onSave(v);if(err)return showErr(err);closeForm();});
 }
 function showErr(t){const e=$('#dlgErr');e.textContent=t;e.hidden=false}
-function closeForm(){$('#modal').hidden=true;$('#modal').innerHTML='';FORM=null}
+function closeForm(){$('#modal').hidden=true;$('#modal').innerHTML='';FORM=null;MV=null}
 
 /* ---------- import / export ---------- */
 function openImport(){
@@ -1820,40 +1928,64 @@ function xTime(v){
   const ts=[...clean(v).matchAll(/(\d{1,2})[:.](\d{2})/g)].map(m=>m2t(+m[1]*60+ +m[2]));
   return{from:ts[0]||'',to:ts[1]||''};
 }
-function parseSheet(rows){
+/* Titelregels boven de kolomnamen: klantnaam, inlog, telefoon en losse aanwijzingen */
+function sheetMeta(top){
+  const cells=top.flat().map(clean).filter(Boolean),m={cust:'',login:'',phone:'',info:[]};
+  for(const c of cells){
+    if(!m.cust&&/(overzicht|planning|lijst|rooster|schema)/i.test(c)){let t=c.replace(/[:\s]+$/,'').replace(/^.*?(auto['\u2019]?s|voertuigen|wagens|leasewagens|bedrijfswagens)\s+(van|voor)?\s*/i,'').replace(/^(overzicht|planning|wasplanning|lijst|rooster|schema)\s+(van|voor)?\s*/i,'');if(t&&t.length<=40)m.cust=t;continue}
+    if(/inlog|login/i.test(c)){m.login=c.replace(/^\s*(inlog|login)\s*:?\s*/i,'');continue}
+    if(/^(\+31|0)[\d\s-]{8,}$/.test(c)){m.phone=c;continue}
+    if(c.length<=80)m.info.push(c);
+  }
+  return m;
+}
+/* "Straat 1, Plaats" of "Straat 1, 1234 AB Plaats" in één cel uit elkaar halen */
+function splitAddr(addr,city,pc){
+  let a=addr,c=city,p=pc;
+  const pm=/\b(\d{4})\s?([A-Za-z]{2})\b/.exec(a+' '+c);if(!p&&pm){p=(pm[1]+' '+pm[2]).toUpperCase();a=a.replace(pm[0],'').trim();c=c.replace(pm[0],'').trim()}
+  if(!a&&/,/.test(c)&&/\d/.test(c.slice(0,c.lastIndexOf(',')))){a=c.slice(0,c.lastIndexOf(',')).trim();c=c.slice(c.lastIndexOf(',')+1).trim()}
+  return{addr:a.replace(/[,\s]+$/,''),city:c.replace(/^[,\s]+/,''),pc:p};
+}
+const geoKey=(addr,city)=>normTxt(addr)+'|'+normTxt(city);
+const pdokAddr=a=>String(a||'').split(/\s+\/\s+|\s+en\s+|;/)[0].trim();
+let XGEO={};
+function parseSheet(rows,opts={}){
   const hi=rows.findIndex(r=>r&&r.some(c=>/kenteken/i.test(clean(c))));
   if(hi<0)return{error:'Geen kolom "Kenteken" gevonden. Zorg dat er een rij met kolomnamen boven de gegevens staat.'};
   const H=rows[hi].map(c=>clean(c).toLowerCase()),col=(re,not)=>H.findIndex(h=>re.test(h)&&!(not&&not.test(h)));
   const c={plate:col(/kenteken/),cust:col(/klant|bedrijf|debiteur|relatie/,/mail/),addr:col(/straat|adres/,/mail/),pc:col(/postcode/),city:col(/plaats|stad/),veh:col(/voertuig|merk|model|soort/),
     mail:col(/mail/),login:col(/inlog|login|account/),info:col(/locatie\s*info|parkeer|instructie|bijzonderhe/)};
-  if(c.cust<0)return{error:'De kolom "Klant" is nodig.'};
+  const meta=sheetMeta(rows.slice(0,hi)),fixedCust=c.cust<0?clean(opts.cust!=null?opts.cust:meta.cust):'';
   if(c.pc<0&&c.city<0)return{error:'Een kolom "Postcode" of "Plaats" is nodig om de locatie te bepalen.'};
   const dcols=H.map((h,i)=>/datum/.test(h)?i:-1).filter(i=>i>=0);
   if(!dcols.length)return{error:'Geen kolom met "Datum" in de naam gevonden.'};
   const slots=dcols.map((d,k)=>{const end=k+1<dcols.length?dcols[k+1]:H.length;let t=-1,n=-1,x=-1;
-    for(let i=d+1;i<end;i++){const h=H[i];if(t<0&&/tijd/.test(h))t=i;else if(x<0&&/geannuleerd|annuler|vervallen/.test(h))x=i;else if(n<0&&/opmerk|notitie|informatie|info/.test(h)&&!/locatie/.test(h))n=i}
-    return{d,t,n,x,per:H[d].replace(/datum/,'').trim()}});
-  const items=[],skipped=[],stat={nb:0,cancel:0,reasons:{}},badCity={},log=[];
+    const blank=[];for(let i=d+1;i<end;i++){const h=H[i];if(t<0&&/tijd/.test(h))t=i;else if(x<0&&/geannuleerd|annuler|vervallen/.test(h))x=i;else if(n<0&&/opmerk|notitie|informatie|info/.test(h)&&!/locatie/.test(h))n=i;else if(!h)blank.push(i)}
+    return{d,t,n,x,blank,per:H[d].replace(/datum/,'').trim()}});
+  const items=[],skipped=[],stat={nb:0,cancel:0,reasons:{}},badCity={},log=[],lookups=new Map();
   const cell=(row,i)=>i>=0?clean(row[i]):'';
   for(let r=hi+1;r<rows.length;r++){
-    const row=rows[r]||[],plate=cell(row,c.plate).toUpperCase(),cust=cell(row,c.cust);
+    const row=rows[r]||[],plate=cell(row,c.plate).toUpperCase(),cust=c.cust<0?(fixedCust||'Onbekende klant'):cell(row,c.cust);
     if(!plate&&!cust)continue;
     if(!plate||!cust){skipped.push(`Rij ${r+1}: kenteken of klant ontbreekt`);continue}
-    const pc=cell(row,c.pc).toUpperCase(),city=cell(row,c.city);
-    if(!geocode(pc,city)){const k=city||pc||'(leeg)';badCity[k]=(badCity[k]||0)+1;skipped.push(`Rij ${r+1}: plaats "${k}" niet herkend`);log.push({row:r+1,plate,cust,city:k,per:'',date:'',time:'',note:'',status:'city',reason:`Plaats "${k}" niet herkend; voeg een postcode toe of maak de locatie handmatig aan`});continue}
-    const base={plate,cust,addr:cell(row,c.addr),pc,city,veh:cell(row,c.veh),mail:cell(row,c.mail),login:cell(row,c.login),info:cell(row,c.info)};
+    const sp=splitAddr(cell(row,c.addr),cell(row,c.city),cell(row,c.pc).toUpperCase());let{pc,city}=sp;const addr=sp.addr;
+    let exact=null;
+    if(!pc&&addr&&city){const k=geoKey(addr,city),g=XGEO[k];if(g&&g.ok){pc=g.postcode;exact=g;if(g.city)city=g.city}else if(!g)lookups.set(k,{key:k,addr,city,q:pdokAddr(addr)+' '+city})}
+    if(!exact&&!geocode(pc,city)){const k=city||pc||'(leeg)';badCity[k]=(badCity[k]||0)+1;skipped.push(`Rij ${r+1}: plaats "${k}" niet herkend`);log.push({row:r+1,plate,cust,city:k,per:'',date:'',time:'',note:'',status:'city',reason:`Plaats "${k}" niet herkend; voeg een postcode toe of maak de locatie handmatig aan`});continue}
+    const base={plate,cust,addr,pc,city,veh:cell(row,c.veh),mail:cell(row,c.mail),login:cell(row,c.login)||meta.login,phone:meta.phone,info:cell(row,c.info)||meta.info.join(' \u00b7 '),...(exact?{lat:exact.lat,lng:exact.lng,geoLabel:exact.label}:{})};
     for(const s of slots){
-      const raw=row[s.d],date=xDate(raw),tm=s.t>=0?cell(row,s.t):'',note=cell(row,s.n);
+      const raw=row[s.d],date=xDate(raw),tm=s.t>=0?cell(row,s.t):'',note=[cell(row,s.n),...s.blank.map(i=>typeof row[i]==='boolean'?'':cell(row,i)).filter(v=>v&&!/^(true|false|waar|onwaar|x|ja|nee)$/i.test(v))].filter(Boolean).join(' \u00b7 ');
       const L=(status,reason)=>log.push({row:r+1,plate,cust,city,per:s.per,date:date||'',time:tm,note,status,reason});
       if(!date){const v=clean(raw);if(v){stat.nb++;stat.reasons[v]=(stat.reasons[v]||0)+1;L('nb',v)}continue}
       if(s.x>=0&&cell(row,s.x)){stat.cancel++;L('cancel','Geannuleerd: '+cell(row,s.x));continue}
       let t={};
       if(s.t>=0){t=xTime(row[s.t]);if(!t.from&&tm){stat.nb++;stat.reasons[tm]=(stat.reasons[tm]||0)+1;L('nb',tm);continue}}
-      if(/^(niet beschikbaar|geannuleerd|vervalt|vervallen)/i.test(note)){stat.nb++;stat.reasons[note]=(stat.reasons[note]||0)+1;L('nb',note);continue}
+      if(/^\s*(g?e?a?nnul|annul|afgezegd)/i.test(note)){stat.cancel++;L('cancel',note);continue}
+      if(/^\s*(niet beschikbaar|vervalt|vervallen)/i.test(note)){stat.nb++;stat.reasons[note]=(stat.reasons[note]||0)+1;L('nb',note);continue}
       items.push({...base,date,from:t.from||'',to:t.to||'',note,li:log.length});L('ok','');
     }
   }
-  return{items,skipped,stat,badCity,log};
+  return{items,skipped,stat,badCity,log,lookups:[...lookups.values()],noCust:c.cust<0,cust:fixedCust,meta};
 }
 const isSample=()=>D.customers.some(c=>/^c\d+$/.test(c.id))&&D.customers.some(c=>c.name==='Autobedrijf Van Dijk');
 function removeSample(){
@@ -1867,7 +1999,7 @@ const locKey=i=>i.cust.toLowerCase()+'|'+(i.pc?i.pc.replace(/\s/g,''):(i.addr+'|
 function openXlsxImport(){
   XIMP=null;FORM=null;const m=$('#modal');
   m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="xT"><h3 id="xT">Opdrachten importeren uit Excel</h3>
-  <p class="note">Eén rij per voertuig met Kenteken, Klant, Adres en Postcode en/of Plaats, plus per maand een kolom Datum met daarna Tijd (bijv. "08.30 tot 09.00"), en eventueel Informatie en Geannuleerd. Cellen als "Niet beschikbaar" of een ingevulde Geannuleerd worden overgeslagen. Mailadres, Inlog en Locatie informatie worden bij de klant en locatie bewaard.</p>
+  <p class="note">Eén rij per voertuig met Kenteken, Klant, Adres en Postcode en/of Plaats (ook "Straat 1, Plaats" in één kolom). Ontbreekt de postcode, dan zoekt de app die op via PDOK; ontbreekt de kolom Klant, dan wordt de klantnaam uit de titel boven de lijst gehaald. Verder plus per maand een kolom Datum met daarna Tijd (bijv. "08.30 tot 09.00"), en eventueel Informatie en Geannuleerd. Cellen als "Niet beschikbaar" of een ingevulde Geannuleerd worden overgeslagen. Mailadres, Inlog en Locatie informatie worden bij de klant en locatie bewaard.</p>
   <div class="fgrid">
     <label class="fld wide"><span>Bestand (.xlsx, .xls of .csv)</span><input type="file" id="xf" accept=".xlsx,.xls,.csv"></label>
     <label class="fld"><span>Type reiniging</span><select id="xtype">${D.types.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} (${t.dur} min)</option>`).join('')}</select></label>
@@ -1887,12 +2019,33 @@ function readXlsx(file){
   const fr=new FileReader();
   fr.onload=()=>{try{
     const wb=XLSX.read(new Uint8Array(fr.result),{type:'array'});let res=null;
-    for(const n of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:false});const r=parseSheet(rows);if(!res||(r.items&&r.items.length&&!(res.items&&res.items.length)))res={...r,sheet:n};if(r.items&&r.items.length)break}
+    for(const n of wb.SheetNames){const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:false});const r=parseSheet(rows);if(!res||((r.items&&r.items.length||r.lookups&&r.lookups.length)&&!(res.items&&res.items.length)))res={...r,sheet:n,rows};if(r.items&&r.items.length)break}
     if(res.error){out.innerHTML=`<p class="hint" style="color:var(--bad)">${esc(res.error)}</p>`;$('#xgo').disabled=true;return}
-    XIMP={...res,file:file.name};renderXPrev();
+    XIMP={...res,file:file.name};xLookup();
   }catch(e){out.innerHTML='<p class="hint" style="color:var(--bad)">Dit bestand kon niet gelezen worden. Is het een Excel- of CSV-bestand?</p>'}};
   fr.readAsArrayBuffer(file);
 }
+/* Ontbrekende postcodes opzoeken via PDOK (op straat + plaats), daarna opnieuw inlezen */
+async function xLookup(){
+  const X=XIMP;if(!X)return;
+  if(!SERVER||!X.lookups||!X.lookups.length){renderXPrev();return}
+  const out=$('#xprev'),todo=X.lookups;X.geoRes=X.geoRes||[];
+  out.innerHTML=`<p class="hint">Postcodes opzoeken via PDOK\u2026 0 van ${todo.length}</p>`;
+  try{
+    for(let i=0;i<todo.length;i+=20){
+      const part=todo.slice(i,i+20);
+      const d=await withPw(()=>api('/api/adres',{method:'POST',body:JSON.stringify({items:part.map((l,k)=>({id:'x'+(i+k),q:l.q,type:'adres'}))})}));
+      for(const r of d.results||[]){const l=part[+r.id.slice(1)-i];if(!l)continue;
+        const a=normTxt(l.city),b=normTxt(r.city),cityOk=!a||!b||a===b||a.includes(b)||b.includes(a);
+        const ok=r.ok&&cityOk&&r.lat>50&&r.lat<54&&r.lng>3&&r.lng<8;
+        XGEO[l.key]=ok?{ok:true,postcode:String(r.postcode||'').replace(/^(\d{4})\s?([A-Za-z]{2})$/,'$1 $2').toUpperCase(),city:r.city,lat:r.lat,lng:r.lng,label:r.label}:{ok:false,why:r.ok?`PDOK vond "${r.label}", in een andere plaats`:(r.error||'Niet gevonden')};
+        X.geoRes.push({addr:l.addr,city:l.city,...XGEO[l.key]})}
+      if($('#xprev'))out.innerHTML=`<p class="hint">Postcodes opzoeken via PDOK\u2026 ${Math.min(i+20,todo.length)} van ${todo.length}</p>`;
+    }
+  }catch(e){X.geoErr=apiErr(e)}
+  if(XIMP!==X)return;xReparse();
+}
+function xReparse(){const X=XIMP;if(!X)return;const r=parseSheet(X.rows,{cust:X.custEdit});XIMP={...X,...r};renderXPrev()}
 function renderXPrev(){
   const X=XIMP,out=$('#xprev'),clear=$('#xclear').checked,items=xItems(),past=X.items.length-items.length;
   const custs=D.customers.filter(c=>!(clear&&/^c\d+$/.test(c.id))).map(c=>clean(c.name).toLowerCase());
@@ -1903,7 +2056,7 @@ function renderXPrev(){
   const wk=dates.filter(d=>{const n=wday(d);return!D.workers.some(w=>(w.days||[]).includes(n))});
   let far=0;const seen={};items.forEach(i=>{const k=locKey(i);if(seen[k])return;seen[k]=1;const g=geocode(i.pc,i.city);if(!g||!D.workers.length)return;const near=Math.min(...D.workers.map(w=>hav(g,{lat:+w.lat,lng:+w.lng})));if(near>far)far=near});
   const est=new Set(items.filter(i=>(geocode(i.pc,i.city)||{}).geo==='plaats').map(locKey)).size;
-  const rowsH=dates.map(d=>{const its=byDate[d],ts=its.map(i=>i.from).filter(Boolean).sort(),te=its.map(i=>i.to).filter(Boolean).sort(),cs=new Set(its.map(i=>i.city.toUpperCase()));return`<tr><td>${esc(fdate(d,{weekday:'short',day:'numeric',month:'short',year:'numeric'}))}</td><td>${its.length}</td><td class="mono">${ts.length?ts[0]+'–'+(te[te.length-1]||''):'hele dag'}</td><td class="small">${esc([...cs].slice(0,4).map(x=>x.charAt(0)+x.slice(1).toLowerCase()).join(', '))}${cs.size>4?' …':''}</td></tr>`}).join('');
+  const rowsH=dates.map(d=>{const its=byDate[d],ts=its.map(i=>i.from).filter(Boolean).sort(),te=its.map(i=>i.to).filter(Boolean).sort(),cs=new Set(its.map(i=>i.city===i.city.toUpperCase()?i.city.charAt(0)+i.city.slice(1).toLowerCase():i.city));return`<tr><td>${esc(fdate(d,{weekday:'short',day:'numeric',month:'short',year:'numeric'}))}</td><td>${its.length}</td><td class="mono">${ts.length?ts[0]+'–'+(te[te.length-1]||''):'hele dag'}</td><td class="small">${esc([...cs].slice(0,4).join(', '))}${cs.size>4?' …':''}</td></tr>`}).join('');
   const st=X.stat||{nb:0,cancel:0,reasons:{}};const rs=Object.entries(st.reasons||{}).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>`"${esc(k)}" ${v}×`).join(', ');
   let info=[];if(st.nb)info.push(`${st.nb} keer niet gepland volgens de lijst (${rs})`);if(st.cancel)info.push(`${st.cancel} geannuleerd`);if(past)info.push(`${past} in het verleden`);
   let warn='';
@@ -1914,7 +2067,13 @@ function renderXPrev(){
   const bc=Object.entries(X.badCity||{});
   if(bc.length)warn+=`<p class="hint" style="color:var(--bad);margin:0">${X.skipped.length} rij(en) overgeslagen omdat de plaats onbekend is: ${bc.map(([k,v])=>esc(k)+' ('+v+')').join(', ')}. Voeg een postcode-kolom toe of maak de locatie handmatig aan.</p>`;
   else if(X.skipped.length)warn+=`<p class="hint" style="color:var(--bad);margin:0">${X.skipped.length} rij(en) overgeslagen: ${X.skipped.slice(0,5).map(esc).join('; ')}</p>`;
-  out.innerHTML=`<div style="margin-top:14px;display:grid;gap:8px"><p style="margin:0"><b>${esc(X.file)}</b> <span class="muted small">(blad "${esc(X.sheet)}")</span></p>
+  const gr=X.geoRes||[],grOk=gr.filter(g=>g.ok).length;
+  let geoH='';
+  if(gr.length)geoH=`<details${gr.length-grOk?' open':''}><summary class="small"><b>${grOk} van ${gr.length}</b> adressen zonder postcode gevonden via PDOK${gr.length-grOk?`, <span style="color:var(--bad)">${gr.length-grOk} niet gevonden</span>`:''}</summary><div class="tbl-wrap" style="max-height:180px;overflow:auto;margin-top:6px"><table><thead><tr><th>Adres in de lijst</th><th>Gevonden</th></tr></thead><tbody>${gr.map(g=>`<tr><td class="small">${esc(g.addr)}, ${esc(g.city)}</td><td class="small">${g.ok?`<span class="chip ok">${esc(g.postcode)}</span> ${esc(g.label)}`:`<span style="color:var(--bad)">${esc(g.why)}</span>`}</td></tr>`).join('')}</tbody></table></div></details>`;
+  else if(X.geoErr)geoH=`<p class="hint" style="color:var(--bad);margin:0">Postcodes opzoeken via PDOK lukte niet: ${esc(X.geoErr)} De app schat de positie op basis van de plaats.</p>`;
+  else if(!SERVER&&X.lookups&&X.lookups.length)geoH=`<p class="hint" style="margin:0">${X.lookups.length} adres(sen) zonder postcode. In de Netlify-versie zoekt de app de postcode op via PDOK; hier wordt de positie geschat op basis van de plaats.</p>`;
+  const custH=X.noCust?`<label class="fld" style="max-width:360px"><span>Klant (geen kolom Klant in de lijst${X.meta&&X.meta.cust?', gevonden in de titel':''})</span><input id="xcust" value="${esc(X.custEdit!=null?X.custEdit:X.cust)}" placeholder="Naam van de klant"></label>`:'';
+  out.innerHTML=`<div style="margin-top:14px;display:grid;gap:8px"><p style="margin:0"><b>${esc(X.file)}</b> <span class="muted small">(blad "${esc(X.sheet)}")</span></p>${custH}${geoH}
   <p style="margin:0">${plates.size} voertuigen · ${cu.size} klanten (${newC} nieuw) · ${locs.size} locaties · <b>${items.length} opdrachten</b> op ${dates.length} datum(s)</p>
   ${items.length?`<div class="tbl-wrap" style="max-height:240px;overflow:auto"><table><thead><tr><th>Datum</th><th>Voertuigen</th><th>Tijden</th><th>Plaatsen</th></tr></thead><tbody>${rowsH}</tbody></table></div>`:'<p class="hint" style="margin:0">Geen opdrachten om te importeren met deze instellingen.</p>'}${warn}
   <div class="row"><button class="btn sm" data-act="xlog">Bekijk alle regels per voertuig (${X.log.length})</button></div><div id="xlogBox"></div>
@@ -1930,11 +2089,11 @@ function doXImport(){
   let n=0,dup=0,newC=0,newL=0;const dates=new Set(),newLocs=[];
   for(const it of items){
     let cu=D.customers.find(x=>clean(x.name).toLowerCase()===it.cust.toLowerCase());
-    if(!cu){cu={id:uid('c'),name:it.cust,contact:'',phone:'',email:it.mail||'',login:it.login||''};D.customers.push(cu);newC++}
-    else{if(!cu.email&&it.mail)cu.email=it.mail;if(!cu.login&&it.login)cu.login=it.login}
+    if(!cu){cu={id:uid('c'),name:it.cust,contact:'',phone:it.phone||'',email:it.mail||'',login:it.login||''};D.customers.push(cu);newC++}
+    else{if(!cu.email&&it.mail)cu.email=it.mail;if(!cu.login&&it.login)cu.login=it.login;if(!cu.phone&&it.phone)cu.phone=it.phone}
     const npc=it.pc.replace(/\s/g,''),na=it.addr.toLowerCase(),nc=it.city.toLowerCase();
     let lo=D.locations.find(l=>l.customerId===cu.id&&(npc?String(l.postcode||'').replace(/\s/g,'').toUpperCase()===npc&&(!it.addr||!l.address||clean(l.address).toLowerCase()===na):clean(l.address).toLowerCase()===na&&clean(l.city).toLowerCase()===nc));
-    if(!lo){const city=it.city?it.city.charAt(0)+it.city.slice(1).toLowerCase().replace(/(^|[\s-])(\S)/g,(m,a,b)=>a+b.toUpperCase()):'';lo={id:uid('l'),customerId:cu.id,name:it.addr||'Locatie',address:it.addr,postcode:it.pc,city,info:it.info||'',...geocode(it.pc,it.city)};D.locations.push(lo);newLocs.push(lo);newL++}
+    if(!lo){const city=it.city&&it.city===it.city.toUpperCase()?it.city.toLowerCase().replace(/(^|[\s-])(\S)/g,(m,a,b)=>a+b.toUpperCase()):it.city||'';lo={id:uid('l'),customerId:cu.id,name:it.addr||'Locatie',address:it.addr,postcode:it.pc,city,info:it.info||'',...(it.lat?{lat:it.lat,lng:it.lng,geo:'pdok',pdokLabel:it.geoLabel||''}:geocode(it.pc,it.city))};D.locations.push(lo);newLocs.push(lo);newL++}
     else if(!lo.info&&it.info)lo.info=it.info;
     if(D.jobs.some(j=>j.plate===it.plate&&j.date===it.date&&j.locationId===lo.id)){dup++;if(log[it.li]){log[it.li].status='dup';log[it.li].reason='Bestaat al (zelfde kenteken, datum en locatie)'}continue}
     let from=it.from,to=it.to;const len=from&&to?t2m(to)-t2m(from):0;
@@ -2053,6 +2212,13 @@ function onClick(e){
     case'orsfetch':fetchORS(el.dataset.date?[el.dataset.date]:null);break;
     case'pdok':pdokImprove();break;
     case'orsclear':D.ors={};D.orsAt=null;save();render();toast('Opgehaalde rijtijden gewist; de schatting wordt weer gebruikt.');break;
+    case'msgs':openMsgs({wid:el.dataset.wid,ref:el.dataset.ref});break;
+    case'msgw':{const t=$('#msgTxt');if(t)MV.draft=t.value;MV.wid=el.dataset.wid;markSeen(MV.wid);renderMsgs();break}
+    case'msgtpl':{const t=$('#msgTxt');t.value=(t.value?t.value.trim()+' ':'')+MSGT[+el.dataset.i];t.focus();const k=t.value.indexOf('{tijd}');if(k>=0)t.setSelectionRange(k,k+6);break}
+    case'msgsend':sendMsg();break;
+    case'msgnoref':{const t=$('#msgTxt');if(t)MV.draft=t.value;MV.ref='';renderMsgs();break}
+    case'msgref':fetchMsgs(true).then(()=>{if(MSG.err==='pw'){const w=MV&&MV.wid;askPw(()=>{openMsgs({wid:w})})}else renderMsgs()});break;
+    case'msgclose':closeForm();render();break;
     case'absnew':openAbs(null,{wid:el.dataset.wid,date:el.dataset.date});break;
     case'absedit':openAbs(el.dataset.id);break;
     case'absmonth':{const ym=S.absMonth||S.date.slice(0,7);S.absMonth=addDays(ym+'-15',+el.dataset.d*30).slice(0,7);render();break}
@@ -2085,7 +2251,10 @@ function onChange(e){
   const el=e.target;
   if(el.id==='xf'&&el.files&&el.files[0])return readXlsx(el.files[0]);
   if((el.id==='xclear'||el.id==='xfuture')&&XIMP)return renderXPrev();
+  if(el.id==='xcust'&&XIMP){XIMP.custEdit=el.value;return xReparse()}
   if(el.id==='logM'){LOGF.m=el.value;return logRefresh()}
+  if(el.dataset.msgsel&&MV){if(el.checked)MV.sel.add(el.dataset.msgsel);else MV.sel.delete(el.dataset.msgsel);return}
+  if(el.id==='msgUrg'&&MV){MV.urgent=el.checked;return}
   if(el.dataset.absf){if(el.dataset.absf==='w')S.absW=el.value;else S.absT=el.value;return render()}
   if(el.id==='dateIn'&&el.value){S.date=el.value;S.selLoc=null;save();render();return}
   if(el.dataset.act==='moveto'&&el.value){const ids=el.dataset.ids.split(',');let w=el.value;
@@ -2109,7 +2278,7 @@ function init(){
   load();
   try{if(window.claude&&typeof window.claude.use==='function')window.claude.use('sample').then(s=>{SAMPLE=s||null}).catch(()=>{})}catch(e){}
   document.addEventListener('click',onClick);
-  if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);document.addEventListener('change',onChange);
+  if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);if(SERVER)setInterval(()=>{if(!document.hidden&&(MV||(S.tab==='planning'&&Date.now()-MSG.at>30000)))fetchMsgs(true)},15000);document.addEventListener('change',onChange);
   document.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.combo){const k=e.target.dataset.combo;$('#f_'+k).value='';comboShow(k,e.target.value);return}if(e.target.id==='jobQ'){S.jobQ=e.target.value;$('#jobsTbl').innerHTML=jobsTable()}if(e.target.id==='logQ'){LOGF.q=e.target.value;logRefresh()}});
   document.addEventListener('dragstart',onDragStart);document.addEventListener('dragover',onDragOver);document.addEventListener('drop',onDrop);document.addEventListener('dragend',onDragEnd);
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#modal').hidden)closeForm()});

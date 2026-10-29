@@ -30,6 +30,15 @@ Netlify Blobs hoef je niet apart aan te zetten; het werkt automatisch op elke Ne
    en meldt per auto Gereed of Probleem. Zonder bereik worden meldingen later verstuurd.
 4. Planner: meldingen verschijnen automatisch (elke minuut) in de rit, de dagplanning en de opdrachtenlijst.
 
+## Berichten tussen planner en medewerkers
+- Planner: Planning > Berichten, of in een bezoek "Bericht aan …" (het bericht gaat dan over die klant en die auto's).
+  Kies één medewerker of "Bericht aan meerdere", gebruik eventueel een standaardtekst en vink Urgent aan als het direct gezien moet worden.
+- Medewerker: nieuwe berichten staan bovenaan de planning (urgent in rood, de telefoon trilt) met de knoppen Gelezen en Antwoorden.
+  Via het ballonnetje rechtsboven staat het hele gesprek, en kan de medewerker zelf een bericht sturen.
+- Planner ziet per bericht "gelezen 10:15" en krijgt een rode teller bij Planning en Berichten voor ongelezen antwoorden.
+- De app haalt elke 15 tot 45 seconden nieuwe berichten op zolang hij open staat. Berichten worden 30 dagen bewaard.
+- De medewerker moet wel een geactiveerde link hebben (Medewerkers > Kopieer link, of één keer publiceren).
+
 Telefoon kwijt of medewerker uit dienst? Medewerker bewerken > "Nieuwe link maken", en daarna publiceren.
 
 ## Echte rijtijden met OpenRouteService (optioneel)

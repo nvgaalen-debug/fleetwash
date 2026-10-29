@@ -112,6 +112,25 @@ textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:1
 .minibtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:3px 8px;font-size:13px;cursor:pointer;color:var(--ink)}
 .ic{width:20px;height:20px;flex:none}
 #toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;font-size:15px;z-index:60;width:max-content;max-width:calc(100% - 32px)}
+.mbtn{position:relative;border:0;background:rgba(255,255,255,.16);color:inherit;border-radius:10px;width:42px;height:38px;display:grid;place-items:center;cursor:pointer;flex:none}
+.mbtn .ic{width:22px;height:22px}
+.mbtn b{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;border-radius:10px;background:var(--bad);color:#fff;font:700 11px/19px var(--f-body);padding:0 5px;box-shadow:0 0 0 2px var(--accent)}
+.pmsg{background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--accent);border-radius:12px;padding:12px 14px;display:grid;gap:8px}
+.pmsg.urg{border-color:var(--bad);border-left-color:var(--bad);background:var(--bad-soft)}
+.pmsg .lab{font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:flex;gap:8px}
+.pmsg.urg .lab{color:var(--bad);font-weight:600}
+.pmsg p{margin:0;font-size:17px;white-space:pre-wrap;overflow-wrap:anywhere}
+.pmsg .acts{grid-template-columns:1fr 1fr}
+.pmsg .big{min-height:44px;padding:10px;font-size:16px}
+.thread{display:flex;flex-direction:column;gap:8px}
+.bub{max-width:85%;border-radius:14px;padding:9px 12px;display:grid;gap:3px;white-space:pre-wrap;overflow-wrap:anywhere}
+.bub small{font-size:12px;opacity:.85}
+.bub.them{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:4px}
+.bub.me{align-self:flex-end;background:var(--accent);color:var(--on-accent);border-bottom-right-radius:4px}
+.bub.urg{box-shadow:0 0 0 2px var(--bad)}
+.mday{align-self:center;font-size:12px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-top:6px}
+.reply{position:sticky;bottom:0;background:var(--bg);padding:8px 0 calc(8px + env(safe-area-inset-bottom,0px));display:grid;gap:8px}
+.back{display:flex;align-items:center;gap:6px;border:0;background:none;color:var(--accent);font-weight:600;font-size:16px;cursor:pointer;padding:4px 0;justify-self:start}
 .refresh{justify-self:center;border:0;background:none;color:var(--muted);font-size:14px;cursor:pointer;text-decoration:underline}
 @media (prefers-reduced-motion:reduce){.prog i{transition:none}}
 @media (max-width:380px){.sumrow b{font-size:19px}.vtime{font-size:21px}}
@@ -120,7 +139,7 @@ textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:1
 </head>
 <body>
 
-<header class="top gut"><div class="wrap"><div class="brand"><svg width="22" height="22" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="currentColor"/></svg>Mijn Wasroute</div><div class="who" id="who"></div></div></header>
+<header class="top gut"><div class="wrap"><div class="brand"><svg width="22" height="22" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="currentColor"/></svg>Mijn Wasroute</div><div class="who" id="who"></div><button class="mbtn" data-act="msgs" id="mbtn" aria-label="Berichten van de planner"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><b id="mcount" hidden></b></button></div></header>
 <nav class="daynav gut" aria-label="Dag kiezen"><div class="wrap">
   <div style="display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px">
     <button class="arrow" data-act="day" data-d="-1" aria-label="Vorige dag"><svg class="ic" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -152,7 +171,7 @@ const API=(()=>{try{return !window.claude&&/^https?:$/.test(location.protocol)}c
 let TOK='';
 try{TOK=new URLSearchParams(location.search).get('t')||localStorage.getItem('wasroute.tok')||'';if(TOK&&TOK!=='demo')localStorage.setItem('wasroute.tok',TOK)}catch(e){try{TOK=new URLSearchParams(location.search).get('t')||''}catch(x){}}
 const DEMO=!API||TOK==='demo';
-const S={date:TODAY,data:null,dates:[],loading:false,err:'',form:null};
+const S={date:TODAY,data:null,dates:[],loading:false,err:'',form:null,view:'plan',msgs:[],msgDraft:''};
 const QKEY='wasroute.queue';
 const getQ=()=>{try{return JSON.parse(localStorage.getItem(QKEY)||'[]')}catch(e){return[]}};
 const setQ=q=>{try{localStorage.setItem(QKEY,JSON.stringify(q))}catch(e){}};
@@ -212,6 +231,49 @@ async function report(jobId,st,reason,note){
   else{setQ(getQ().filter(q=>!(q.jobId===jobId&&q.date===item.date)).concat(item));toast('Geen verbinding. De melding wordt verstuurd zodra je weer online bent.')}
 }
 
+/* ---------- berichten van en naar de planner ---------- */
+const DEMO_MSGS=(()=>{const t=Date.now(),iso=x=>new Date(t-x*60000).toISOString();return[
+  {id:'m1',from:'planner',text:'Goedemorgen Sanne, bij Autohuis Lage Weide staan vandaag 5 auto\u2019s klaar in plaats van 3.',at:iso(140),readAt:iso(131)},
+  {id:'m2',from:'worker',text:'Top, ik neem extra doeken mee.',at:iso(126)},
+  {id:'m3',from:'planner',text:'Let op: Studio Glans is pas na 12:00 aanwezig. Bel bij aankomst even naar Mila.',urgent:true,ref:'Studio Glans, Houten',at:iso(8),readAt:null}]})();
+const unreadMsgs=()=>(S.msgs||[]).filter(m=>m.from==='planner'&&!m.readAt);
+let MSG_SEEN=new Set();
+async function loadMsgs(){
+  if(DEMO){S.msgs=DEMO_MSGS;}else{if(!TOK)return;
+    try{const r=await fetch(`/api/berichten?t=${encodeURIComponent(TOK)}`,{cache:'no-store'});if(!r.ok)return;const d=await r.json();S.msgs=d.messages||[]}catch(e){return}}
+  const un=unreadMsgs(),fresh=un.filter(m=>!MSG_SEEN.has(m.id));
+  if(fresh.length&&MSG_SEEN.size){try{navigator.vibrate&&navigator.vibrate(fresh.some(m=>m.urgent)?[250,120,250,120,250]:[200])}catch(e){}}
+  un.forEach(m=>MSG_SEEN.add(m.id));if(!MSG_SEEN.size)MSG_SEEN.add('_');
+  msgBadge();if(S.view==='msgs'){markRead();render()}else if(!S.form&&(fresh.length||S.data))render();
+}
+function msgBadge(){const n=unreadMsgs().length,b=$('#mcount');b.hidden=!n;b.textContent=n;$('#mbtn').setAttribute('aria-label',n?`Berichten van de planner, ${n} nieuw`:'Berichten van de planner');document.title=(n?`(${n}) `:'')+'Mijn Wasroute'}
+async function markRead(ids){
+  const un=unreadMsgs().filter(m=>!ids||ids.includes(m.id));if(!un.length)return;
+  const now=new Date().toISOString();un.forEach(m=>m.readAt=now);msgBadge();
+  if(DEMO)return;try{await fetch('/api/berichten',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({t:TOK,action:'read',ids:un.map(m=>m.id)})})}catch(e){}
+}
+async function sendReply(){
+  const ta=$('#rtext'),text=(ta&&ta.value||'').trim();if(!text){toast('Typ eerst een bericht.');return}
+  S.msgDraft=text;const btn=$('#rsend');if(btn)btn.disabled=true;
+  if(DEMO){S.msgs.push({id:'r'+Date.now(),from:'worker',text,at:new Date().toISOString()});S.msgDraft='';ta.value='';render();toast('Voorbeeld: in de echte app gaat dit naar de planner.');return}
+  try{const r=await fetch('/api/berichten',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({t:TOK,action:'reply',text})});const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||'fout');S.msgs.push(d.message);S.msgDraft='';const t2=$('#rtext');if(t2)t2.value='';render();toast('Verstuurd naar de planner.')}
+  catch(e){if(btn)btn.disabled=false;toast('Niet verstuurd. Controleer je verbinding en probeer opnieuw.')}
+}
+function mday(at){const d=iso(new Date(at));return d===TODAY?'Vandaag':d===addDays(TODAY,-1)?'Gisteren':fdate(d,{weekday:'long',day:'numeric',month:'long'})}
+function msgBanners(){
+  return unreadMsgs().map(m=>`<section class="pmsg${m.urgent?' urg':''}" aria-live="polite"><div class="lab">${m.urgent?IC.warn+' Urgent bericht van de planner':'Bericht van de planner'}<span style="margin-left:auto">${esc(hhmm(m.at))}</span></div>${m.ref?`<div class="meta">Over ${esc(m.ref)}</div>`:''}<p>${esc(m.text)}</p>
+    <div class="acts"><button class="big ok" data-act="mread" data-id="${esc(m.id)}">${IC.check} Gelezen</button><button class="big alt" data-act="msgs">${IC.note} Antwoorden</button></div></section>`).join('');
+}
+function msgsView(){
+  let last='';const th=(S.msgs||[]).map(m=>{const d=mday(m.at),sep=d!==last?`<div class="mday">${esc(d)}</div>`:'';last=d;
+    return sep+`<div class="bub ${m.from==='worker'?'me':'them'}${m.urgent?' urg':''}">${m.urgent?'<b style="color:var(--bad);font-size:13px">Urgent</b>':''}${m.ref?`<small>Over ${esc(m.ref)}</small>`:''}<div>${esc(m.text)}</div><small>${m.from==='worker'?'Jij':'Planner'} \u00b7 ${esc(hhmm(m.at))}</small></div>`}).join('');
+  return`${DEMO?'<div class="banner">Voorbeeldweergave met fictieve berichten.</div>':''}<button class="back" data-act="plan"><svg class="ic" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> Terug naar planning</button>
+    <h2 style="font:600 22px var(--f-disp);margin:0">Berichten met de planner</h2>
+    <div class="thread" id="thread">${th||'<div class="msg">Nog geen berichten. Hier verschijnen berichten van de planner, en je kunt hier zelf iets sturen.</div>'}</div>
+    <div class="reply"><textarea id="rtext" placeholder="Bericht aan de planner, bijv. ik ben 10 minuten later bij de volgende klant" maxlength="1000">${esc(S.msgDraft)}</textarea><button class="big ok" id="rsend" data-act="rsend">Versturen</button></div>`;
+}
+
 /* ---------- weergave ---------- */
 function dayHeader(){
   const rel=S.date===TODAY?'Vandaag':S.date===addDays(TODAY,1)?'Morgen':S.date===addDays(TODAY,-1)?'Gisteren':'';
@@ -257,9 +319,11 @@ function visitHtml(v,st){
 }
 function render(){
   dayHeader();
-  const a=$('#app'),d=S.data&&S.data.date===S.date?S.data:null;
+  const a=$('#app');$('.daynav').hidden=S.view==='msgs';
+  if(S.view==='msgs'){const ta=$('#rtext');if(ta)S.msgDraft=ta.value;a.innerHTML=msgsView();const t=$('#thread');if(t)window.scrollTo(0,document.body.scrollHeight);msgBadge();return}
+  const _a=a,d=S.data&&S.data.date===S.date?S.data:null;
   $('#who').textContent=(S.data&&S.data.name)||'';
-  let h=DEMO?'<div class="banner">Voorbeeldweergave met fictieve afspraken. Medewerkers openen de echte app via hun persoonlijke link van de planner.</div>':'';
+  let h=(DEMO?'<div class="banner">Voorbeeldweergave met fictieve afspraken. Medewerkers openen de echte app via hun persoonlijke link van de planner.</div>':'')+msgBanners();
   if(S.err==='nolink'){a.innerHTML=h+'<div class="msg"><h2>Open je persoonlijke link</h2>Je hebt van de planner een link gekregen naar deze app. Open die link één keer; daarna onthoudt deze telefoon hem.</div>';return}
   if(S.err&&!d){a.innerHTML=h+`<div class="msg err"><h2>${S.err==='offline'?'Geen verbinding':'Kan planning niet laden'}</h2>${esc(S.err==='offline'?'Controleer je internetverbinding.':S.err)}<p><button class="minibtn" data-act="reload">Opnieuw proberen</button></p></div>`;return}
   if(!d){a.innerHTML=h+'<div class="msg">Afspraken laden…</div>';return}
@@ -285,7 +349,11 @@ document.addEventListener('click',e=>{
   switch(el.dataset.act){
     case'day':S.date=addDays(S.date,+el.dataset.d);S.form=null;load();break;
     case'goto':S.date=el.dataset.date;S.form=null;load();break;
-    case'reload':load();break;
+    case'reload':load();loadMsgs();break;
+    case'msgs':S.view='msgs';S.form=null;render();markRead();break;
+    case'plan':{const ta=$('#rtext');if(ta)S.msgDraft=ta.value;S.view='plan';render();window.scrollTo(0,0);break}
+    case'mread':markRead([id]).then(render);break;
+    case'rsend':sendReply();break;
     case'done':report(id,'done');break;
     case'issue':S.form=id;S.mode='issue';render();break;
     case'note':S.form=id;S.mode='note';render();{const t=$('#note');if(t){t.focus();t.setSelectionRange(t.value.length,t.value.length)}}break;
@@ -297,9 +365,10 @@ document.addEventListener('click',e=>{
   }
 });
 window.addEventListener('online',()=>{flush();load(true)});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!S.form){flush();load(true)}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){loadMsgs();if(!S.form){flush();load(true)}}});
+setInterval(()=>{if(!document.hidden&&!(S.view==='msgs'&&$('#rtext')&&$('#rtext').value))loadMsgs()},45000);
 setInterval(()=>{if(!document.hidden&&!S.form){flush();load(true)}},120000);
-flush();load();
+flush();load();loadMsgs();
 </script>
 
 </body>

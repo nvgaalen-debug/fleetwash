@@ -241,6 +241,14 @@ td.act{white-space:nowrap;text-align:right}
 .bub.urg{box-shadow:0 0 0 2px var(--bad)}
 .mday{align-self:center;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-top:4px}
 .tbl-wrap tr.grp td{background:var(--sunk);padding:7px 12px;font-size:13.5px}.tbl-wrap tr.grp .btn{margin-left:8px}
+#ctx{position:fixed;z-index:80;min-width:250px;max-width:320px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 14px 34px rgba(0,0,0,.2);padding:6px;display:grid;gap:1px}
+#ctx button{display:grid;gap:1px;text-align:left;border:0;background:none;border-radius:6px;padding:7px 10px;cursor:pointer;color:var(--ink);font:500 14px var(--f-body)}
+#ctx button span{display:flex;align-items:center;gap:7px}#ctx button .ic{width:15px;height:15px}
+#ctx button small{color:var(--muted);font-size:12px}
+#ctx button:hover,#ctx button:focus-visible{background:var(--sunk);outline:none}
+.ctx-t{font:600 11px var(--f-body);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:6px 10px 4px}
+.ctx-sep{height:1px;background:var(--line);margin:4px 2px}
+
 .jfbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin:4px 0 12px}
 .jf{display:grid;gap:3px}.jf span{font:600 11px var(--f-body);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 .jf input.mini,.jf select.mini{min-width:0}
@@ -1544,7 +1552,7 @@ function timeline(st){
     s.stops.forEach((p,i)=>{const cu=CUS[p.loc.customerId]||{};const sel=S.selLoc===p.loc.id&&S.wid===w.id;
       blk+=`<div class="blk job${p.late?' late':''}${sel?' sel':''}" draggable="true" data-drag="${p.jobs.join(',')}" data-act="visit" title="Klik voor details" data-wid="${w.id}" data-loc="${p.loc.id}" style="left:${pc(p.start)};width:${wd(p.start,p.end)};--c:${c}" title="${esc(cu.name)} · ${p.jobs.length} voertuig(en) · ${m2t(p.start)}–${m2t(p.end)}${p.late?' · TE LAAT':''}">${(()=>{const m=stMap(date),ss=p.jobs.map(id=>m[id]).filter(Boolean);return ss.some(x=>x.st==='issue')?'<b class="bmark bad">!</b>':ss.length===p.jobs.length&&ss.length?'<b class="bmark ok">✓</b>':ss.some(x=>x.note)?'<b class="bmark">…</b>':''})()}${i+1}. ${esc(cu.name||'')}<small>${p.jobs.length}× · ${m2t(p.start)}</small></div>`});
     blk+=`<i class="endmark" style="left:${pc(s.finish)}" title="Terug ${m2t(s.finish)}"></i>`;
-    return`<div class="tl-row"><button class="tl-who${S.wid===w.id?' sel':''}${why?' na':''}" data-act="selw" data-wid="${w.id}"><b><i class="dot" style="background:${c}"></i>${esc(w.name)}</b><small>${esc(w.postcode)} ${esc(w.city)} · ${esc(shiftOf(w,date).start)}–${esc(shiftOf(w,date).end)}</small>${ovr(w,date)?`<small><span class="chip warn">Afwijkende werktijd</span></small>`:''}<small>${why?`<span style="color:var(--bad)">${esc(why)}</span>`:`${s.n} voert. · ${fkm(s.km)} · ${fdur(s.trav)} rijden`}</small></button><div class="tl-track" data-drop="row:${w.id}">${grid}${blk}</div></div>`}).join('');
+    return`<div class="tl-row"><button class="tl-who${S.wid===w.id?' sel':''}${why?' na':''}" data-act="selw" data-wid="${w.id}"><b><i class="dot" style="background:${c}"></i>${esc(w.name)}</b><small>${esc(w.postcode)} ${esc(w.city)} · ${esc(shiftOf(w,date).start)}–${esc(shiftOf(w,date).end)}</small>${ovr(w,date)?`<small><span class="chip warn">Afwijkende werktijd</span></small>`:''}<small>${why?`<span style="color:var(--bad)">${esc(why)}</span>`:`${s.n} voert. · ${fkm(s.km)} · ${fdur(s.trav)} rijden`}</small></button><div class="tl-track" data-drop="row:${w.id}" data-wid="${w.id}" data-rs="${rs}" data-re="${re}">${grid}${blk}</div></div>`}).join('');
   return`<section class="panel"><div class="tl-head"><h2>Dagplanning ${esc(fdate(date,{day:'numeric',month:'long'}))}</h2><div class="legend"><span><i class="lg job"></i>Reinigen</span><span><i class="lg drive"></i>Rijden</span><span><i class="lg wait"></i>Wachten op venster</span><span><i class="lg pause"></i>Pauze</span></div><span class="sp"></span><span class="small muted">Sleep een blok naar een andere medewerker om te herplannen</span></div>
   <div class="tl-wrap"><div class="tl"><div class="tl-row"><div style="background:var(--sunk);border-right:1px solid var(--line)"></div><div class="tl-axis">${ticks}</div></div>${out}</div></div></section>`;
 }
@@ -1701,16 +1709,76 @@ function jobFields(){
     {k:'duration',label:'Afwijkende duur (min)',type:'number',ph:'standaard per type'},{k:'priority',label:'Prioriteit',type:'select',options:[[1,'Laag'],[2,'Normaal'],[3,'Hoog']]},
     {k:'notes',label:'Opmerking',wide:1}];
 }
-function editJob(id){
+function editJob(id,preset){
   if(!D.locations.length){toast('Voeg eerst een klant met locatie toe.');S.tab='klanten';render();return}
-  const j=id?JOB[id]:{plate:'',vehicle:'',locationId:D.locations[0].id,date:S.date,type:D.types[0]?.id,from:'',to:'',duration:'',priority:2,notes:''};
+  const pl=preset&&preset._place,j=id?JOB[id]:{plate:'',vehicle:'',locationId:(preset&&preset.locationId)||D.locations[0].id,date:S.date,type:D.types[0]?.id,from:(preset&&preset.from)||'',to:'',duration:'',priority:2,notes:''};
   const old=id?j.date:null;
-  openForm({title:id?'Opdracht '+j.plate:'Nieuwe opdracht',note:id?jobPlanNote(j):'',fields:jobFields(),values:j,
+  openForm({title:id?'Opdracht '+j.plate:pl&&WRK[pl.wid]?'Nieuwe afspraak voor '+WRK[pl.wid].name:'Nieuwe opdracht',note:id?jobPlanNote(j):pl&&WRK[pl.wid]?`Wordt ingepland bij ${WRK[pl.wid].name}${pl.at!=null?' rond '+m2t(pl.at):' op de beste plek in de rit'} en vastgezet. Pas het tijdvak aan als de klant een andere tijd wil.`:'',fields:jobFields(),values:j,
     onSave:v=>{if(v.from&&v.to&&t2m(v.to)<=t2m(v.from))return'"Uiterlijk gereed" moet later zijn dan "Vanaf".';
-      if(id)Object.assign(j,v);else D.jobs.push({id:uid('j'),...v});replan([v.date,old]);toast(id?'Opdracht opgeslagen, planning herberekend.':'Opdracht toegevoegd en ingepland.')},
+      if(id){Object.assign(j,v);replan([v.date,old]);toast('Opdracht opgeslagen, planning herberekend.');return}
+      const nj={id:uid('j'),...v};D.jobs.push(nj);index();
+      if(pl&&WRK[pl.wid]){if(!hasPlan(v.date)&&jobsOn(v.date).length>1)autoPlan(v.date);const nm=placeNewJob(nj,pl);replan([v.date]);const st=jobPlanInfo(nj);toast(`Afspraak ${nj.plate} ingepland bij ${nm}${st.start!=null?' om '+m2t(st.start):''} en vastgezet${st.st==='late'?'. Let op: valt buiten het tijdvak of de werktijd':''}.`);return}
+      replan([v.date]);toast('Opdracht toegevoegd en ingepland.')},
     onDelete:id?()=>{D.jobs=D.jobs.filter(x=>x.id!==id);replan([old]);toast('Opdracht verwijderd.')}:null});
 }
 function replan(dates){index();for(const d of new Set(dates.filter(Boolean))){if(D.plans[d]&&D.plans[d].edited)cleanPlan(d);else if(jobsOn(d).length||D.plans[d])autoPlan(d)}save();render()}
+/* ---------- rechtermuisknop op het planbord ---------- */
+function closeCtx(){const c=$('#ctx');if(c)c.remove()}
+function openCtx(x,y,html,title){
+  closeCtx();const m=document.createElement('div');m.id='ctx';m.setAttribute('role','menu');m.innerHTML=(title?`<div class="ctx-t">${title}</div>`:'')+html;document.body.appendChild(m);
+  const r=m.getBoundingClientRect(),W=innerWidth,H=innerHeight;m.style.left=Math.max(8,Math.min(x,W-r.width-8))+'px';m.style.top=Math.max(8,Math.min(y,H-r.height-8))+'px';
+  const f=m.querySelector('button');if(f)f.focus({preventScroll:true});
+}
+const ctxBtn=(act,lab,attrs='',sub='')=>`<button role="menuitem" data-act="${act}" ${attrs}><span>${lab}</span>${sub?`<small>${sub}</small>`:''}</button>`;
+function onContext(e){
+  if(S.tab!=='planning')return;
+  const blk=e.target.closest('.blk.job'),track=e.target.closest('.tl-track'),who=e.target.closest('.tl-who');
+  if(!blk&&!track&&!who)return;
+  e.preventDefault();
+  if(blk){
+    const wid=blk.dataset.wid,lid=blk.dataset.loc,ids=blk.dataset.drag.split(','),w=WRK[wid],l=LOC[lid]||{},cu=CUS[l.customerId]||{},P=getPlan(S.date),pinned=ids.every(id=>P.pinned[id]===wid);
+    const others=D.workers.filter(x=>x.id!==wid&&avail(x,S.date));
+    const sim=simulate(w,P.routes[wid]||[],S.date),stop=sim.stops.find(p=>p.loc.id===lid);
+    openCtx(e.clientX,e.clientY,
+      ctxBtn('visit','Details van dit bezoek',`data-wid="${wid}" data-loc="${lid}"`)+
+      ctxBtn('ctxnew',`${I.plus} Nieuwe afspraak op deze locatie`,`data-wid="${wid}" data-loc="${lid}" data-t="${stop?Math.round(stop.end):''}"`,`bij ${esc(w.name.split(' ')[0])}, aansluitend`)+
+      ctxBtn('chat',`${I.auto} Herplan met AI`,`data-id="${ids[0]}"`,ids.length>1?`${ids.length} auto's, begint bij ${esc(JOB[ids[0]].plate)}`:esc(JOB[ids[0]].plate))+
+      ctxBtn('pin',pinned?'Losmaken':'Vastzetten bij '+esc(w.name.split(' ')[0]),`data-wid="${wid}" data-ids="${ids.join(',')}"`)+
+      `<div class="ctx-sep"></div><div class="ctx-t">Verplaatsen naar</div>`+others.map(o=>ctxBtn('ctxmove',`<i class="dot" style="background:${wc(o)}"></i> ${esc(o.name)}`,`data-wid="${o.id}" data-ids="${ids.join(',')}"`)).join('')+
+      ctxBtn('ctxmove','Uit de planning halen',`data-wid="" data-ids="${ids.join(',')}"`),
+      `${esc(cu.name||'Bezoek')} · ${ids.length} ${ids.length===1?'auto':"auto's"}`);
+    return;
+  }
+  const row=e.target.closest('.tl-row'),tr=row&&row.querySelector('.tl-track'),wid=(tr&&tr.dataset.wid)||(who&&who.dataset.wid);const w=WRK[wid];if(!w)return;
+  let t=null;
+  if(track){const r=track.getBoundingClientRect(),rs=+track.dataset.rs,re=+track.dataset.re;t=Math.round((rs+(e.clientX-r.left)/r.width*(re-rs))/15)*15}
+  const first=w.name.split(' ')[0];
+  openCtx(e.clientX,e.clientY,
+    (t!=null?ctxBtn('ctxnew',`${I.plus} Nieuwe afspraak om ${m2t(t)}`,`data-wid="${wid}" data-t="${t}"`,`bij ${esc(first)}, vastgezet`):'')+
+    ctxBtn('ctxnew',`${I.plus} Nieuwe afspraak voor ${esc(first)}`,`data-wid="${wid}"`,'op de beste plek in de rit')+
+    ctxBtn('newjob',`${I.plus} Nieuwe afspraak, automatisch plannen`,'','de app kiest de medewerker')+
+    `<div class="ctx-sep"></div>`+
+    ctxBtn('selw','Rit bekijken',`data-wid="${wid}"`)+
+    ctxBtn('ovr','Werktijd deze dag',`data-wid="${wid}"`)+
+    ctxBtn('sick','Ziek melden',`data-id="${wid}"`)+
+    ctxBtn('msgs',`${I.chat} Bericht sturen`,`data-wid="${wid}"`),
+    `${esc(w.name)} · ${esc(fdate(S.date,{weekday:'short',day:'numeric',month:'short'}))}`);
+}
+/* nieuwe opdracht direct bij een medewerker, op een tijdstip of op de beste plek */
+function newJobAt(wid,t,lid){
+  const pre={wid,at:t!=null&&t!==''?+t:null};
+  editJob(null,{locationId:lid||undefined,from:pre.at!=null?m2t(pre.at):'',_place:pre});
+}
+function placeNewJob(j,pre){
+  const P=getPlan(j.date),w=WRK[pre.wid];if(!w)return'';
+  for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>id!==j.id);
+  const r=P.routes[pre.wid]=P.routes[pre.wid]||[];
+  if(pre.at!=null){const sim=simulate(w,r,j.date);const nxt=r.find(id=>{const g=sim.seg.find(x=>x.k==='job'&&x.id===id);return g&&g.a>=pre.at-1});const i=nxt?r.indexOf(nxt):r.length;r.splice(i,0,j.id)}
+  else{const b=bestPos(w,r,[j.id],true)||bestPos(w,r,[j.id],false);P.routes[pre.wid]=b?b.arr:r.concat(j.id)}
+  P.pinned[j.id]=pre.wid;P.edited=Date.now();if(!P.auto)P.auto=Date.now();
+  return w.name;
+}
+
 /* ---------- AI-chat per kenteken: verzoek in gewone taal -> zoekcriteria -> doorgerekende opties -> toepassen ---------- */
 let CHAT=null;
 function jobWhere(id){const j=JOB[id];if(!j)return null;const P=D.plans[j.date];let wid=null;if(P&&P.routes)for(const k in P.routes)if(P.routes[k].includes(id))wid=k;
@@ -2540,6 +2608,7 @@ function showCopy(t){openForm({title:'Back-up',note:'Selecteer de tekst en kopie
 /* ---------- events ---------- */
 function onClick(e){
   if(!e.target.closest('.navg'))closeMenus();
+  const inCtx=e.target.closest('#ctx');if(!inCtx)closeCtx();else setTimeout(closeCtx,0);
   const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;
   if(el.tagName==='SELECT')return;
   if(a==='sel'&&e.target.closest('select,button:not([data-act="sel"])'))return;
@@ -2574,6 +2643,8 @@ function onClick(e){
     case'logbulk':openLogBulk();break;
     case'logbulkdone':{let n=0;for(const i of LOGSEL){const e=logEntry(i);if(e&&PROBLEM.has(liveEntries({entries:[e]})[0].st)){e.done=true;n++}}LOGSEL=new Set();save();logRefresh();toast(`${n} regel(s) afgehandeld.`);break}
     case'jfgoto':S.date=el.dataset.date;S.wid=el.dataset.wid;S.tab='planning';render();setTimeout(()=>{const r=document.querySelector('.split');if(r)r.scrollIntoView({behavior:'smooth',block:'start'})},50);break;
+    case'ctxnew':newJobAt(el.dataset.wid,el.dataset.t,el.dataset.loc);break;
+    case'ctxmove':moveJobs(el.dataset.ids.split(','),el.dataset.wid||null);break;
     case'jfclear':S.jf={...JF0,sort:jf().sort};render();break;
     case'logclr':LOGSEL=new Set();logRefresh();break;
     case'logdel':if(el.dataset.armed){const lg=curLog();D.importLogs=importLogs().filter(x=>x!==lg);S.logId=null;LOGSRC=null;save();render();toast('Log verwijderd; de opdrachten blijven staan.')}else{el.dataset.armed='1';el.textContent='Klik nogmaals om te verwijderen'}break;
@@ -2680,10 +2751,10 @@ function init(){
   load();
   try{if(window.claude&&typeof window.claude.use==='function')window.claude.use('sample').then(s=>{SAMPLE=s||null}).catch(()=>{})}catch(e){}
   document.addEventListener('click',onClick);
-  if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);if(SERVER)setInterval(()=>{if(!document.hidden&&(MV||(S.tab==='planning'&&Date.now()-MSG.at>30000)))fetchMsgs(true)},15000);document.addEventListener('change',onChange);
+  if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);if(SERVER)setInterval(()=>{if(!document.hidden&&(MV||(S.tab==='planning'&&Date.now()-MSG.at>30000)))fetchMsgs(true)},15000);document.addEventListener('change',onChange);document.addEventListener('contextmenu',onContext);addEventListener('scroll',closeCtx,{passive:true});addEventListener('resize',closeCtx);
   document.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.combo){const k=e.target.dataset.combo;$('#f_'+k).value='';comboShow(k,e.target.value);return}if(e.target.id==='jobQ'){S.jobQ=e.target.value;$('#jobsTbl').innerHTML=jobsTable()}if(e.target.id==='logQ'){LOGF.q=e.target.value;logRefresh()}});
   document.addEventListener('dragstart',onDragStart);document.addEventListener('dragover',onDragOver);document.addEventListener('drop',onDrop);document.addEventListener('dragend',onDragEnd);
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.querySelector('.navg.open')){const b=document.querySelector('.navg.open > .tab');closeMenus();if(b)b.focus();return}if(!$('#modal').hidden)closeForm()}});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#ctx')){closeCtx();return}if(e.key==='Escape'){if(document.querySelector('.navg.open')){const b=document.querySelector('.navg.open > .tab');closeMenus();if(b)b.focus();return}if(!$('#modal').hidden)closeForm()}});
   $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeForm()});
   render();
 }

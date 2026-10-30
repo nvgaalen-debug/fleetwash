@@ -207,6 +207,9 @@ td.act{white-space:nowrap;text-align:right}
 .bub.them{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:3px}
 .bub.urg{box-shadow:0 0 0 2px var(--bad)}
 .mday{align-self:center;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-top:4px}
+.logacts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.logbulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--accent-soft);border-radius:var(--r);padding:8px 12px;margin:8px 0}
+tr.muted-row td{opacity:.6}
 .linkbtn{border:0;background:none;color:var(--accent);cursor:pointer;padding:0;font:inherit;text-decoration:underline}
 .msg-tpl,.msg-to{gap:6px}.msg-tpl{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}.msg-tpl .fchip{font-size:12.5px;flex:none;white-space:nowrap}
 .msg-to .fchip{display:inline-flex;gap:5px;align-items:center;cursor:pointer}
@@ -1366,7 +1369,7 @@ Antwoord met alleen een JSON-object, zonder andere tekst, in het Nederlands, kor
 /* ---------- weergave ---------- */
 let toastT;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
-const TABS=[['planning','Planning'],['opdrachten','Opdrachten'],['klanten','Klanten & locaties'],['medewerkers','Medewerkers'],['afwezigheid','Afwezigheid'],['instellingen','Instellingen']];
+const TABS=[['planning','Planning'],['opdrachten','Opdrachten'],['klanten','Klanten & locaties'],['medewerkers','Medewerkers'],['afwezigheid','Afwezigheid'],['importlog','Importlog'],['instellingen','Instellingen']];
 function render(){
   const nIss=SERVER?openIssues(S.date)+msgUnread():0;
   $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab" data-act="tab" data-k="${k}" aria-pressed="${S.tab===k}">${l}${k==='planning'&&nIss?` <span class="tabbadge" title="${nIss} open melding(en) en ongelezen berichten van medewerkers">${nIss}</span>`:''}</button>`).join('');
@@ -1377,6 +1380,7 @@ function render(){
   else if(S.tab==='klanten')v.innerHTML=viewCustomers();
   else if(S.tab==='medewerkers')v.innerHTML=viewWorkers();
   else if(S.tab==='afwezigheid')v.innerHTML=viewAbsence();
+  else if(S.tab==='importlog'){v.innerHTML=viewImportLog();if(LOGSRC)logRefresh()}
   else v.innerHTML=viewSettings();
 }
 function dayState(){
@@ -1535,7 +1539,7 @@ function jobMatches(j,q){
 }
 function viewJobs(){
   const q=S.jobQ||'';
-  return`<section class="panel"><div class="toolbar"><h2>Reinigingsopdrachten</h2><label class="search"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></g></svg><input type="search" id="jobQ" value="${esc(q)}" placeholder="Zoek op kenteken, klant of plaats" aria-label="Zoek op kenteken, klant of plaats" autocomplete="off"></label><span class="sp"></span><div class="seg"><button data-act="jobscope" data-k="dag" aria-pressed="${S.jobScope==='dag'}">${esc(fdate(S.date,{day:'numeric',month:'short'}))}</button><button data-act="jobscope" data-k="alle" aria-pressed="${S.jobScope==='alle'}">Alle datums</button></div>${D.importLog?`<button class="btn" data-act="openlog">Importlog</button>`:''}<button class="btn" data-act="import">${I.imp} Importeren uit Excel</button><button class="btn primary" data-act="newjob">${I.plus} Nieuwe opdracht</button></div>
+  return`<section class="panel"><div class="toolbar"><h2>Reinigingsopdrachten</h2><label class="search"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></g></svg><input type="search" id="jobQ" value="${esc(q)}" placeholder="Zoek op kenteken, klant of plaats" aria-label="Zoek op kenteken, klant of plaats" autocomplete="off"></label><span class="sp"></span><div class="seg"><button data-act="jobscope" data-k="dag" aria-pressed="${S.jobScope==='dag'}">${esc(fdate(S.date,{day:'numeric',month:'short'}))}</button><button data-act="jobscope" data-k="alle" aria-pressed="${S.jobScope==='alle'}">Alle datums</button></div>${importLogs().length?`<button class="btn" data-act="openlog">Importlog</button>`:''}<button class="btn" data-act="import">${I.imp} Importeren uit Excel</button><button class="btn primary" data-act="newjob">${I.plus} Nieuwe opdracht</button></div>
   <div id="jobsTbl">${jobsTable()}</div></section>`;
 }
 function jobsTable(){
@@ -1976,11 +1980,11 @@ function parseSheet(rows,opts={}){
     const sp=splitAddr(cell(row,c.addr),cell(row,c.city),cell(row,c.pc).toUpperCase());let{pc,city}=sp;const addr=sp.addr;
     let exact=null;
     if(!pc&&addr&&city){const k=geoKey(addr,city),g=XGEO[k];if(g&&g.ok){pc=g.postcode;exact=g;if(g.city)city=g.city}else if(!g)lookups.set(k,{key:k,addr,city,q:pdokAddr(addr)+' '+city})}
-    if(!exact&&!geocode(pc,city)){const k=city||pc||'(leeg)';badCity[k]=(badCity[k]||0)+1;skipped.push(`Rij ${r+1}: plaats "${k}" niet herkend`);log.push({row:r+1,plate,cust,city:k,per:'',date:'',time:'',note:'',status:'city',reason:`Plaats "${k}" niet herkend; voeg een postcode toe of maak de locatie handmatig aan`});continue}
+    if(!exact&&!geocode(pc,city)){const k=city||pc||'(leeg)';badCity[k]=(badCity[k]||0)+1;skipped.push(`Rij ${r+1}: plaats "${k}" niet herkend`);log.push({row:r+1,plate,cust,city:city||'',addr,pc,per:'',date:'',time:'',note:'',status:'city',reason:`Plaats "${k}" niet herkend; voeg een postcode toe of maak de locatie handmatig aan`});continue}
     const base={plate,cust,addr,pc,city,veh:cell(row,c.veh),mail:cell(row,c.mail),login:cell(row,c.login)||meta.login,phone:meta.phone,info:cell(row,c.info)||meta.info.join(' \u00b7 '),...(exact?{lat:exact.lat,lng:exact.lng,geoLabel:exact.label}:{})};
     for(const s of slots){
       const raw=row[s.d],date=xDate(raw),tm=s.t>=0?cell(row,s.t):'',note=[cell(row,s.n),...s.blank.map(i=>typeof row[i]==='boolean'?'':cell(row,i)).filter(v=>v&&!/^(true|false|waar|onwaar|x|ja|nee)$/i.test(v))].filter(Boolean).join(' \u00b7 ');
-      const L=(status,reason)=>log.push({row:r+1,plate,cust,city,per:s.per,date:date||'',time:tm,note,status,reason});
+      const tt=s.t>=0?xTime(row[s.t]):{};const L=(status,reason)=>log.push({row:r+1,plate,cust,city,addr,pc,veh:base.veh,from:tt.from||'',to:tt.to||'',per:s.per,date:date||'',time:tm,note,status,reason});
       if(!date){const v=clean(raw);if(v){stat.nb++;stat.reasons[v]=(stat.reasons[v]||0)+1;L('nb',v)}continue}
       if(s.x>=0&&cell(row,s.x)){stat.cancel++;L('cancel','Geannuleerd: '+cell(row,s.x));continue}
       let t={};
@@ -2111,7 +2115,7 @@ function doXImport(){
   index();closeForm();XIMP=null;
   const ds=[...dates].sort(),today=todayIso();
   if(ds.length){S.date=ds.find(d=>d>=today)||ds[0];S.tab='planning';S.selLoc=null}
-  D.importLog={file:fileName,at:Date.now(),entries:log};
+  D.importLog={file:fileName,at:Date.now(),entries:log};importLogs();const lid=uid('il');D.importLogs=D.importLogs.filter(x=>x.at!==D.importLog.at).concat({id:lid,...D.importLog}).slice(-10);S.logId=lid;delete D.importLog;
   const msg=`${n} opdrachten geïmporteerd (${newC} nieuwe klanten, ${newL} nieuwe locaties)${dup?`, ${dup} dubbele overgeslagen`:''}`;
   if(SERVER&&n){save();importPipeline(ds,newLocs,msg);return}
   replan(ds);
@@ -2197,7 +2201,7 @@ function parseBlocks(rows,opts={}){
     if(!pc&&addr&&city&&/\d/.test(addr)){const k=geoKey(addr,city),g=XGEO[k];if(g&&g.ok){pc=g.postcode;exact=g;if(g.city)city=g.city}else if(!g){lookups.set(k,{key:k,addr,city,q:pdokAddr(addr)+' '+city});blk.lookups++}}
     else if(!pc&&addr&&city&&!cityFromText(addr)){const k=geoKey(addr,city),g=XGEO[k];if(g&&g.ok){pc=g.postcode;exact=g;if(g.city)city=g.city}else if(!g){lookups.set(k,{key:k,addr,city,q:addr+' '+city});blk.lookups++}}
     const veh=blk.vehIdx>=0?clean(row[blk.vehIdx]):'';
-    if(!exact&&!geocode(pc,city)){const k=city||addr||'(leeg)';badCity[k]=(badCity[k]||0)+1;skipped.push(`Rij ${r+1}: locatie "${k}" niet gevonden`);log.push({row:r+1,plate,cust,city:k,per:'',date:'',time:'',note:'',status:'city',reason:`Locatie "${addr||''}${city?', '+city:''}" niet gevonden; vul plaats of postcode aan`});continue}
+    if(!exact&&!geocode(pc,city)){const k=city||addr||'(leeg)';badCity[k]=(badCity[k]||0)+1;skipped.push(`Rij ${r+1}: locatie "${k}" niet gevonden`);log.push({row:r+1,plate,cust,city:city||'',addr,pc,veh,per:'',date:'',time:'',note:'',status:'city',reason:`Locatie "${addr||''}${city?', '+city:''}" niet gevonden; vul plaats of postcode aan`});continue}
     // cellen na kenteken/adres: datums met hun tijd en opmerkingen
     const appts=[],rowNotes=[];let cur=null,gap=0,lastDate='',prevNb=false,times=0,timeAfterLast=null;
     const last=row.length;
@@ -2214,7 +2218,7 @@ function parseBlocks(rows,opts={}){
         else if(cur&&cur.from&&gap===0&&t.rest&&/annul/i.test(t.rest))cur.cancel=t.rest;
         if(cur&&appts.length>1&&cur===appts[appts.length-1])timeAfterLast=timeAfterLast?'multi':t;
         gap=0;continue}
-      if(t.k==='nb'){if(cur&&!cur.from&&gap===0&&!cur.nb)cur.nb=t.v;else if(!prevNb){stat.nb++;stat.reasons['Niet beschikbaar']=(stat.reasons['Niet beschikbaar']||0)+1;log.push({row:r+1,plate,cust,city,per:'',date:'',time:'',note:'',status:'nb',reason:'Niet beschikbaar (zonder datum)'})}prevNb=true;gap=0;continue}
+      if(t.k==='nb'){if(cur&&!cur.from&&gap===0&&!cur.nb)cur.nb=t.v;else if(!prevNb){stat.nb++;stat.reasons['Niet beschikbaar']=(stat.reasons['Niet beschikbaar']||0)+1;log.push({row:r+1,plate,cust,city,addr,pc,veh,per:'',date:'',time:'',note:'',status:'nb',reason:'Niet beschikbaar (zonder datum)'})}prevNb=true;gap=0;continue}
       prevNb=false;
       if(cur&&gap===0){if(/annul/i.test(t.v))cur.cancel=t.v;else cur.notes.push(t.v)}else rowNotes.push(t.v);
       gap=0;
@@ -2226,15 +2230,102 @@ function parseBlocks(rows,opts={}){
     const base={plate,cust,addr,pc,city,veh,mail:'',login:blk.meta.login,phone:blk.meta.phone,info:blk.meta.info.filter(x=>!/^datum/i.test(x)).join(' · '),...(exact?{lat:exact.lat,lng:exact.lng,geoLabel:exact.label}:{})};
     for(const a of appts){
       const note=[...a.notes,...extra].join(' · '),per=fdate(a.date,{month:'short',year:'numeric'}),time=a.from?a.from+(a.to?'–'+a.to:''):'';
-      const L=(status,reason)=>log.push({row:r+1,plate,cust,city,per,date:a.date,time,note,status,reason});
+      const L=(status,reason)=>log.push({row:r+1,plate,cust,city,addr,pc,veh,from:a.from,to:a.to,win:!!a.win,per,date:a.date,time,note,status,reason});
       if(a.cancel){stat.cancel++;L('cancel','Geannuleerd: '+a.cancel);continue}
       if(a.nb){stat.nb++;stat.reasons[a.nb]=(stat.reasons[a.nb]||0)+1;L('nb',a.nb);continue}
       items.push({...base,date:a.date,from:a.from,to:a.to,win:!!a.win,note,li:log.length});L('ok','');blk.ok++;if(a.date>=todayIso())blk.future++;
     }
-    if(!appts.length)log.push({row:r+1,plate,cust,city,per:'',date:'',time:'',note:extra.join(' · '),status:'nb',reason:'Geen datum in de lijst'});
+    if(!appts.length)log.push({row:r+1,plate,cust,city,addr,pc,veh,per:'',date:'',time:'',note:extra.join(' · '),status:'nb',reason:'Geen datum in de lijst'});
   }
   if(!blocks.length)return{error:'Geen rij met "Kenteken" gevonden.'};
   return{items,skipped,stat,badCity,log,lookups:[...lookups.values()],blocks,multi:true};
+}
+
+/* ---------- Importlog als eigen pagina: filteren en vanuit de log alsnog afspraken maken ---------- */
+let LOGSEL=new Set();
+function importLogs(){
+  if(!D.importLogs){D.importLogs=D.importLog?[{id:uid('il'),...D.importLog}]:[]}
+  return D.importLogs;
+}
+function curLog(){const L=importLogs();return L.find(x=>x.id===S.logId)||L[L.length-1]||null}
+const nextWorkday=d=>{let x=addDays(d,1);while([0,6].includes(wday(x)))x=addDays(x,1);return x};
+function viewImportLog(){
+  const L=importLogs(),lg=curLog();
+  if(!lg){LOGSRC=null;return`<section class="panel empty"><h2>Nog geen import</h2><p>Na het importeren van een Excel-lijst zie je hier per voertuig wat er met elke afspraak is gebeurd, en kun je afspraken alsnog inplannen.</p><button class="btn primary" data-act="ximport">${I.imp} Excel importeren</button></section>`}
+  if(!LOGSRC||LOGSRC.id!==lg.id||LOGSRC.preview){LOGSRC={entries:lg.entries,preview:false,id:lg.id};LOGSEL=new Set()}
+  const custs=[...new Set(lg.entries.map(e=>e.cust))].sort();
+  return`<section class="panel sec"><div class="toolbar"><h2>Importlog</h2>
+    <select class="mini" data-act="logpick" id="logPick" aria-label="Kies import">${L.slice().reverse().map(x=>`<option value="${x.id}"${x.id===lg.id?' selected':''}>${esc(x.file)} · ${esc(new Date(x.at).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}</option>`).join('')}</select>
+    <span class="sp"></span><button class="btn sm" data-act="logcsv">${I.copy} Kopieer als CSV</button><button class="btn sm" data-act="logdel" title="Deze log verwijderen (de opdrachten blijven staan)">${I.trash} Log verwijderen</button><button class="btn sm primary" data-act="ximport">${I.imp} Nieuwe import</button></div>
+    <p class="hint" style="margin:0">De status is actueel: wat je in de planning wijzigt, zie je hier direct terug. Bij een afspraak die niet doorging kun je hem <b>alsnog inplannen</b> op een andere datum, of het adres aanvullen als de plaats onbekend was.</p>
+    ${logShell(custs)}</section>`;
+}
+function logEntry(i){const lg=curLog();return lg&&lg.entries[+i]}
+function findLoc(cu,addr,pc,city){
+  const npc=String(pc||'').replace(/\s/g,'').toUpperCase(),na=clean(addr).toLowerCase(),nc=clean(city).toLowerCase();
+  return D.locations.find(l=>l.customerId===cu.id&&(npc?String(l.postcode||'').replace(/\s/g,'').toUpperCase()===npc&&(!na||!l.address||clean(l.address).toLowerCase()===na):clean(l.address).toLowerCase()===na&&clean(l.city).toLowerCase()===nc));
+}
+function logMakeJob(e,v){
+  let cu=D.customers.find(x=>clean(x.name).toLowerCase()===clean(v.cust).toLowerCase());
+  if(!cu){cu={id:uid('c'),name:clean(v.cust),contact:'',phone:'',email:'',login:''};D.customers.push(cu)}
+  let lo=findLoc(cu,v.addr,v.pc,v.city),isNew=false;
+  if(!lo){const g=geocode(v.pc,v.city);if(!g)return{err:'Plaats of postcode niet gevonden. Vul een postcode (1234 AB) of een bekende plaats in.'};
+    lo={id:uid('l'),customerId:cu.id,name:v.addr||'Locatie',address:v.addr||'',postcode:String(v.pc||'').toUpperCase(),city:v.city||'',info:'',...g};D.locations.push(lo);isNew=true}
+  const j={id:uid('j'),plate:normPlate(v.plate)?v.plate.toUpperCase():v.plate,vehicle:v.veh||'',locationId:lo.id,date:v.date,from:v.from||'',to:v.to||'',type:v.type||D.types[0].id,duration:+v.duration||'',priority:2,notes:v.note||''};
+  D.jobs.push(j);
+  e.orig=e.orig||{status:e.status,reason:e.reason,date:e.date};e.status='imp';e.jobId=j.id;e.date=v.date;e.time=v.from?v.from+(v.to?'–'+v.to:''):'';e.fixed=Date.now();e.done=false;
+  e.addr=lo.address;e.pc=lo.postcode;e.city=lo.city;
+  return{job:j,lo,isNew};
+}
+function openLogFix(i){
+  const e=logEntry(i);if(!e)return;const today=todayIso();
+  const lenM=e.from&&e.to?t2m(e.to)-t2m(e.from):0;
+  const vals={cust:e.cust,plate:e.plate,veh:e.veh||'',addr:e.addr||'',pc:e.pc||'',city:e.city||'',
+    date:e.date&&e.date>=today?e.date:nextWorkday(today),from:e.from||'',to:e.to||'',duration:lenM>0&&!e.win?lenM:'',type:D.types[0].id,note:e.note||''};
+  const cityProb=e.status==='city';
+  openForm({title:cityProb?'Adres aanvullen en inplannen':'Afspraak alsnog inplannen',okLabel:'Afspraak aanmaken',
+    note:`${e.plate} · ${e.cust} · ${(LOGST[e.status]||[e.status])[0]}${e.reason?': '+e.reason:''}${e.date?' (oorspronkelijk '+fdate(e.date,{day:'numeric',month:'short',year:'numeric'})+')':''}`,
+    fields:[{k:'h1',type:'heading',label:'Voertuig en klant'},{k:'plate',label:'Kenteken',req:1},{k:'veh',label:'Voertuig'},{k:'cust',label:'Klant',req:1,wide:1},
+      {k:'h2',type:'heading',label:cityProb?'Locatie (aanvullen: postcode of juiste plaats)':'Locatie'},{k:'addr',label:'Adres',wide:1},{k:'pc',label:'Postcode',ph:'1234 AB'},{k:'city',label:'Plaats'},
+      {k:'h3',type:'heading',label:'Afspraak'},{k:'date',label:'Datum',type:'date',req:1},{k:'type',label:'Type reiniging',type:'select',options:D.types.map(t=>[t.id,`${t.name} (${t.dur} min)`])},
+      {k:'from',label:'Tijdvak vanaf',type:'time'},{k:'to',label:'Tijdvak tot',type:'time'},{k:'duration',label:'Duur (min, leeg = standaard type)',type:'number'},{k:'note',label:'Opmerking',wide:1}],
+    values:vals,
+    onSave:v=>{
+      if(v.date<today)return'Kies een datum vanaf vandaag.';
+      if(v.from&&v.to&&t2m(v.to)<=t2m(v.from))return'"Tot" moet na "vanaf" liggen.';
+      if(!v.pc&&!v.city)return'Vul een postcode of plaats in.';
+      if(D.jobs.some(j=>j.plate===v.plate.toUpperCase()&&j.date===v.date))return`${v.plate} staat op ${fdate(v.date,{day:'numeric',month:'short'})} al ingepland.`;
+      const r=logMakeJob(e,{...v,plate:v.plate.toUpperCase()});if(r.err)return r.err;
+      index();replan([v.date]);if(r.isNew)pdokAfterSave(r.lo);
+      toast(`${v.plate.toUpperCase()} ingepland op ${fdate(v.date,{weekday:'short',day:'numeric',month:'short'})}${(()=>{const le=liveEntries({entries:[e]})[0];return le.st==='planned'?' bij '+le.reason:le.st==='unplanned'?', maar past nog niet: zie de log':''})()}.`);
+      render();return'';
+    }});
+}
+function openLogMove(i){
+  const e=logEntry(i),j=e&&JOB[e.jobId];if(!j)return;const old=j.date;
+  openForm({title:'Andere datum of tijd',okLabel:'Verplaatsen',note:`${j.plate} · ${e.cust} · nu ${fdate(old,{weekday:'short',day:'numeric',month:'short'})}`,
+    fields:[{k:'date',label:'Datum',type:'date',req:1},{k:'from',label:'Tijdvak vanaf',type:'time'},{k:'to',label:'Tijdvak tot',type:'time'}],values:{date:old,from:j.from,to:j.to},
+    onSave:v=>{if(v.date<todayIso())return'Kies een datum vanaf vandaag.';if(v.from&&v.to&&t2m(v.to)<=t2m(v.from))return'"Tot" moet na "vanaf" liggen.';
+      j.date=v.date;j.from=v.from;j.to=v.to;e.date=v.date;e.time=v.from?v.from+(v.to?'–'+v.to:''):'';index();replan([...new Set([old,v.date])]);render();
+      const le=liveEntries({entries:[e]})[0];toast(le.st==='planned'?`Verplaatst en ingepland: ${le.reason}.`:'Verplaatst, maar past nog niet. Probeer Voorstel.');return''}});
+}
+function openLogBulk(){
+  const ids=[...LOGSEL].map(i=>[i,logEntry(i)]).filter(([,e])=>e&&!(e.status==='imp'&&JOB[e.jobId]));
+  if(!ids.length){toast('Selecteer regels die (nog) geen afspraak hebben.');return}
+  openForm({title:`${ids.length} afspraken alsnog inplannen`,okLabel:'Inplannen',note:'Elke geselecteerde auto krijgt een afspraak op de gekozen datum, op hetzelfde adres. Regels met een onbekende plaats worden overgeslagen: vul die eerst per regel aan.',
+    fields:[{k:'date',label:'Datum',type:'date',req:1},{k:'type',label:'Type reiniging',type:'select',options:D.types.map(t=>[t.id,`${t.name} (${t.dur} min)`])},
+      {k:'keep',label:'Tijdvak',type:'select',options:[['1','Oorspronkelijk tijdvak aanhouden'],['0','Geen tijdvak (hele dag)']]}],values:{date:nextWorkday(todayIso()),type:D.types[0].id,keep:'1'},
+    onSave:v=>{if(v.date<todayIso())return'Kies een datum vanaf vandaag.';let n=0,skip=0;
+      for(const[,e]of ids){if(e.status==='city'||(!e.pc&&!e.city)||D.jobs.some(j=>j.plate===e.plate&&j.date===v.date)){skip++;continue}
+        const lenM=e.from&&e.to?t2m(e.to)-t2m(e.from):0;
+        const r=logMakeJob(e,{cust:e.cust,plate:e.plate,veh:e.veh,addr:e.addr,pc:e.pc,city:e.city,date:v.date,from:v.keep==='1'?e.from:'',to:v.keep==='1'?e.to:'',duration:v.keep==='1'&&lenM>0&&!e.win?lenM:'',type:v.type,note:e.note});
+        if(r.err)skip++;else n++}
+      LOGSEL=new Set();index();replan([v.date]);render();toast(`${n} afspraken ingepland op ${fdate(v.date,{weekday:'short',day:'numeric',month:'short'})}${skip?`, ${skip} overgeslagen`:''}.`);return''}});
+}
+function logGoto(i){
+  const e=logEntry(i),j=e&&JOB[e.jobId];if(!j)return;S.date=j.date;S.tab='planning';
+  const P=D.plans[j.date];let wid=null;if(P&&P.routes)for(const k in P.routes)if(P.routes[k].includes(j.id))wid=k;
+  render();window.scrollTo(0,0);if(wid){S.wid=wid;S.selLoc=j.locationId;render();openVisit(wid,j.locationId)}else toast(`${j.plate} staat nog bij Niet ingepland op deze dag.`);
 }
 
 /* ---------- importlog: per voertuig per periode wat er met de afspraak gebeurde ---------- */
@@ -2242,45 +2333,50 @@ let LOGF={st:'probleem',q:'',m:''},LOGSRC=null;
 const LOGST={unplanned:['Niet ingepland','bad'],city:['Plaats onbekend','bad'],nb:['Niet beschikbaar','warn'],cancel:['Geannuleerd','warn'],planned:['Ingepland','ok'],imp:['Te importeren','acc'],past:['In het verleden',''],dup:['Bestaat al',''],gone:['Opdracht verwijderd','']};
 const PROBLEM=new Set(['unplanned','city','nb','cancel']);
 function liveEntries(src){
-  if(src.preview){const fut=$('#xfuture')&&$('#xfuture').checked,t=todayIso();return src.entries.map(e=>({...e,st:e.status==='ok'?(fut&&e.date<t?'past':'imp'):e.status,reason:e.status==='ok'&&fut&&e.date<t?'Datum ligt voor vandaag':e.reason}))}
+  if(src.preview){const fut=$('#xfuture')&&$('#xfuture').checked,t=todayIso();return src.entries.map((e,i)=>({...e,i,st:e.status==='ok'?(fut&&e.date<t?'past':'imp'):e.status,reason:e.status==='ok'&&fut&&e.date<t?'Datum ligt voor vandaag':e.reason}))}
   const memo={};
-  return src.entries.map(e=>{
+  return src.entries.map((e,i)=>({...liveOne(e,memo),i}));
+}
+function liveOne(e,memo){
+  {
     if(e.status!=='imp')return{...e,st:e.status};
     const j=JOB[e.jobId];if(!j)return{...e,st:'gone',reason:'Opdracht is na de import verwijderd'};
     const P=D.plans[j.date];let wid=null;if(P&&P.routes)for(const k in P.routes)if(P.routes[k].includes(j.id))wid=k;
     if(wid&&WRK[wid]){const key=wid+'|'+j.date;const s=memo[key]||(memo[key]=simulate(WRK[wid],P.routes[wid],j.date));const g=s.seg.find(x=>x.k==='job'&&x.id===j.id);
       return{...e,st:'planned',date:j.date,reason:`${WRK[wid].name}, ${g?m2t(g.a)+'–'+m2t(g.b):''}${g&&g.late?' (buiten tijdvak)':''}`}}
     return{...e,st:'unplanned',date:j.date,reason:hasPlan(j.date)?whyUnplanned(j,j.date):'Nog niet gepland: open deze dag in Planning'};
-  });
+  }
 }
-function logShell(){
+function logShell(custs){
   const ms=[...new Set(LOGSRC.entries.map(e=>(e.date||'').slice(0,7)).filter(Boolean))].sort();
-  return`<div class="logbar"><div id="logChips" class="row"></div><div class="row"><select id="logM" class="mini" aria-label="Maand"><option value="">Alle maanden</option>${ms.map(m=>`<option value="${m}"${LOGF.m===m?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select><label class="search" style="flex:0 1 260px"><input type="search" id="logQ" value="${esc(LOGF.q)}" placeholder="Zoek kenteken, klant, plaats of reden" aria-label="Zoek in log" autocomplete="off"></label></div></div><div id="logTbl"></div>`;
+  return`<div class="logbar"><div id="logChips" class="row"></div><div class="row"><select id="logM" class="mini" aria-label="Maand"><option value="">Alle maanden</option>${ms.map(m=>`<option value="${m}"${LOGF.m===m?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>${custs&&custs.length>1?`<select id="logC" class="mini" aria-label="Klant"><option value="">Alle klanten</option>${custs.map(c=>`<option${LOGF.c===c?' selected':''}>${esc(c)}</option>`).join('')}</select>`:''}<label class="search" style="flex:0 1 260px"><input type="search" id="logQ" value="${esc(LOGF.q)}" placeholder="Zoek kenteken, klant, plaats of reden" aria-label="Zoek in log" autocomplete="off"></label></div></div><div id="logBulk"></div><div id="logTbl"></div>`;
 }
 function logFiltered(all){
   const q=LOGF.q.trim().toLowerCase(),qp=normPlate(q);
-  return all.filter(e=>(LOGF.st==='alle'||(LOGF.st==='probleem'?PROBLEM.has(e.st):e.st===LOGF.st))&&(!LOGF.m||(e.date||'').slice(0,7)===LOGF.m)
+  return all.filter(e=>(LOGF.st==='alle'||(LOGF.st==='probleem'?PROBLEM.has(e.st)&&!e.done:LOGF.st==='done'?e.done:LOGF.st==='fixed'?!!e.fixed:e.st===LOGF.st))&&(!LOGF.m||(e.date||'').slice(0,7)===LOGF.m)&&(!LOGF.c||e.cust===LOGF.c)
     &&(!q||(qp&&normPlate(e.plate).includes(qp))||[e.cust,e.city,e.reason,e.note].some(x=>String(x||'').toLowerCase().includes(q))));
 }
 function logRefresh(){
   if(!LOGSRC||!$('#logTbl'))return;
-  const all=liveEntries(LOGSRC),cnt={};all.forEach(e=>cnt[e.st]=(cnt[e.st]||0)+1);const nP=all.filter(e=>PROBLEM.has(e.st)).length;
-  const chips=[['probleem','Problemen',nP],['alle','Alles',all.length],...Object.keys(LOGST).filter(k=>cnt[k]).map(k=>[k,LOGST[k][0],cnt[k]])];
+  const all=liveEntries(LOGSRC),cnt={};all.forEach(e=>cnt[e.st]=(cnt[e.st]||0)+1);const nP=all.filter(e=>PROBLEM.has(e.st)&&!e.done).length,nD=all.filter(e=>e.done).length,nF=all.filter(e=>e.fixed).length;
+  const chips=[['probleem','Problemen',nP],['alle','Alles',all.length],...Object.keys(LOGST).filter(k=>cnt[k]).map(k=>[k,LOGST[k][0],cnt[k]]),...(nF?[['fixed','Alsnog ingepland',nF]]:[]),...(nD?[['done','Afgehandeld',nD]]:[])];
   $('#logChips').innerHTML=chips.map(([k,l,n])=>`<button class="fchip" data-act="logf" data-k="${k}" aria-pressed="${LOGF.st===k}">${esc(l)} <span>${n}</span></button>`).join('');
   const rows=logFiltered(all),shown=rows.slice(0,500);
   const city=c=>c?(c===c.toUpperCase()?c.charAt(0)+c.slice(1).toLowerCase():c):'';
-  $('#logTbl').innerHTML=rows.length?`<div class="tbl-wrap" style="max-height:${LOGSRC.preview?'300px':'56vh'};overflow:auto"><table><thead><tr><th>Rij</th><th>Kenteken</th><th>Klant · plaats</th><th>Datum</th><th>Tijdslot</th><th>Status</th><th>Toelichting</th><th></th></tr></thead><tbody>${shown.map(e=>{const s=LOGST[e.st]||[e.st,''];
-      return`<tr><td class="mono small">${e.row}</td><td>${plateHtml(e.plate)}</td><td><b>${esc(e.cust)}</b><div class="small muted">${esc(city(e.city))}</div></td><td class="mono small">${e.date?esc(fdate(e.date,{weekday:'short',day:'numeric',month:'short'})):esc(e.per||'—')}</td><td class="mono small">${esc(e.time||'')}</td><td><span class="chip ${s[1]}">${esc(s[0])}</span></td><td class="small">${esc(e.reason||'')}${e.note&&e.note!==e.reason?`<div class="muted">${esc(e.note)}</div>`:''}</td><td class="act">${e.st==='unplanned'?`<button class="btn sm" data-act="propose" data-ids="${e.jobId}">${I.auto} Voorstel</button>`:''}</td></tr>`}).join('')}</tbody></table></div>${rows.length>500?`<p class="hint">De eerste 500 van ${rows.length} regels worden getoond. Verfijn het filter.</p>`:''}`
+  $('#logTbl').innerHTML=rows.length?`<div class="tbl-wrap" style="max-height:${LOGSRC.preview?'300px':'56vh'};overflow:auto"><table><thead><tr>${LOGSRC.preview?'':`<th style="width:28px"><input type="checkbox" id="logAll" aria-label="Alles selecteren"${shown.length&&shown.every(e=>LOGSEL.has(e.i))?' checked':''}></th>`}<th>Rij</th><th>Kenteken</th><th>Klant · plaats</th><th>Datum</th><th>Tijdslot</th><th>Status</th><th>Toelichting</th><th></th></tr></thead><tbody>${shown.map(e=>{const s=LOGST[e.st]||[e.st,''];
+      return`<tr${e.done?' class="muted-row"':''}>${LOGSRC.preview?'':`<td><input type="checkbox" data-logsel="${e.i}"${LOGSEL.has(e.i)?' checked':''} aria-label="Selecteer ${esc(e.plate)}"></td>`}<td class="mono small">${e.row}</td><td>${plateHtml(e.plate)}</td><td><b>${esc(e.cust)}</b><div class="small muted">${esc(city(e.city))}</div></td><td class="mono small">${e.date?esc(fdate(e.date,{weekday:'short',day:'numeric',month:'short'})):esc(e.per||'—')}</td><td class="mono small">${esc(e.time||'')}</td><td><span class="chip ${s[1]}">${esc(s[0])}</span>${e.fixed?'<div class="small muted" style="margin-top:3px">alsnog ingepland</div>':''}${e.done?'<div class="small muted" style="margin-top:3px">afgehandeld</div>':''}</td><td class="small">${esc(e.reason||'')}${e.note&&e.note!==e.reason?`<div class="muted">${esc(e.note)}</div>`:''}</td><td class="act"><div class="logacts">${LOGSRC.preview?(e.st==='unplanned'?`<button class="btn sm" data-act="propose" data-ids="${e.jobId}">${I.auto} Voorstel</button>`:''):logActs(e)}</div></td></tr>`}).join('')}</tbody></table></div>${rows.length>500?`<p class="hint">De eerste 500 van ${rows.length} regels worden getoond. Verfijn het filter.</p>`:''}`
     :'<p class="empty">Geen regels voor dit filter.</p>';
+  logBulkBar();
 }
-function openLog(){
-  if(!D.importLog)return;LOGSRC={entries:D.importLog.entries,preview:false};
-  const all=liveEntries(LOGSRC);LOGF={st:all.some(e=>PROBLEM.has(e.st))?'probleem':'alle',q:'',m:''};FORM=null;
-  $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="lgT" style="width:min(1100px,100%)"><div class="row"><h3 id="lgT" style="margin:0">Importlog</h3><span class="sp"></span><button class="btn sm" data-act="logcsv">${I.copy} Kopieer als CSV</button></div>
-    <p class="note" style="margin:6px 0 4px">${esc(D.importLog.file)} · geïmporteerd ${esc(new Date(D.importLog.at).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}. De status van geïmporteerde opdrachten is actueel: na aanpassingen in de planning zie je hier direct het resultaat.</p>
-    ${logShell()}<div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" data-act="dlgx">Sluiten</button></div></div>`;
-  $('#modal').hidden=false;logRefresh();
+function logBulkBar(){const b=$('#logBulk');if(!b)return;const n=LOGSEL.size;b.innerHTML=n&&!LOGSRC.preview?`<div class="logbulk"><b>${n} geselecteerd</b><button class="btn sm primary" data-act="logbulk">${I.plus} Alsnog inplannen op datum\u2026</button><button class="btn sm" data-act="logbulkdone">Afhandelen</button><button class="btn sm ghost" data-act="logclr">Selectie wissen</button></div>`:''}
+function logActs(e){
+  const b=(act,lab,extra='',cls='')=>`<button class="btn sm${cls}" data-act="${act}" data-i="${e.i}"${extra}>${lab}</button>`;
+  if(e.st==='planned')return b('loggo','Bekijk')+`<button class="btn sm" data-act="editjob" data-id="${e.jobId}">${I.edit} Wijzig</button>`;
+  if(e.st==='unplanned')return`<button class="btn sm primary" data-act="propose" data-ids="${e.jobId}">${I.auto} Voorstel</button>`+b('logmove','Andere datum');
+  const fix=e.st==='city'?b('logfix',`${I.edit} Adres aanvullen`,'',' primary'):b('logfix',`${I.plus} Alsnog inplannen`,'',PROBLEM.has(e.st)?' primary':'');
+  return fix+(PROBLEM.has(e.st)?b('logdone',e.done?'Heropenen':'Afhandelen',` title="${e.done?'Weer als probleem tonen':'Uit de lijst Problemen halen'}"`):'');
 }
+function openLog(){S.tab='importlog';LOGSRC=null;const lg=curLog();if(lg){const all=liveEntries({entries:lg.entries});LOGF={st:all.some(e=>PROBLEM.has(e.st)&&!e.done)?'probleem':'alle',q:'',m:'',c:''}}if(!$('#modal').hidden)closeForm();render();window.scrollTo(0,0)}
 function logCsv(){
   const rows=logFiltered(liveEntries(LOGSRC)),q=v=>{const s=String(v??'');return/[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
   const lines=[['Rij','Kenteken','Klant','Plaats','Periode','Datum','Tijdslot','Status','Toelichting','Opmerking'].join(';')].concat(rows.map(e=>[e.row,e.plate,e.cust,e.city,e.per,e.date,e.time,(LOGST[e.st]||[e.st])[0],e.reason,e.note].map(q).join(';')));
@@ -2313,6 +2409,15 @@ function onClick(e){
     case'xdo':doXImport();break;
     case'openlog':openLog();break;
     case'logf':LOGF.st=el.dataset.k;logRefresh();break;
+    case'logfix':openLogFix(el.dataset.i);break;
+    case'logmove':openLogMove(el.dataset.i);break;
+    case'loggo':logGoto(el.dataset.i);break;
+    case'logdone':{const e=logEntry(el.dataset.i);if(e){e.done=!e.done;save();logRefresh()}break}
+    case'logbulk':openLogBulk();break;
+    case'logbulkdone':{let n=0;for(const i of LOGSEL){const e=logEntry(i);if(e&&PROBLEM.has(liveEntries({entries:[e]})[0].st)){e.done=true;n++}}LOGSEL=new Set();save();logRefresh();toast(`${n} regel(s) afgehandeld.`);break}
+    case'logclr':LOGSEL=new Set();logRefresh();break;
+    case'logdel':if(el.dataset.armed){const lg=curLog();D.importLogs=importLogs().filter(x=>x!==lg);S.logId=null;LOGSRC=null;save();render();toast('Log verwijderd; de opdrachten blijven staan.')}else{el.dataset.armed='1';el.textContent='Klik nogmaals om te verwijderen'}break;
+    case'ximport':openXlsxImport();break;
     case'logcsv':logCsv();break;
     case'xlog':{const box=$('#xlogBox');if(box.innerHTML){box.innerHTML='';el.textContent=`Bekijk alle regels per voertuig (${XIMP.log.length})`}else{LOGSRC={entries:XIMP.log,preview:true};LOGF={st:'alle',q:'',m:''};box.innerHTML=logShell();logRefresh();el.textContent='Verberg regels'}break}
     case'publish':openPublish();break;
@@ -2380,6 +2485,10 @@ function onChange(e){
   if(el.dataset.xname!=null&&XIMP){XIMP.names=Object.assign({},XIMP.names,{[el.dataset.xname]:el.value});return xReparse()}
   if(el.id==='xcust'&&XIMP){XIMP.custEdit=el.value;return xReparse()}
   if(el.id==='logM'){LOGF.m=el.value;return logRefresh()}
+  if(el.id==='logC'){LOGF.c=el.value;return logRefresh()}
+  if(el.id==='logPick'){S.logId=el.value;LOGSRC=null;LOGF={st:'probleem',q:'',m:'',c:''};return render()}
+  if(el.dataset.logsel!=null){const i=+el.dataset.logsel;if(el.checked)LOGSEL.add(i);else LOGSEL.delete(i);return logBulkBar()}
+  if(el.id==='logAll'){const rows=logFiltered(liveEntries(LOGSRC)).slice(0,500);rows.forEach(e=>el.checked?LOGSEL.add(e.i):LOGSEL.delete(e.i));return logRefresh()}
   if(el.dataset.msgsel&&MV){if(el.checked)MV.sel.add(el.dataset.msgsel);else MV.sel.delete(el.dataset.msgsel);return}
   if(el.id==='msgUrg'&&MV){MV.urgent=el.checked;return}
   if(el.dataset.absf){if(el.dataset.absf==='w')S.absW=el.value;else S.absT=el.value;return render()}

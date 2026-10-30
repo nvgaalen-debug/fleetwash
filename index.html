@@ -240,6 +240,10 @@ td.act{white-space:nowrap;text-align:right}
 .bub.them{align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-bottom-left-radius:3px}
 .bub.urg{box-shadow:0 0 0 2px var(--bad)}
 .mday{align-self:center;font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-top:4px}
+.tbl-wrap tr.grp td{background:var(--sunk);padding:7px 12px;font-size:13.5px}.tbl-wrap tr.grp .btn{margin-left:8px}
+.jfbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin:4px 0 12px}
+.jf{display:grid;gap:3px}.jf span{font:600 11px var(--f-body);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.jf input.mini,.jf select.mini{min-width:0}
 .logacts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .logbulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--accent-soft);border-radius:var(--r);padding:8px 12px;margin:8px 0}
 tr.muted-row td{opacity:.6}
@@ -1646,13 +1650,46 @@ function jobMatches(j,q){
 function viewJobs(){
   const q=S.jobQ||'';
   return`<section class="panel"><div class="toolbar"><h2>Reinigingsopdrachten</h2><label class="search"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></g></svg><input type="search" id="jobQ" value="${esc(q)}" placeholder="Zoek op kenteken, klant of plaats" aria-label="Zoek op kenteken, klant of plaats" autocomplete="off"></label><span class="sp"></span><div class="seg"><button data-act="jobscope" data-k="dag" aria-pressed="${S.jobScope==='dag'}">${esc(fdate(S.date,{day:'numeric',month:'short'}))}</button><button data-act="jobscope" data-k="alle" aria-pressed="${S.jobScope==='alle'}">Alle datums</button></div>${importLogs().length?`<button class="btn" data-act="openlog">Importlog</button>`:''}<button class="btn" data-act="import">${I.imp} Importeren uit Excel</button><button class="btn primary" data-act="newjob">${I.plus} Nieuwe opdracht</button></div>
+  ${jobFilterBar()}
   <div id="jobsTbl">${jobsTable()}</div></section>`;
 }
+const JF0={from:'',to:'',wid:'',cust:'',type:'',st:'',prio:'',sort:'date'};
+const jf=()=>S.jf||(S.jf={...JF0});
+let JPI=null;
+function jobPlanInfo(j){
+  const key=j.id;if(JPI&&JPI[key])return JPI[key];
+  const P=D.plans[j.date];let r={st:'none',wid:'',start:null};
+  if(P&&P.routes){r.st='unplanned';for(const wid in P.routes){const rt=P.routes[wid];if(rt.includes(j.id)&&WRK[wid]){const sim=simulate(WRK[wid],rt,j.date);
+    for(const id of rt){const g=sim.seg.find(x=>x.k==='job'&&x.id===id);if(JPI)JPI[id]={st:g&&g.late?'late':'planned',wid,start:g?g.a:null}}
+    r=(JPI&&JPI[key])||(()=>{const g=sim.seg.find(x=>x.k==='job'&&x.id===j.id);return{st:g&&g.late?'late':'planned',wid,start:g?g.a:null}})();break}}}
+  if(JPI)JPI[key]=r;return r;
+}
+const jobPlanSt=j=>jobPlanInfo(j).st;
+function jobFilterBar(){
+  const f=jf(),sel=(k,opts,lab)=>`<label class="jf"><span>${lab}</span><select class="mini" data-jf="${k}">${opts.map(([v,l])=>`<option value="${esc(v)}"${String(f[k])===String(v)?' selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
+  const custs=[...new Set(D.customers.map(c=>c.name))].sort((a,b)=>a.localeCompare(b,'nl'));
+  const active=Object.keys(JF0).some(k=>k!=='sort'&&f[k]);
+  return`<div class="jfbar"><label class="jf"><span>Van</span><input type="date" class="mini" data-jf="from" value="${esc(f.from)}"></label><label class="jf"><span>Tot en met</span><input type="date" class="mini" data-jf="to" value="${esc(f.to)}"></label>
+    ${sel('wid',[['','Alle medewerkers'],...D.workers.map(w=>[w.id,w.name]),['__none','Niet ingepland']],'Medewerker')}${sel('cust',[['','Alle klanten'],...custs.map(c=>[c,c])],'Klant')}${sel('type',[['','Alle types'],...D.types.map(t=>[t.id,t.name])],'Type')}
+    ${sel('st',[['','Alle'],['planned','Ingepland'],['late','Buiten tijdvak'],['unplanned','Niet ingepland'],['none','Nog niet gepland']],'Planning')}${sel('prio',[['','Alle'],['3','Hoog'],['2','Normaal'],['1','Laag']],'Prioriteit')}
+    ${sel('sort',[['date','Datum oplopend'],['date-','Datum aflopend'],['wrk','Datum, medewerker, rit'],['cust','Klant'],['city','Plaats'],['plate','Kenteken']],'Sorteren')}
+    ${active?`<button class="btn sm ghost" data-act="jfclear">Filters wissen</button>`:''}</div>`;
+}
 function jobsTable(){
-  const q=(S.jobQ||'').trim();
-  const list=(q||S.jobScope!=='dag'?[...D.jobs]:jobsOn(S.date)).filter(j=>jobMatches(j,q)).sort((a,b)=>a.date.localeCompare(b.date)||(LOC[a.locationId]?.city||'').localeCompare(LOC[b.locationId]?.city||''));
+  const q=(S.jobQ||'').trim(),f=jf();JPI={};
+  const cityOf=j=>LOC[j.locationId]?.city||'',custOf=j=>CUS[(LOC[j.locationId]||{}).customerId]?.name||'';
+  const pst=j=>{const i=jobPlanInfo(j);return i.start!=null?i.start:(j.from?t2m(j.from):9999)};
+  const wname=j=>{const w=WRK[jobPlanInfo(j).wid];return w?w.name:'\uffff'};
+  const byDate=(a,b)=>a.date.localeCompare(b.date)||pst(a)-pst(b)||cityOf(a).localeCompare(cityOf(b));
+  const cmp={date:byDate,'date-':(a,b)=>-byDate(a,b),cust:(a,b)=>custOf(a).localeCompare(custOf(b),'nl')||byDate(a,b),city:(a,b)=>cityOf(a).localeCompare(cityOf(b),'nl')||byDate(a,b),plate:(a,b)=>a.plate.localeCompare(b.plate)||byDate(a,b),wrk:(a,b)=>a.date.localeCompare(b.date)||wname(a).localeCompare(wname(b),'nl')||pst(a)-pst(b)}[f.sort]||byDate;
+  const wide=q||S.jobScope!=='dag'||f.from||f.to;
+  const list=(wide?[...D.jobs]:jobsOn(S.date)).filter(j=>jobMatches(j,q)&&(!f.from||j.date>=f.from)&&(!f.to||j.date<=f.to)&&(!f.cust||custOf(j)===f.cust)&&(!f.type||j.type===f.type)&&(!f.prio||String(j.priority||2)===f.prio)&&(!f.st||jobPlanSt(j)===f.st)&&(!f.wid||(f.wid==='__none'?!WRK[jobPlanInfo(j).wid]:jobPlanInfo(j).wid===f.wid))).sort(cmp);
   const pr={1:'Laag',2:'Normaal',3:'Hoog'};
-  const rowsH=list.map(j=>{const l=LOC[j.locationId]||{},c=CUS[l.customerId]||{};return`<tr><td>${plateHtml(j.plate)}<div class="small muted">${esc(j.vehicle)}</div></td><td><b>${esc(c.name)}</b><div class="small muted">${esc(l.name)} · ${esc(l.postcode)} ${esc(l.city)}</div></td><td class="mono">${esc(fdate(j.date,{weekday:'short',day:'numeric',month:'short'}))}</td><td class="mono">${j.from||j.to?esc((j.from||'—')+'–'+(j.to||'—')):'<span class="muted">hele dag</span>'}</td><td>${esc((TYP[j.type]||{}).name||j.type)}</td><td class="mono">${jobDur(j)} min</td><td>${+j.priority===3?'<span class="chip warn">Hoog</span>':pr[j.priority]||'Normaal'}</td><td>${jobStatus(j)}</td><td class="act"><button class="btn ghost" data-act="chat" data-id="${j.id}" title="Herplan met AI" aria-label="Herplan met AI">${I.auto}</button><button class="btn ghost" data-act="editjob" data-id="${j.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('');
+  const grpKey=j=>f.sort==='wrk'?j.date+'|'+(jobPlanInfo(j).wid||''):(f.sort==='date'||f.sort==='date-')?j.date:null;
+  const cnt={};list.forEach(j=>{const k=grpKey(j);if(k!=null)cnt[k]=(cnt[k]||0)+1});
+  const grpH=j=>{const w=WRK[jobPlanInfo(j).wid];return`<tr class="grp"><td colspan="9"><b>${esc(fdate(j.date,{weekday:'long',day:'numeric',month:'long'}))}</b>${f.sort==='wrk'?` \u00b7 ${w?`<i class="dot" style="background:${wc(w)}"></i> ${esc(w.name)}`:'<span style="color:var(--warn)">Niet ingepland</span>'}`:''}<span class="muted"> \u00b7 ${cnt[grpKey(j)]} ${cnt[grpKey(j)]===1?'auto':'auto\u2019s'}</span>${f.sort==='wrk'&&w?` <button class="btn sm ghost" data-act="jfgoto" data-date="${j.date}" data-wid="${w.id}">Naar rit</button>`:''}</td></tr>`};
+  let prevG=null;
+  const rowsH=list.map(j=>{const gk=grpKey(j),gh=gk!=null&&gk!==prevG?grpH(j):'';prevG=gk;const l=LOC[j.locationId]||{},c=CUS[l.customerId]||{};return gh+`<tr><td>${plateHtml(j.plate)}<div class="small muted">${esc(j.vehicle)}</div></td><td><b>${esc(c.name)}</b><div class="small muted">${esc(l.name)} · ${esc(l.postcode)} ${esc(l.city)}</div></td><td class="mono">${esc(fdate(j.date,{weekday:'short',day:'numeric',month:'short'}))}</td><td class="mono">${j.from||j.to?esc((j.from||'—')+'–'+(j.to||'—')):'<span class="muted">hele dag</span>'}</td><td>${esc((TYP[j.type]||{}).name||j.type)}</td><td class="mono">${jobDur(j)} min</td><td>${+j.priority===3?'<span class="chip warn">Hoog</span>':pr[j.priority]||'Normaal'}</td><td>${jobStatus(j)}</td><td class="act"><button class="btn ghost" data-act="chat" data-id="${j.id}" title="Herplan met AI" aria-label="Herplan met AI">${I.auto}</button><button class="btn ghost" data-act="editjob" data-id="${j.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('');
   return`${list.length?`<div class="tbl-wrap"><table><thead><tr><th>Kenteken</th><th>Klant · locatie</th><th>Datum</th><th>Venster</th><th>Type</th><th>Duur</th><th>Prioriteit</th><th>Planning</th><th></th></tr></thead><tbody>${rowsH}</tbody></table></div>`:`<p class="empty">${q?`Geen opdrachten gevonden voor "${esc(q)}".`:'Geen opdrachten voor deze selectie.'}</p>`}
   <p class="hint">${list.length} opdracht(en)${q?' gevonden over alle datums':''}. Na een wijziging in opdrachten plant de app die dag opnieuw automatisch; handmatig vastgezette bezoeken blijven bij dezelfde medewerker.</p>`;
 }
@@ -2458,19 +2495,24 @@ function liveOne(e,memo){
 }
 function logShell(custs){
   const ms=[...new Set(LOGSRC.entries.map(e=>(e.date||'').slice(0,7)).filter(Boolean))].sort();
-  return`<div class="logbar"><div id="logChips" class="row"></div><div class="row"><select id="logM" class="mini" aria-label="Maand"><option value="">Alle maanden</option>${ms.map(m=>`<option value="${m}"${LOGF.m===m?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>${custs&&custs.length>1?`<select id="logC" class="mini" aria-label="Klant"><option value="">Alle klanten</option>${custs.map(c=>`<option${LOGF.c===c?' selected':''}>${esc(c)}</option>`).join('')}</select>`:''}<label class="search" style="flex:0 1 260px"><input type="search" id="logQ" value="${esc(LOGF.q)}" placeholder="Zoek kenteken, klant, plaats of reden" aria-label="Zoek in log" autocomplete="off"></label></div></div><div id="logBulk"></div><div id="logTbl"></div>`;
+  return`<div class="logbar"><div id="logChips" class="row"></div><div class="row"><select id="logM" class="mini" aria-label="Maand"><option value="">Alle maanden</option>${ms.map(m=>`<option value="${m}"${LOGF.m===m?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>${custs&&custs.length>1?`<select id="logC" class="mini" aria-label="Klant"><option value="">Alle klanten</option>${custs.map(c=>`<option${LOGF.c===c?' selected':''}>${esc(c)}</option>`).join('')}</select>`:''}<label class="jf"><span>Van</span><input type="date" class="mini" id="logFrom" value="${esc(LOGF.from||'')}"></label><label class="jf"><span>Tot en met</span><input type="date" class="mini" id="logTo" value="${esc(LOGF.to||'')}"></label><label class="jf"><span>Sorteren</span><select id="logSort" class="mini">${[['date','Datum oplopend'],['date-','Datum aflopend'],['row','Volgorde in Excel'],['cust','Klant'],['plate','Kenteken']].map(([v,l])=>`<option value="${v}"${(LOGF.sort||'date')===v?' selected':''}>${l}</option>`).join('')}</select></label><label class="search" style="flex:0 1 260px"><input type="search" id="logQ" value="${esc(LOGF.q)}" placeholder="Zoek kenteken, klant, plaats of reden" aria-label="Zoek in log" autocomplete="off"></label></div></div><div id="logBulk"></div><div id="logTbl"></div>`;
 }
 function logFiltered(all){
   const q=LOGF.q.trim().toLowerCase(),qp=normPlate(q);
-  return all.filter(e=>(LOGF.st==='alle'||(LOGF.st==='probleem'?PROBLEM.has(e.st)&&!e.done:LOGF.st==='done'?e.done:LOGF.st==='fixed'?!!e.fixed:e.st===LOGF.st))&&(!LOGF.m||(e.date||'').slice(0,7)===LOGF.m)&&(!LOGF.c||e.cust===LOGF.c)
+  return all.filter(e=>(LOGF.st==='alle'||(LOGF.st==='probleem'?PROBLEM.has(e.st)&&!e.done:LOGF.st==='done'?e.done:LOGF.st==='fixed'?!!e.fixed:e.st===LOGF.st))&&(!LOGF.m||(e.date||'').slice(0,7)===LOGF.m)&&(!LOGF.c||e.cust===LOGF.c)&&(!LOGF.from||(e.date&&e.date>=LOGF.from))&&(!LOGF.to||(e.date&&e.date<=LOGF.to))
     &&(!q||(qp&&normPlate(e.plate).includes(qp))||[e.cust,e.city,e.reason,e.note].some(x=>String(x||'').toLowerCase().includes(q))));
+}
+function logSort(rows){
+  const k=LOGF.sort||'date',d=(a,b)=>(a.date?0:1)-(b.date?0:1)||String(a.date).localeCompare(String(b.date))||String(a.time||'').localeCompare(String(b.time||''))||a.row-b.row;
+  const c={date:d,'date-':(a,b)=>(a.date?0:1)-(b.date?0:1)||-String(a.date).localeCompare(String(b.date))||a.row-b.row,row:(a,b)=>a.row-b.row||d(a,b),cust:(a,b)=>String(a.cust).localeCompare(String(b.cust),'nl')||d(a,b),plate:(a,b)=>String(a.plate).localeCompare(String(b.plate))||d(a,b)}[k]||d;
+  return rows.slice().sort(c);
 }
 function logRefresh(){
   if(!LOGSRC||!$('#logTbl'))return;
   const all=liveEntries(LOGSRC),cnt={};all.forEach(e=>cnt[e.st]=(cnt[e.st]||0)+1);const nP=all.filter(e=>PROBLEM.has(e.st)&&!e.done).length,nD=all.filter(e=>e.done).length,nF=all.filter(e=>e.fixed).length;
   const chips=[['probleem','Problemen',nP],['alle','Alles',all.length],...Object.keys(LOGST).filter(k=>cnt[k]).map(k=>[k,LOGST[k][0],cnt[k]]),...(nF?[['fixed','Alsnog ingepland',nF]]:[]),...(nD?[['done','Afgehandeld',nD]]:[])];
   $('#logChips').innerHTML=chips.map(([k,l,n])=>`<button class="fchip" data-act="logf" data-k="${k}" aria-pressed="${LOGF.st===k}">${esc(l)} <span>${n}</span></button>`).join('');
-  const rows=logFiltered(all),shown=rows.slice(0,500);
+  const rows=logSort(logFiltered(all)),shown=rows.slice(0,500);
   const city=c=>c?(c===c.toUpperCase()?c.charAt(0)+c.slice(1).toLowerCase():c):'';
   $('#logTbl').innerHTML=rows.length?`<div class="tbl-wrap" style="max-height:${LOGSRC.preview?'300px':'56vh'};overflow:auto"><table><thead><tr>${LOGSRC.preview?'':`<th style="width:28px"><input type="checkbox" id="logAll" aria-label="Alles selecteren"${shown.length&&shown.every(e=>LOGSEL.has(e.i))?' checked':''}></th>`}<th>Rij</th><th>Kenteken</th><th>Klant · plaats</th><th>Datum</th><th>Tijdslot</th><th>Status</th><th>Toelichting</th><th></th></tr></thead><tbody>${shown.map(e=>{const s=LOGST[e.st]||[e.st,''];
       return`<tr${e.done?' class="muted-row"':''}>${LOGSRC.preview?'':`<td><input type="checkbox" data-logsel="${e.i}"${LOGSEL.has(e.i)?' checked':''} aria-label="Selecteer ${esc(e.plate)}"></td>`}<td class="mono small">${e.row}</td><td>${plateHtml(e.plate)}</td><td><b>${esc(e.cust)}</b><div class="small muted">${esc(city(e.city))}</div></td><td class="mono small">${e.date?esc(fdate(e.date,{weekday:'short',day:'numeric',month:'short'})):esc(e.per||'—')}</td><td class="mono small">${esc(e.time||'')}</td><td><span class="chip ${s[1]}">${esc(s[0])}</span>${e.fixed?'<div class="small muted" style="margin-top:3px">alsnog ingepland</div>':''}${e.done?'<div class="small muted" style="margin-top:3px">afgehandeld</div>':''}</td><td class="small">${esc(e.reason||'')}${e.note&&e.note!==e.reason?`<div class="muted">${esc(e.note)}</div>`:''}</td><td class="act"><div class="logacts">${LOGSRC.preview?(e.st==='unplanned'?`<button class="btn sm" data-act="propose" data-ids="${e.jobId}">${I.auto} Voorstel</button>`:''):logActs(e)}</div></td></tr>`}).join('')}</tbody></table></div>${rows.length>500?`<p class="hint">De eerste 500 van ${rows.length} regels worden getoond. Verfijn het filter.</p>`:''}`
@@ -2531,6 +2573,8 @@ function onClick(e){
     case'logdone':{const e=logEntry(el.dataset.i);if(e){e.done=!e.done;save();logRefresh()}break}
     case'logbulk':openLogBulk();break;
     case'logbulkdone':{let n=0;for(const i of LOGSEL){const e=logEntry(i);if(e&&PROBLEM.has(liveEntries({entries:[e]})[0].st)){e.done=true;n++}}LOGSEL=new Set();save();logRefresh();toast(`${n} regel(s) afgehandeld.`);break}
+    case'jfgoto':S.date=el.dataset.date;S.wid=el.dataset.wid;S.tab='planning';render();setTimeout(()=>{const r=document.querySelector('.split');if(r)r.scrollIntoView({behavior:'smooth',block:'start'})},50);break;
+    case'jfclear':S.jf={...JF0,sort:jf().sort};render();break;
     case'logclr':LOGSEL=new Set();logRefresh();break;
     case'logdel':if(el.dataset.armed){const lg=curLog();D.importLogs=importLogs().filter(x=>x!==lg);S.logId=null;LOGSRC=null;save();render();toast('Log verwijderd; de opdrachten blijven staan.')}else{el.dataset.armed='1';el.textContent='Klik nogmaals om te verwijderen'}break;
     case'ximport':openXlsxImport();break;
@@ -2604,6 +2648,10 @@ function onChange(e){
   if(el.dataset.menuname){const g=menuCfg().groups[el.dataset.menuname];if(g){g.l=el.value.trim()||g.l;save();render()}return}
   if(el.id==='logM'){LOGF.m=el.value;return logRefresh()}
   if(el.id==='logC'){LOGF.c=el.value;return logRefresh()}
+  if(el.id==='logSort'){LOGF.sort=el.value;return logRefresh()}
+  if(el.id==='logFrom'){LOGF.from=el.value;return logRefresh()}
+  if(el.id==='logTo'){LOGF.to=el.value;return logRefresh()}
+  if(el.dataset.jf){jf()[el.dataset.jf]=el.value;const t=$('#jobsTbl');if(t)t.innerHTML=jobsTable();if(el.dataset.jf!=='sort'){const bar=document.querySelector('.jfbar');if(bar)bar.outerHTML=jobFilterBar()}return}
   if(el.id==='logPick'){S.logId=el.value;LOGSRC=null;LOGF={st:'probleem',q:'',m:'',c:''};return render()}
   if(el.dataset.logsel!=null){const i=+el.dataset.logsel;if(el.checked)LOGSEL.add(i);else LOGSEL.delete(i);return logBulkBar()}
   if(el.id==='logAll'){const rows=logFiltered(liveEntries(LOGSRC)).slice(0,500);rows.forEach(e=>el.checked?LOGSEL.add(e.i):LOGSEL.delete(e.i));return logRefresh()}

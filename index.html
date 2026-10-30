@@ -54,6 +54,39 @@ button,input,select,textarea{font:inherit;color:inherit}
 .tab{font:600 15px/1 var(--f-disp);letter-spacing:.03em;padding:9px 12px;border-radius:var(--r);border:0;background:none;color:var(--muted);cursor:pointer}
 .tab:hover{color:var(--ink)}
 .tab[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent)}
+.tab{display:inline-flex;align-items:center;gap:5px}
+.tab .chev{width:13px;height:13px;opacity:.7;transition:transform .15s}
+.navg{position:relative}
+.navg.open .chev{transform:rotate(180deg)}
+.navmenu{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:40;min-width:270px;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.14);padding:6px;gap:2px}
+.navg.open .navmenu{display:grid}
+@media (hover:hover){.navg:hover .navmenu{display:grid}.navg:hover .chev{transform:rotate(180deg)}}
+.navmenu::before{content:"";position:absolute;inset:-8px 0 auto;height:8px}
+.navmenu button{display:grid;gap:2px;text-align:left;border:0;background:none;border-radius:7px;padding:8px 10px;cursor:pointer;color:var(--ink)}
+.navmenu button b{font:600 15px/1.2 var(--f-disp);letter-spacing:.02em;display:flex;align-items:center;gap:6px}
+.navmenu button small{font-size:12.5px;color:var(--muted)}
+.navmenu button:hover,.navmenu button:focus-visible{background:var(--sunk)}
+.navmenu button[aria-current]{background:var(--accent-soft)}.navmenu button[aria-current] b{color:var(--accent)}
+.navdot{width:7px;height:7px;border-radius:50%;background:var(--bad);display:inline-block}.navdot.neu{background:var(--warn)}
+.tabbadge.neu{background:var(--sunk);color:var(--ink)}
+.mlist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.mrow{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--surface)}
+.mrow.mgroup{background:var(--sunk)}
+.mgrip{color:var(--muted);width:14px;text-align:center}
+.mlab{flex:1;min-width:0;display:grid;gap:1px}.mlab small{color:var(--muted);font-size:12.5px}
+.mrow select.mini{max-width:210px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px;align-items:start}
+.mgrid .sec,.sec:has(> .mlist){align-content:start}
+.mrow{flex-wrap:wrap;min-width:0}.mlab{min-width:150px}
+.mgrid .mlab small{display:none}
+.mgrid .mrow select.mini{max-width:150px}.mgrid .mlab{min-width:120px}
+.subnav{border-top:1px solid var(--line);background:var(--bg)}
+.subnav-in{max-width:1520px;margin:0 auto;display:flex;gap:4px;align-items:center;padding-block:6px;overflow-x:auto;scrollbar-width:none}
+.subnav-t{font:600 12px var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-right:8px;white-space:nowrap}
+.subnav button{border:0;background:none;border-radius:999px;padding:6px 12px;font:500 14px var(--f-body);color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.subnav button .ic{width:15px;height:15px}
+.subnav button:hover{color:var(--ink);background:var(--surface)}
+.subnav button[aria-pressed="true"]{background:var(--surface);color:var(--accent);font-weight:600;box-shadow:0 0 0 1px var(--line)}
 .datebar{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .datebar input{padding:7px 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
 .dlabel{font:600 15px/1 var(--f-disp);letter-spacing:.02em;min-width:9ch}
@@ -332,14 +365,15 @@ tr.muted-row td{opacity:.6}
 
 <header class="top"><div class="top-in gut">
   <div class="brand"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="var(--accent)"/><path d="M9.5 15.5c1.2 1.8 4.6 2.2 6.4-.4" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round"/></svg>Wasroute <small>dispatch &amp; routeplanning</small></div>
-  <nav class="tabs" id="tabs"></nav>
-  <div class="datebar">
+  <nav class="tabs" id="tabs" aria-label="Hoofdmenu"></nav>
+  <div class="datebar" id="datebar">
     <button class="iconbtn" data-act="day" data-d="-1" aria-label="Vorige dag"><svg class="ic" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <input type="date" id="dateIn" aria-label="Planningsdatum">
     <button class="iconbtn" data-act="day" data-d="1" aria-label="Volgende dag"><svg class="ic" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <span class="dlabel" id="dayName"></span>
   </div>
-</div></header>
+</div><nav class="subnav" id="subnav" aria-label="Submenu" hidden></nav>
+</header>
 <main class="gut" id="view"></main>
 <div id="modal" hidden></div>
 <div id="toast" hidden></div>
@@ -1369,10 +1403,82 @@ Antwoord met alleen een JSON-object, zonder andere tekst, in het Nederlands, kor
 /* ---------- weergave ---------- */
 let toastT;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
-const TABS=[['planning','Planning'],['opdrachten','Opdrachten'],['klanten','Klanten & locaties'],['medewerkers','Medewerkers'],['afwezigheid','Afwezigheid'],['importlog','Importlog'],['instellingen','Instellingen']];
+/* ---------- menu: indeling instelbaar via Beheer > Menu indelen ---------- */
+const MENU_ITEMS={
+  'planning':['Planning','Dagplanning, kaart en meldingen'],
+  'opdrachten':['Overzicht opdrachten','Alle reinigingsopdrachten zoeken en wijzigen'],
+  'importlog':['Importlog','Wat er met elke geïmporteerde afspraak gebeurde'],
+  'act:import':['Excel importeren','Nieuwe lijst inlezen en plannen'],
+  'klanten':['Klanten & locaties','Klanten, adressen en locatie-info'],
+  'medewerkers':['Gegevens medewerkers','Werktijden, standplaats, vaardigheden en app-link'],
+  'afwezigheid':['Afwezigheid','Verlofkalender, ziekte, training en verlofsaldo'],
+  'act:msgs':['Berichten','Berichten naar de app van medewerkers'],
+  'instellingen:planning':['Planning en reistijd','Rekenregels, pauze, werkdag en rijtijden'],
+  'instellingen:types':['Reinigingstypes','Soorten reiniging, duur en vaardigheden'],
+  'instellingen:data':['Gegevens en back-up','Back-up kopiëren of terugzetten'],
+  'instellingen:menu':['Menu indelen','Kies wat in het hoofdmenu en in de groepen staat']};
+const MENU_SHORT={'opdrachten':'Overzicht','medewerkers':'Gegevens'};
+const menuDefault=()=>({top:['planning','g:opdr','klanten','g:mw','g:beheer'],groups:{opdr:{l:'Opdrachten',items:['opdrachten','importlog','act:import']},mw:{l:'Medewerkers',items:['medewerkers','afwezigheid','act:msgs']},beheer:{l:'Beheer',items:['instellingen:planning','instellingen:types','instellingen:data','instellingen:menu']}},hidden:[]});
+function menuCfg(){
+  let m=D.menu;if(!m||!m.top||!m.groups)m=D.menu=menuDefault();
+  const placed=new Set([...m.top.filter(x=>!x.startsWith('g:')),...Object.values(m.groups).flatMap(g=>g.items),...(m.hidden||[])]);
+  for(const id of Object.keys(MENU_ITEMS))if(!placed.has(id)){const g=m.groups.beheer||Object.values(m.groups)[0];if(g)g.items.push(id);else m.top.push(id)}
+  m.top=m.top.filter(x=>x.startsWith('g:')?m.groups[x.slice(2)]:MENU_ITEMS[x]);
+  for(const k in m.groups)if(!m.top.includes('g:'+k))m.top.push('g:'+k);
+  m.hidden=(m.hidden||[]).filter(x=>x!=='instellingen:menu');
+  return m;
+}
+const mLabel=(id,inGroup)=>(inGroup&&MENU_SHORT[id])||MENU_ITEMS[id][0];
+function buildNav(){const m=menuCfg();return m.top.map(x=>{if(!x.startsWith('g:'))return{k:x,l:mLabel(x),to:x,d:MENU_ITEMS[x][1]};const g=m.groups[x.slice(2)];return{k:x,l:g.l,items:g.items.map(id=>[id,mLabel(id,true),MENU_ITEMS[id][1]])}}).filter(g=>!g.items||g.items.length)}
+function menuLoc(id){const m=menuCfg();if(m.hidden.includes(id))return'hidden';if(m.top.includes(id))return'top';for(const k in m.groups)if(m.groups[k].items.includes(id))return'g:'+k;return'top'}
+function menuMove(id,to){
+  const m=menuCfg();m.top=m.top.filter(x=>x!==id);m.hidden=m.hidden.filter(x=>x!==id);for(const k in m.groups)m.groups[k].items=m.groups[k].items.filter(x=>x!==id);
+  if(to==='top')m.top.push(id);else if(to==='hidden')m.hidden.push(id);else m.groups[to.slice(2)].items.push(id);
+}
+function menuShift(list,id,d){const i=list.indexOf(id),j=i+d;if(i<0||j<0||j>=list.length)return;[list[i],list[j]]=[list[j],list[i]]}
+function viewMenu(){
+  const m=menuCfg(),gids=Object.keys(m.groups);
+  const opts=id=>[['top','Hoofdmenu'],...gids.map(k=>['g:'+k,'Onder '+m.groups[k].l]),...(id==='instellingen:menu'?[]:[['hidden','Verbergen']])];
+  const row=(id,list,where)=>`<li class="mrow"><span class="mgrip" aria-hidden="true">≡</span><div class="mlab"><b>${esc(MENU_ITEMS[id][0])}</b><small>${esc(MENU_ITEMS[id][1])}</small></div>
+    <select class="mini" data-menuloc="${id}" aria-label="Plaats van ${esc(MENU_ITEMS[id][0])}">${opts(id).map(([v,l])=>`<option value="${v}"${menuLoc(id)===v?' selected':''}>${esc(l)}</option>`).join('')}</select>
+    ${where!=='hidden'?`<button class="iconbtn" data-act="menuup" data-id="${id}" data-w="${where}" aria-label="Omhoog"${list.indexOf(id)===0?' disabled':''}>${I.up}</button><button class="iconbtn" data-act="menudown" data-id="${id}" data-w="${where}" aria-label="Omlaag"${list.indexOf(id)===list.length-1?' disabled':''}>${I.down}</button>`:''}</li>`;
+  const topRows=m.top.map(x=>{if(!x.startsWith('g:'))return row(x,m.top,'top');const k=x.slice(2),g=m.groups[k];
+    return`<li class="mrow mgroup"><span class="mgrip" aria-hidden="true">▾</span><div class="mlab"><input class="mini" data-menuname="${k}" value="${esc(g.l)}" aria-label="Naam van groep" style="font-weight:600;max-width:220px"><small>Groep met ${g.items.length} onderdeel${g.items.length===1?'':'en'}${g.items.length?'':' (wordt niet getoond)'}</small></div>
+      ${g.items.length?'':`<button class="btn sm ghost" data-act="menudelg" data-k="${k}">${I.trash} Verwijderen</button>`}
+      <button class="iconbtn" data-act="menuup" data-id="${x}" data-w="top" aria-label="Omhoog"${m.top.indexOf(x)===0?' disabled':''}>${I.up}</button><button class="iconbtn" data-act="menudown" data-id="${x}" data-w="top" aria-label="Omlaag"${m.top.indexOf(x)===m.top.length-1?' disabled':''}>${I.down}</button></li>`}).join('');
+  const groups=gids.map(k=>{const g=m.groups[k];return`<section class="panel sec"><h3>${esc(g.l)} <span class="muted small">uitklapmenu</span></h3>${g.items.length?`<ul class="mlist">${g.items.map(id=>row(id,g.items,'g:'+k)).join('')}</ul>`:'<p class="small muted" style="margin:0">Leeg. Zet hier onderdelen neer via de keuzelijst bij een onderdeel.</p>'}</section>`}).join('');
+  return`<section class="panel sec"><div class="toolbar"><h2>Menu indelen</h2><span class="sp"></span><button class="btn" data-act="menunewg">${I.plus} Nieuwe groep</button><button class="btn ghost" data-act="menureset">Standaard herstellen</button></div>
+    <p class="hint" style="margin:0">Kies per onderdeel of het los in het hoofdmenu staat, onder een groep (uitklapmenu), of verborgen is. Met de pijltjes bepaal je de volgorde. Wijzigingen zie je direct in de menubalk. De indeling geldt voor deze browser.</p>
+    <h3>Hoofdmenu <span class="muted small">van links naar rechts</span></h3><ul class="mlist">${topRows}</ul></section>
+    <div class="mgrid">${groups}</div>
+    ${m.hidden.length?`<section class="panel sec"><h3>Verborgen</h3><ul class="mlist">${m.hidden.map(id=>row(id,m.hidden,'hidden')).join('')}</ul></section>`:''}`;
+}
+
+const navCur=()=>S.tab==='instellingen'?'instellingen:'+(S.setPage||'planning'):S.tab;
+const navGroup=()=>buildNav().find(g=>g.to===S.tab||(g.items||[]).some(([t])=>t===navCur()))||{};
+function navTo(t){
+  if(t.startsWith('act:')){closeMenus();const a=t.slice(4);if(a==='import')openXlsxImport();else if(a==='msgs')openMsgs({});return}
+  const[tab,sub]=t.split(':');S.tab=tab;if(sub)S.setPage=sub;closeMenus();render();window.scrollTo(0,0);
+}
+function closeMenus(){document.querySelectorAll('.navg.open').forEach(g=>{g.classList.remove('open');const b=g.querySelector('[aria-expanded]');if(b)b.setAttribute('aria-expanded','false')})}
+function renderNav(nIss){
+  const cur=navCur(),grp=navGroup(),nLog=(()=>{const lg=curLog();if(!lg)return 0;return liveEntries({entries:lg.entries}).filter(e=>PROBLEM.has(e.st)&&!e.done).length})();
+  const badge=(n,t,neutral)=>n?` <span class="tabbadge${neutral?' neu':''}" title="${esc(t)}">${n}</span>`:'';
+  const itemBadge=t=>t==='importlog'?badge(nLog,nLog+' problemen in de laatste import',true):t==='act:msgs'?badge(msgUnread(),'ongelezen berichten'):'';
+  const NAV=buildNav();
+  $('#tabs').innerHTML=NAV.map(g=>{
+    const on=g===grp;
+    if(!g.items)return`<button class="tab" data-act="navto" data-to="${g.to}" aria-pressed="${on}" title="${esc(g.d)}">${esc(g.l)}${g.k==='planning'?badge(nIss,nIss+' open melding(en) en ongelezen berichten van medewerkers'):itemBadge(g.k)}</button>`;
+    const ids=g.items.map(x=>x[0]),red=ids.includes('act:msgs')?msgUnread():0,neu=ids.includes('importlog')?nLog:0;
+    return`<div class="navg"><button class="tab" data-act="navg" aria-haspopup="true" aria-expanded="false" aria-pressed="${on}">${esc(g.l)}${red||neu?`<span class="navdot${red?'':' neu'}" aria-label="${red||neu} nieuw"></span>`:''}<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="navmenu" role="menu">${g.items.map(([t,l,d])=>`<button role="menuitem" data-act="navto" data-to="${t}"${t===cur?' aria-current="page"':''}><b>${esc(l)}${itemBadge(t)}</b><small>${esc(d)}</small></button>`).join('')}</div></div>`}).join('');
+  const sub=$('#subnav');
+  if(grp.items){sub.hidden=false;sub.innerHTML=`<div class="subnav-in gut"><span class="subnav-t">${esc(grp.l)}</span>${grp.items.map(([t,l])=>`<button data-act="navto" data-to="${t}" aria-pressed="${t===cur}">${t.startsWith('act:')?(t==='act:import'?I.imp:I.chat)+' ':''}${esc(l)}${itemBadge(t)}</button>`).join('')}</div>`}
+  else{sub.hidden=true;sub.innerHTML=''}
+}
 function render(){
   const nIss=SERVER?openIssues(S.date)+msgUnread():0;
-  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button class="tab" data-act="tab" data-k="${k}" aria-pressed="${S.tab===k}">${l}${k==='planning'&&nIss?` <span class="tabbadge" title="${nIss} open melding(en) en ongelezen berichten van medewerkers">${nIss}</span>`:''}</button>`).join('');
+  renderNav(nIss);$('#datebar').hidden=!['planning','opdrachten'].includes(S.tab);
   $('#dateIn').value=S.date;$('#dayName').textContent=fdate(S.date,{weekday:'long'});
   const v=$('#view');
   if(S.tab==='planning')v.innerHTML=viewPlanning();
@@ -1815,23 +1921,26 @@ function viewSettings(){
   const num=(k,l,h,step=1)=>`<label class="fld"><span>${l}</span><input type="number" step="${step}" id="set_${k}" data-set="${k}" value="${esc(s[k])}"><small class="muted">${h}</small></label>`;
   const tr=D.types.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td class="mono">${t.dur} min</td><td>${t.skill?`<span class="chip">${esc(t.skill)}</span>`:'<span class="muted">iedereen</span>'}</td><td class="act"><button class="btn ghost" data-act="edittype" data-id="${t.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
   const orsPts=orsPointsFor(null),orsMiss=orsMissing(orsPts),orsTot=orsPts.length*(orsPts.length-1);
-  return`<section class="panel sec"><h2>Reistijd en werkdag</h2>
+  const pages={planning:`<section class="panel sec"><h2>Reistijd en werkdag</h2>
   <div class="settings"><label class="fld"><span>Bron voor reistijden</span><select id="set_travelSource" data-set="travelSource"><option value="schatting"${!useORS()?' selected':''}>Schatting (hemelsbreed × wegfactor)</option><option value="ors"${useORS()?' selected':''}>OpenRouteService (echte wegen)</option></select><small class="muted">Bij OpenRouteService gebruikt de app echte rijtijden over de weg. Waar die nog niet zijn opgehaald, wordt geschat.</small></label>
   <div class="fld"><span>OpenRouteService</span><div class="small">${SERVER?`${orsTot?`${orsTot-orsMiss} van ${orsTot} rijtijden opgehaald`:'Nog geen locaties'}${D.orsAt?` · bijgewerkt ${esc(new Date(D.orsAt).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}`:''}`:'Werkt in de Netlify-versie, met ORS_API_KEY in Netlify.'}</div><div class="row" style="margin-top:6px"><button class="btn sm" data-act="orsfetch"${SERVER?'':' disabled'}>${I.route} Rijtijden ophalen</button>${D.ors&&Object.keys(D.ors).length?'<button class="btn sm ghost" data-act="orsclear">Opgehaalde rijtijden wissen</button>':''}</div><small class="muted">Haalt rijtijden op tussen alle standplaatsen en locaties met opdrachten vanaf vandaag. Nieuwe locaties? Klik opnieuw; alleen wat ontbreekt wordt opgehaald.</small></div></div>
   <div class="settings">${num('urbanSpeed','Snelheid in de bebouwde kom (km/u)','Geldt voor de eerste kilometers van elke rit')}${num('urbanKm','Kilometers stadsverkeer per rit','Daarna rekent de app met de snelheid buiten de kom',1)}${num('roadSpeed','Snelheid buiten de kom (km/u)','Gemiddelde inclusief snelweg')}${num('roadFactor','Wegfactor','Hemelsbrede afstand × factor = rijafstand',.05)}${num('parkMin','Parkeren en opstarten (min)','Per aankomst op een klantlocatie')}${num('minTravel','Minimale rijtijd tussen locaties (min)','Voorkomt 0 min bij geschatte posities')}${num('pauseMin','Pauze (min)','0 = geen pauze inplannen')}<label class="fld"><span>Pauze vanaf</span><input type="time" id="set_pauseAt" data-set="pauseAt" value="${esc(s.pauseAt)}"><small class="muted">Eerste moment hierna waarop de pauze geen tijdvak laat missen</small></label>${num('kmWeight','Weging kilometers','Minuten "kosten" per km naast reistijd',.05)}</div>
   <div class="settings">${num('maxPreTravel','Maximale aanrijtijd vóór de begintijd (min)','Rijtijd naar de eerste klant die buiten werktijd valt. Is de rit langer, dan begint de eerste klus later.')}</div>
   <div style="display:grid;gap:8px"><label class="chk"><input type="checkbox" id="set_startAtFirst" data-set="startAtFirst"${s.startAtFirst!==false?' checked':''}> Begintijd = aanwezig bij de eerste klant (aanrijden vanaf standplaats valt vóór de begintijd)</label><label class="chk"><input type="checkbox" id="set_endAtLast" data-set="endAtLast"${s.endAtLast===true?' checked':''}> Eindtijd = klaar bij de laatste klant (terugrit naar standplaats valt na de eindtijd)</label></div>
   <div class="row"><button class="btn primary" data-act="saveset">Opslaan en opnieuw plannen</button></div></section>
-  <section class="panel sec"><div class="toolbar"><h2>Reinigingstypes</h2><span class="sp"></span><button class="btn" data-act="edittype">${I.plus} Nieuw type</button></div>
-  <div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Standaardduur</th><th>Vereiste vaardigheid</th><th></th></tr></thead><tbody>${tr}</tbody></table></div></section>
-  <section class="panel sec"><h2>Gegevens</h2>
-  <p class="help">Gegevens worden in deze browser bewaard. Kopieer een back-up om ze elders te gebruiken of terug te zetten.</p>
-  <div class="row"><button class="btn" data-act="export">${I.copy} Back-up kopiëren</button><button class="btn" data-act="restore">${I.imp} Back-up terugzetten</button><button class="btn danger" data-act="reset">Voorbeelddata herstellen</button></div>
-  <div class="help"><h3 style="margin-top:14px">Zo rekent de planner</h3>
+  <section class="panel sec"><div class="help"><h3 style="margin-top:14px">Zo rekent de planner</h3>
   <p>Per dag simuleert de app voor elke medewerker de rit: vertrek op begintijd vanaf de standplaats, rijden, parkeren, eventueel wachten tot het tijdvenster opent, reinigen, pauze, en terug naar de standplaats. Een rit is geldig als alle voertuigen binnen hun venster klaar zijn, de medewerker voor de eindtijd terug is en de vaardigheden kloppen.</p>
   <p>Staat "Begintijd = aanwezig bij de eerste klant" aan, dan vertrekt de medewerker zo vroeg dat hij precies op zijn begintijd bij de eerste klant is. Bij begintijd 08:00 kan de eerste klus dus om 08:00 beginnen, waar de medewerker ook woont.</p>
   <p>Het plannen gebeurt in twee stappen. Eerst wordt opdracht voor opdracht ingevoegd op de goedkoopste plek; opdrachten met hoge prioriteit en weinig alternatieven gaan voor. Daarna verschuift de app hele klantlocaties tussen medewerkers en draait volgordes om zolang reistijd en kilometers dalen. Auto's op dezelfde locatie blijven zo vanzelf bij elkaar.</p>
-  <p>Reistijden zijn een schatting op basis van hemelsbrede afstand. Voor productie koppel je een routeservice (bijv. OSRM, Google of TomTom) voor echte rijtijden en wegroutes.</p></div></section>`;
+  <p>Reistijden zijn een schatting op basis van hemelsbrede afstand. Voor productie koppel je een routeservice (bijv. OSRM, Google of TomTom) voor echte rijtijden en wegroutes.</p></div></section>`,
+  types:`<section class="panel sec"><div class="toolbar"><h2>Reinigingstypes</h2><span class="sp"></span><button class="btn" data-act="edittype">${I.plus} Nieuw type</button></div>
+  <div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Standaardduur</th><th>Vereiste vaardigheid</th><th></th></tr></thead><tbody>${tr}</tbody></table></div></section>`,
+  data:`<section class="panel sec"><h2>Gegevens</h2>
+  <p class="help">Gegevens worden in deze browser bewaard. Kopieer een back-up om ze elders te gebruiken of terug te zetten.</p>
+  <div class="row"><button class="btn" data-act="export">${I.copy} Back-up kopiëren</button><button class="btn" data-act="restore">${I.imp} Back-up terugzetten</button><button class="btn danger" data-act="reset">Voorbeelddata herstellen</button></div>
+</section>`};
+  if(S.setPage==='menu')return viewMenu();
+  return pages[S.setPage]||pages.planning;
 }
 function editType(id){
   const t=id?TYP[id]:{name:'',dur:30,skill:''};const used=id?D.jobs.filter(j=>j.type===id).length:0;
@@ -2388,11 +2497,18 @@ function showCopy(t){openForm({title:'Back-up',note:'Selecteer de tekst en kopie
 
 /* ---------- events ---------- */
 function onClick(e){
+  if(!e.target.closest('.navg'))closeMenus();
   const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;
   if(el.tagName==='SELECT')return;
   if(a==='sel'&&e.target.closest('select,button:not([data-act="sel"])'))return;
   switch(a){
     case'tab':S.tab=el.dataset.k;render();window.scrollTo(0,0);break;
+    case'navto':navTo(el.dataset.to);break;
+    case'menuup':case'menudown':{const m=menuCfg(),w=el.dataset.w,list=w==='top'?m.top:w==='hidden'?m.hidden:m.groups[w.slice(2)].items;menuShift(list,el.dataset.id,a==='menuup'?-1:1);save();render();break}
+    case'menunewg':{const m=menuCfg(),k=uid('g');m.groups[k]={l:'Nieuwe groep',items:[]};m.top.push('g:'+k);save();render();const i=document.querySelector(`[data-menuname="${k}"]`);if(i){i.focus();i.select()}break}
+    case'menudelg':{const m=menuCfg(),k=el.dataset.k;if(m.groups[k]&&!m.groups[k].items.length){delete m.groups[k];m.top=m.top.filter(x=>x!=='g:'+k);save();render()}break}
+    case'menureset':D.menu=menuDefault();save();render();toast('Standaardindeling hersteld.');break;
+    case'navg':{const g=el.closest('.navg'),open=!g.classList.contains('open');closeMenus();if(open){g.classList.add('open');el.setAttribute('aria-expanded','true');const f=g.querySelector('[role=menuitem]');if(f&&e.detail===0)f.focus()}break}
     case'day':S.date=addDays(S.date,+el.dataset.d);S.selLoc=null;save();render();break;
     case'auto':autoPlan(S.date);save();render();toast('Planning automatisch opnieuw gemaakt. Vastgezette bezoeken zijn gerespecteerd.');break;
     case'unpinall':{const P=getPlan(S.date);P.pinned={};P.edited=Date.now();save();render();toast('Alle vastzettingen opgeheven. Klik Automatisch plannen om vrij te optimaliseren.');break}
@@ -2484,6 +2600,8 @@ function onChange(e){
   if((el.id==='xclear'||el.id==='xfuture')&&XIMP)return renderXPrev();
   if(el.dataset.xname!=null&&XIMP){XIMP.names=Object.assign({},XIMP.names,{[el.dataset.xname]:el.value});return xReparse()}
   if(el.id==='xcust'&&XIMP){XIMP.custEdit=el.value;return xReparse()}
+  if(el.dataset.menuloc){menuMove(el.dataset.menuloc,el.value);save();render();toast(`${MENU_ITEMS[el.dataset.menuloc][0]} staat nu ${el.value==='top'?'in het hoofdmenu':el.value==='hidden'?'verborgen':'onder '+menuCfg().groups[el.value.slice(2)].l}.`);return}
+  if(el.dataset.menuname){const g=menuCfg().groups[el.dataset.menuname];if(g){g.l=el.value.trim()||g.l;save();render()}return}
   if(el.id==='logM'){LOGF.m=el.value;return logRefresh()}
   if(el.id==='logC'){LOGF.c=el.value;return logRefresh()}
   if(el.id==='logPick'){S.logId=el.value;LOGSRC=null;LOGF={st:'probleem',q:'',m:'',c:''};return render()}
@@ -2517,7 +2635,7 @@ function init(){
   if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);if(SERVER)setInterval(()=>{if(!document.hidden&&(MV||(S.tab==='planning'&&Date.now()-MSG.at>30000)))fetchMsgs(true)},15000);document.addEventListener('change',onChange);
   document.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.combo){const k=e.target.dataset.combo;$('#f_'+k).value='';comboShow(k,e.target.value);return}if(e.target.id==='jobQ'){S.jobQ=e.target.value;$('#jobsTbl').innerHTML=jobsTable()}if(e.target.id==='logQ'){LOGF.q=e.target.value;logRefresh()}});
   document.addEventListener('dragstart',onDragStart);document.addEventListener('dragover',onDragOver);document.addEventListener('drop',onDrop);document.addEventListener('dragend',onDragEnd);
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#modal').hidden)closeForm()});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){if(document.querySelector('.navg.open')){const b=document.querySelector('.navg.open > .tab');closeMenus();if(b)b.focus();return}if(!$('#modal').hidden)closeForm()}});
   $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeForm()});
   render();
 }

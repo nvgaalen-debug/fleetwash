@@ -55,3 +55,8 @@ Werkt automatisch, zonder sleutel:
 - Na een Excel-import loopt de app automatisch door: exacte posities (PDOK) > echte rijtijden (OpenRouteService, als die aan staat) > planning.
 - Bestaande locaties: Klanten & locaties > "Posities verbeteren via PDOK".
 Vindt PDOK een adres niet, dan blijft de geschatte positie staan en zie je bij de locatie waarom.
+
+## Voorbereiding Business Central
+Opdrachten > Naar Business Central toont per maand welke meldingen naar BC zouden gaan (gereed = factureerbaar; niet gelukt volgens de instelling per klant; per melding aan te passen met "Naar BC").
+Vul vooraf in: debiteurnummer bij Klanten, artikelnummer bij Reinigingstypes, eventueel verzendadrescode bij Locaties en resourcenummer bij Medewerkers.
+Met "Kopieer als JSON (API)" zie je precies wat de koppeling straks naar de BC-API stuurt. De koppeling zelf (AL-extensie + Netlify-functie) is nog niet actief.

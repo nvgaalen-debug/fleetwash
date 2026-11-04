@@ -30,7 +30,10 @@ const ENV = () => ({
   companyName: process.env.BC_COMPANY_NAME,
 });
 
-const FIELDS = ["externalId", "customerNo", "shipToCode", "licensePlate", "cleaningDate", "cleaningTime", "itemNo", "resourceNo", "status", "billable", "reason", "note"];
+const FIELDS = ["externalId", "customerNo", "shipToCode", "licensePlate", "cleaningDate", "cleaningTime", "itemNo", "resourceNo", "status", "billable", "reason", "note", "locationName", "locationAddress", "locationCity"];
+// Velden die geen invloed hebben op het factuurbedrag: die mogen ook bijgewerkt worden als de regel al op een factuur staat.
+const INFO = ["resourceNo", "note", "reason", "cleaningTime", "locationName", "locationAddress", "locationCity"];
+const LOCF = ["locationName", "locationAddress", "locationCity"];
 const STATUSES = new Set(["Gereed", "NietGereinigd", "NietBeschikbaar", "Vervallen"]);
 const isMonth = (s) => /^\d{4}-\d{2}$/.test(s || "");
 const lastDay = (m) => { const [y, mo] = m.split("-").map(Number); return `${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, "0")}`; };
@@ -61,15 +64,19 @@ function clean(row) {
     billable: !!row.billable,
     reason: cut(row.reason, 120),
     note: cut(row.note, 250),
+    locationName: cut(row.locationName, 100),
+    locationAddress: cut(row.locationAddress, 100),
+    locationCity: cut(row.locationCity, 30),
   };
   if (/^\d{1,2}:\d{2}$/.test(row.cleaningTime || "")) b.cleaningTime = row.cleaningTime.padStart(5, "0") + ":00";
   return b;
 }
-const same = (bc, b) => FIELDS.every((f) => {
+const eqf = (bc, b, f) => {
   if (!(f in b)) return true;
   if (f === "cleaningTime") return String(bc[f] || "").slice(0, 8) === b[f];
   return String(bc[f] ?? "") === String(b[f] ?? "");
-});
+};
+const same = (bc, b) => FIELDS.every((f) => eqf(bc, b, f));
 
 export default async (req) => {
   const pw = process.env.APP_PASSWORD;
@@ -135,6 +142,9 @@ export default async (req) => {
   }
   const statusMap = () => Object.fromEntries([...existing.values()].map((x) => [x.externalId, { invoiceStatus: x.invoiceStatus, invoiceNo: x.postedInvoiceNo || x.salesInvoiceNo || "", status: x.status }]));
   if (!rows) return json({ bc: statusMap() });
+  // Oudere BC-extensie (voor 1.0.4.0) kent de locatievelden nog niet: dan niet meesturen.
+  const first = existing.values().next().value;
+  const hasLoc = !first || "locationName" in first;
 
   // 2. Bepalen wat er moet gebeuren
   const ops = [], errors = [];
@@ -142,6 +152,7 @@ export default async (req) => {
   const seen = new Set();
   for (const raw of rows) {
     const b = clean(raw);
+    if (!hasLoc) for (const f of LOCF) delete b[f];
     if (!b.externalId || seen.has(b.externalId)) continue;
     seen.add(b.externalId);
     if (!b.customerNo) { errors.push({ externalId: b.externalId, message: "Geen debiteurnummer" }); continue; }
@@ -149,7 +160,15 @@ export default async (req) => {
     const cur = existing.get(b.externalId);
     if (!cur) ops.push({ kind: "created", method: "POST", url: entity, body: b, ext: b.externalId });
     else if (same(cur, b)) unchanged++;
-    else if (cur.invoiceStatus !== "Open") errors.push({ externalId: b.externalId, message: `Staat al op factuur ${cur.postedInvoiceNo || cur.salesInvoiceNo}; niet gewijzigd` });
+    else if (cur.invoiceStatus !== "Open") {
+      const billing = FIELDS.filter((f) => !INFO.includes(f) && !eqf(cur, b, f));
+      if (billing.length) errors.push({ externalId: b.externalId, message: `Staat al op factuur ${cur.postedInvoiceNo || cur.salesInvoiceNo}; niet gewijzigd` });
+      else {
+        const upd = {};
+        for (const f of INFO) if (f in b && !eqf(cur, b, f)) upd[f] = b[f];
+        ops.push({ kind: "updated", method: "PATCH", url: `${entity}(${cur.id})`, body: upd, ext: b.externalId });
+      }
+    }
     else { const { externalId, ...upd } = b; ops.push({ kind: "updated", method: "PATCH", url: `${entity}(${cur.id})`, body: upd, ext: b.externalId }); }
   }
   for (const [ext, cur] of existing) {

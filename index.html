@@ -1997,13 +1997,13 @@ function editCus(id){
   const nl=id?D.locations.filter(l=>l.customerId===id):[];const nj=D.jobs.filter(j=>nl.some(l=>l.id===j.locationId)).length;
   const fields=[{k:'name',label:'Klantnaam',req:1,wide:1},{k:'contact',label:'Contactpersoon'},{k:'phone',label:'Telefoon'},{k:'email',label:'E-mail',type:'email'},{k:'login',label:'Inlog (app/account)'},
     {k:'notes',label:'Opmerkingen over deze klant',type:'textarea',plain:1,ph:'bijv. altijd vooraf bellen, facturatie via hoofdkantoor, sleutels bij de receptie'},
-    {k:'_bc',type:'heading',label:'Business Central'},{k:'bcNo',label:'Debiteurnummer in BC',ph:'bijv. D10023'},{k:'bcFail',label:'Niet gelukt naar BC',type:'select',options:BCFAIL},{k:'bcNb',label:'"Niet beschikbaar" uit Excel naar BC',type:'select',options:[['','Nee'],['1','Ja, als niet factureerbaar']]}];
+    {k:'_bc',type:'heading',label:'Business Central'},{k:'billTo',label:'Factureren aan',type:'select',wide:1,options:[['','Deze klant zelf']].concat(D.customers.filter(x=>x.id!==id&&!x.billTo).sort((a,b)=>a.name.localeCompare(b.name,'nl')).map(x=>[x.id,x.name+(x.bcNo?' ('+x.bcNo+')':'')]))},{k:'bcNo',label:'Debiteurnummer in BC',ph:'bijv. D10023 (leeg laten als je factureert aan een leasemaatschappij)'},{k:'bcFail',label:'Niet gelukt naar BC',type:'select',options:BCFAIL},{k:'bcNb',label:'"Niet beschikbaar" uit Excel naar BC',type:'select',options:[['','Nee'],['1','Ja, als niet factureerbaar']]}];
   if(!id)fields.push({k:'_h',type:'heading',label:'Adres (eerste locatie)'},{k:'locName',label:'Naam locatie',ph:'Hoofdlocatie'},{k:'address',label:'Straat en huisnummer'},{k:'postcode',label:'Postcode',ph:'5301 LK'},{k:'city',label:'Plaats'},
     {k:'info',label:'Locatie-informatie voor de medewerker',type:'textarea',plain:1,ph:'bijv. parkeergarage P2, melden bij de receptie, sleutel in kluisje'});
   openForm({title:id?'Klant bewerken':'Nieuwe klant',fields,values:c,
     note:id?(nl.length?`Locaties: ${nl.map(l=>[l.address,l.city].filter(Boolean).join(', ')||l.name).join(' · ')}. Adressen en locatie-informatie wijzig je bij Locaties; daar voeg je ook een extra locatie toe.`:'Deze klant heeft nog geen locatie. Voeg die toe bij Locaties > Nieuwe locatie.'):'Vul ook het adres in, dan kun je direct opdrachten voor deze klant aanmaken. Meer locaties voeg je later toe bij Locaties.',
     onSave:v=>{
-      const cust={name:v.name,contact:v.contact,phone:v.phone,email:v.email,login:v.login,notes:v.notes,bcNo:v.bcNo,bcFail:v.bcFail,bcNb:v.bcNb};
+      const cust={name:v.name,contact:v.contact,phone:v.phone,email:v.email,login:v.login,notes:v.notes,bcNo:v.bcNo,bcFail:v.bcFail,bcNb:v.bcNb,billTo:v.billTo||''};
       if(id){Object.assign(c,cust);replan(D.jobs.filter(j=>nl.some(l=>l.id===j.locationId)).map(j=>j.date));toast('Klant opgeslagen.');return}
       const hasAddr=v.address||v.postcode||v.city;let loc=null;
       if(hasAddr){loc={name:v.locName||'Hoofdlocatie',address:v.address,postcode:v.postcode,city:v.city,info:v.info,lat:'',lng:''};const ge=fixGeo(loc,null);if(ge)return ge}
@@ -2315,7 +2315,7 @@ function xBillToHtml(X){
     <optgroup label="Leasemaatschappij of verhuurder">${cs.map(c=>`<option value="${esc(c.id)}"${X.billTo===c.id?' selected':''}>${esc(c.name)}${c.bcNo?' ('+esc(c.bcNo)+')':''}</option>`).join('')}</optgroup>
     <option value="__new"${X.billTo==='__new'?' selected':''}>Nieuwe leasemaatschappij…</option></select></label>
     ${X.billTo==='__new'?`<label class="fld" style="max-width:300px;flex:1 1 220px"><span>Naam leasemaatschappij</span><input id="xbillnew" value="${esc(X.billToNew||'')}" placeholder="bijv. Athlon"></label>`:''}</div>
-    <p class="hint" style="margin:0">${X.billTo?'De factuur gaat naar deze klant. De bedrijven uit de lijst worden locaties onder deze klant, met hun eigen naam; op de factuur staan de kentekens gegroepeerd per bedrijf.':'Komt de lijst van een lease- of verhuurmaatschappij? Kies die hier, dan gaat de factuur daarheen en worden de bedrijven uit de lijst locaties.'}</p>`;
+    <p class="hint" style="margin:0">${X.billTo?'De bedrijven uit de lijst blijven zelf de klant in de planning; alleen de factuur gaat naar deze leasemaatschappij. Op de factuur staan de kentekens gegroepeerd per bedrijf.':'Komt de lijst van een lease- of verhuurmaatschappij? Kies die hier, dan gaat de factuur daarheen. De bedrijven blijven gewoon de klant in de planning.'}</p>`;
 }
 function xReparse(){const X=XIMP;if(!X)return;const r=parseAny(X.rows,{cust:X.custEdit,names:X.names});XIMP={...X,...r};renderXPrev()}
 function renderXPrev(){
@@ -2344,10 +2344,10 @@ function renderXPrev(){
   if(gr.length)geoH=`<details${gr.length-grOk?' open':''}><summary class="small"><b>${grOk} van ${gr.length}</b> adressen zonder postcode gevonden via PDOK${gr.length-grOk?`, <span style="color:var(--bad)">${gr.length-grOk} niet gevonden</span>`:''}</summary><div class="tbl-wrap" style="max-height:180px;overflow:auto;margin-top:6px"><table><thead><tr><th>Adres in de lijst</th><th>Gevonden</th></tr></thead><tbody>${gr.map(g=>`<tr><td class="small">${esc(g.addr)}, ${esc(g.city)}</td><td class="small">${g.ok?`<span class="chip ok">${esc(g.postcode)}</span> ${esc(g.label)}`:`<span style="color:var(--bad)">${esc(g.why)}</span>`}</td></tr>`).join('')}</tbody></table></div></details>`;
   else if(X.geoErr)geoH=`<p class="hint" style="color:var(--bad);margin:0">Postcodes opzoeken via PDOK lukte niet: ${esc(X.geoErr)} De app schat de positie op basis van de plaats.</p>`;
   else if(!SERVER&&X.lookups&&X.lookups.length)geoH=`<p class="hint" style="margin:0">${X.lookups.length} adres(sen) zonder postcode. In de Netlify-versie zoekt de app de postcode op via PDOK; hier wordt de positie geschat op basis van de plaats.</p>`;
-  const blkH=X.multi&&X.blocks?`<div class="tbl-wrap" style="max-height:260px;overflow:auto"><table><thead><tr><th>${X.billTo?'Bedrijf / locatie':'Klant'} (aan te passen)</th><th>Voertuigen</th><th>Afspraken</th><th>Vanaf vandaag</th></tr></thead><tbody>${X.blocks.map(b=>`<tr><td><input class="mini" data-xname="${b.i}" value="${esc(b.cust)}" aria-label="Klantnaam blok rij ${b.row}" style="width:100%;min-width:180px"><div class="small muted">rij ${b.row}${b.meta.info.length?' \u00b7 '+esc(b.meta.info.filter(x=>!/^datum/i.test(x)).slice(0,2).join(' \u00b7 ')):''}</div></td><td>${b.plates}</td><td>${b.ok}</td><td><b>${b.future}</b></td></tr>`).join('')}</tbody></table></div>`:'';
-  const custH=(X.noCust?`<label class="fld" style="max-width:360px"><span>${X.billTo?'Bedrijf':'Klant'} (geen kolom Klant in de lijst${X.meta&&X.meta.cust?', gevonden in de titel':''})</span><input id="xcust" value="${esc(X.custEdit!=null?X.custEdit:X.cust)}" placeholder="Naam van de klant"></label>`:'')+xBillToHtml(X);
+  const blkH=X.multi&&X.blocks?`<div class="tbl-wrap" style="max-height:260px;overflow:auto"><table><thead><tr><th>Klant (aan te passen)</th><th>Voertuigen</th><th>Afspraken</th><th>Vanaf vandaag</th></tr></thead><tbody>${X.blocks.map(b=>`<tr><td><input class="mini" data-xname="${b.i}" value="${esc(b.cust)}" aria-label="Klantnaam blok rij ${b.row}" style="width:100%;min-width:180px"><div class="small muted">rij ${b.row}${b.meta.info.length?' \u00b7 '+esc(b.meta.info.filter(x=>!/^datum/i.test(x)).slice(0,2).join(' \u00b7 ')):''}</div></td><td>${b.plates}</td><td>${b.ok}</td><td><b>${b.future}</b></td></tr>`).join('')}</tbody></table></div>`:'';
+  const custH=(X.noCust?`<label class="fld" style="max-width:360px"><span>Klant (geen kolom Klant in de lijst${X.meta&&X.meta.cust?', gevonden in de titel':''})</span><input id="xcust" value="${esc(X.custEdit!=null?X.custEdit:X.cust)}" placeholder="Naam van de klant"></label>`:'')+xBillToHtml(X);
   out.innerHTML=`<div style="margin-top:14px;display:grid;gap:8px"><p style="margin:0"><b>${esc(X.file)}</b> <span class="muted small">(blad "${esc(X.sheet)}")</span></p>${custH}${blkH}${geoH}
-  <p style="margin:0">${plates.size} voertuigen · ${X.billTo?`factuur naar <b id="xbillname">${esc(xBillName(X)||'(naam invullen)')}</b> · ${cu.size} bedrijven`:`${cu.size} klanten (${newC} nieuw)`} · ${locs.size} locaties · <b>${items.length} opdrachten</b> op ${dates.length} datum(s)</p>
+  <p style="margin:0">${plates.size} voertuigen · ${X.billTo?`${cu.size} klanten · factuur naar <b id="xbillname">${esc(xBillName(X)||'(naam invullen)')}</b>`:`${cu.size} klanten (${newC} nieuw)`} · ${locs.size} locaties · <b>${items.length} opdrachten</b> op ${dates.length} datum(s)</p>
   ${items.length?`<div class="tbl-wrap" style="max-height:240px;overflow:auto"><table><thead><tr><th>Datum</th><th>Voertuigen</th><th>Tijden</th><th>Plaatsen</th></tr></thead><tbody>${rowsH}</tbody></table></div>`:'<p class="hint" style="margin:0">Geen opdrachten om te importeren met deze instellingen.</p>'}${warn}
   <div class="row"><button class="btn sm" data-act="xlog">Bekijk alle regels per voertuig (${X.log.length})</button></div><div id="xlogBox"></div>
   <p class="hint" style="margin:0">Opdrachten die al bestaan (zelfde kenteken, datum en locatie) worden overgeslagen, dus opnieuw importeren is veilig. Na het importeren zie je in het importlog wat wel en niet is ingepland.</p></div>`;
@@ -2367,12 +2367,13 @@ function doXImport(){
   if(billCu)log.forEach(e=>{e.billTo=billCu.id});
   const share={};items.forEach(it=>{if(it.from&&it.to){const k=locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to;share[k]=(share[k]||0)+1}});
   for(const it of items){
-    let cu=billCu||D.customers.find(x=>clean(x.name).toLowerCase()===it.cust.toLowerCase());
+    let cu=D.customers.find(x=>x!==billCu&&clean(x.name).toLowerCase()===it.cust.toLowerCase());
     if(!cu){cu={id:uid('c'),name:it.cust,contact:'',phone:it.phone||'',email:it.mail||'',login:it.login||''};D.customers.push(cu);newC++}
-    else if(!billCu){if(!cu.email&&it.mail)cu.email=it.mail;if(!cu.login&&it.login)cu.login=it.login;if(!cu.phone&&it.phone)cu.phone=it.phone}
+    else{if(!cu.email&&it.mail)cu.email=it.mail;if(!cu.login&&it.login)cu.login=it.login;if(!cu.phone&&it.phone)cu.phone=it.phone}
+    if(billCu)cu.billTo=billCu.id;
     const npc=it.pc.replace(/\s/g,''),na=it.addr.toLowerCase(),nc=it.city.toLowerCase();
     let lo=D.locations.find(l=>l.customerId===cu.id&&(npc?String(l.postcode||'').replace(/\s/g,'').toUpperCase()===npc&&(!it.addr||!l.address||clean(l.address).toLowerCase()===na):clean(l.address).toLowerCase()===na&&clean(l.city).toLowerCase()===nc));
-    if(!lo){const city=it.city&&it.city===it.city.toUpperCase()?it.city.toLowerCase().replace(/(^|[\s-])(\S)/g,(m,a,b)=>a+b.toUpperCase()):it.city||'';lo={id:uid('l'),customerId:cu.id,name:billCu?it.cust:(it.addr||'Locatie'),address:it.addr,postcode:it.pc,city,info:billCu?[it.info,it.phone&&'Tel. '+it.phone,it.mail].filter(Boolean).join(' \u00b7 '):(it.info||''),...(it.lat?{lat:it.lat,lng:it.lng,geo:'pdok',pdokLabel:it.geoLabel||''}:geocode(it.pc,it.city))};D.locations.push(lo);newLocs.push(lo);newL++}
+    if(!lo){const city=it.city&&it.city===it.city.toUpperCase()?it.city.toLowerCase().replace(/(^|[\s-])(\S)/g,(m,a,b)=>a+b.toUpperCase()):it.city||'';lo={id:uid('l'),customerId:cu.id,name:it.addr||'Locatie',address:it.addr,postcode:it.pc,city,info:it.info||'',...(it.lat?{lat:it.lat,lng:it.lng,geo:'pdok',pdokLabel:it.geoLabel||''}:geocode(it.pc,it.city))};D.locations.push(lo);newLocs.push(lo);newL++}
     else if(!lo.info&&it.info)lo.info=it.info;
     if(D.jobs.some(j=>j.plate===it.plate&&j.date===it.date&&j.locationId===lo.id)){dup++;if(log[it.li]){log[it.li].status='dup';log[it.li].reason='Bestaat al (zelfde kenteken, datum en locatie)'}continue}
     let from=it.from,to=it.to;const len=from&&to?t2m(to)-t2m(from):0;
@@ -2535,11 +2536,12 @@ function findLoc(cu,addr,pc,city){
 }
 function logMakeJob(e,v){
   const bill=e.billTo&&D.customers.find(c=>c.id===e.billTo);
-  let cu=bill||D.customers.find(x=>clean(x.name).toLowerCase()===clean(v.cust).toLowerCase());
+  let cu=D.customers.find(x=>x!==bill&&clean(x.name).toLowerCase()===clean(v.cust).toLowerCase());
   if(!cu){cu={id:uid('c'),name:clean(v.cust),contact:'',phone:'',email:'',login:''};D.customers.push(cu)}
+  if(bill)cu.billTo=bill.id;
   let lo=findLoc(cu,v.addr,v.pc,v.city),isNew=false;
   if(!lo){const g=geocode(v.pc,v.city);if(!g)return{err:'Plaats of postcode niet gevonden. Vul een postcode (1234 AB) of een bekende plaats in.'};
-    lo={id:uid('l'),customerId:cu.id,name:bill?clean(v.cust):(v.addr||'Locatie'),address:v.addr||'',postcode:String(v.pc||'').toUpperCase(),city:v.city||'',info:'',...g};D.locations.push(lo);isNew=true}
+    lo={id:uid('l'),customerId:cu.id,name:v.addr||'Locatie',address:v.addr||'',postcode:String(v.pc||'').toUpperCase(),city:v.city||'',info:'',...g};D.locations.push(lo);isNew=true}
   const j={id:uid('j'),plate:normPlate(v.plate)?v.plate.toUpperCase():v.plate,vehicle:v.veh||'',locationId:lo.id,date:v.date,from:v.from||'',to:v.to||'',type:v.type||D.types[0].id,duration:+v.duration||'',priority:2,notes:v.note||''};
   D.jobs.push(j);
   e.orig=e.orig||{status:e.status,reason:e.reason,date:e.date};e.status='imp';e.jobId=j.id;e.date=v.date;e.time=v.from?v.from+(v.to?'–'+v.to:''):'';e.fixed=Date.now();e.done=false;
@@ -2600,9 +2602,11 @@ function logGoto(i){
 /* ---------- Business Central: wat er naar BC gaat voor facturatie (voorbereiding koppeling) ---------- */
 const BCFAIL=[['none','Niet sturen'],['nobill','Sturen, niet factureren'],['callout','Sturen als voorrijkosten']];
 const custOfJob=j=>CUS[(LOC[j.locationId]||{}).customerId]||{};
+/* Factuurklant: de leasemaatschappij als die bij de klant is ingesteld, anders de klant zelf */
+const billOf=c=>(c&&c.billTo&&CUS[c.billTo])||c||{};
 const bcFailMode=c=>c.bcFail||'nobill';
 function bcDecide(j,s){
-  const c=custOfJob(j),ov=(D.bcOverride||{})[j.id];
+  const c=billOf(custOfJob(j)),ov=(D.bcOverride||{})[j.id];
   let send,billable,why='';
   if(s.st==='done'){send=true;billable=!/niet\s+factureren/i.test(j.notes||'');if(!billable)why='Opmerking "niet factureren" in de opdracht'}
   else{const m=bcFailMode(c);send=m!=='none';billable=m==='callout';why=m==='none'?'Klant: niet gelukt niet sturen':m==='callout'?'Klant: voorrijkosten':'Klant: sturen, niet factureren'}
@@ -2610,11 +2614,11 @@ function bcDecide(j,s){
   return{send,billable:send&&billable,why,override:ov===true||ov===false};
 }
 function bcRow(j,s){
-  const l=LOC[j.locationId]||{},c=custOfJob(j),t=TYP[j.type]||{},w=WRK[s.wid]||{};const d=bcDecide(j,s);
+  const l=LOC[j.locationId]||{},ec=custOfJob(j),c=billOf(ec),t=TYP[j.type]||{},w=WRK[s.wid]||{};const d=bcDecide(j,s);
   const at=s.at?new Date(s.at):null;
-  return{j,s,c,l,t,w,d,
+  return{j,s,c,ec,l,t,w,d,
     api:{externalId:j.id,customerNo:c.bcNo||'',shipToCode:l.bcShipTo||'',licensePlate:j.plate,cleaningDate:j.date,cleaningTime:at?at.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}):'',
-      itemNo:s.st==='done'?(t.bcItem||''):(bcFailMode(c)==='callout'&&!d.override?(D.settings.bcCalloutItem||'VOORRIJKOSTEN'):(t.bcItem||'')),resourceNo:w.bcResource||'',locationName:l.name||'',locationAddress:[l.address,l.postcode].filter(Boolean).join(', '),locationCity:l.city||'',
+      itemNo:s.st==='done'?(t.bcItem||''):(bcFailMode(c)==='callout'&&!d.override?(D.settings.bcCalloutItem||'VOORRIJKOSTEN'):(t.bcItem||'')),resourceNo:w.bcResource||'',locationName:ec!==c?ec.name||'':l.name||'',locationAddress:[l.address,l.postcode].filter(Boolean).join(', '),locationCity:l.city||'',
       status:s.st==='done'?'Gereed':'NietGereinigd',billable:d.billable,reason:s.st==='issue'?(s.reason||''):'',note:s.note||''},
     missing:[!c.bcNo&&'debiteurnr.',!t.bcItem&&s.st==='done'&&'artikelnr.'].filter(Boolean)};
 }
@@ -2640,9 +2644,9 @@ function bcRows(){
     const P=D.plans[d];let wid=s.wid;if(!wid&&P)for(const k in P.routes||{})if(P.routes[k].includes(id))wid=k;rows.push(bcRow(j,{...s,wid}))}
   // "Niet beschikbaar" uit de Excel, alleen voor klanten die dat willen
   for(const lg of (D.importLogs||[]))for(const e of lg.entries){if(e.status!=='nb'||!e.date||e.date.slice(0,7)!==BCST.month)continue;
-    const c=D.customers.find(x=>clean(x.name).toLowerCase()===clean(e.cust).toLowerCase());if(!c||c.bcNb!=='1')continue;
-    rows.push({nb:true,e,c,l:{},t:{},w:{},d:{send:true,billable:false,why:'Klant: niet beschikbaar ook sturen'},j:{id:'nb-'+lg.id+'-'+e.row+'-'+e.date,plate:e.plate,date:e.date},s:{st:'nb'},
-      api:{externalId:'nb-'+lg.id+'-'+e.row+'-'+e.date,customerNo:c.bcNo||'',shipToCode:'',licensePlate:e.plate,cleaningDate:e.date,cleaningTime:'',itemNo:'',resourceNo:'',status:'NietBeschikbaar',billable:false,reason:e.reason||'Niet beschikbaar',note:''},missing:[!c.bcNo&&'debiteurnr.'].filter(Boolean)})}
+    const ec=D.customers.find(x=>clean(x.name).toLowerCase()===clean(e.cust).toLowerCase()),c=billOf(ec);if(!ec||c.bcNb!=='1')continue;
+    rows.push({nb:true,e,c,ec,l:{},t:{},w:{},d:{send:true,billable:false,why:'Klant: niet beschikbaar ook sturen'},j:{id:'nb-'+lg.id+'-'+e.row+'-'+e.date,plate:e.plate,date:e.date},s:{st:'nb'},
+      api:{externalId:'nb-'+lg.id+'-'+e.row+'-'+e.date,customerNo:c.bcNo||'',shipToCode:'',licensePlate:e.plate,cleaningDate:e.date,cleaningTime:'',itemNo:'',resourceNo:'',status:'NietBeschikbaar',billable:false,reason:e.reason||'Niet beschikbaar',note:'',locationName:ec!==c?ec.name:'',locationAddress:e.addr||'',locationCity:e.city||''},missing:[!c.bcNo&&'debiteurnr.'].filter(Boolean)})}
   return rows.sort((a,b)=>a.j.date.localeCompare(b.j.date)||String(a.api.cleaningTime).localeCompare(String(b.api.cleaningTime)));
 }
 function viewBC(){
@@ -2654,7 +2658,7 @@ function viewBC(){
   const missC=[...new Set(miss.filter(r=>!r.c.bcNo).map(r=>r.c.id))].map(id=>CUS[id]).filter(Boolean),missT=[...new Set(miss.filter(r=>!r.t.bcItem&&r.s.st==='done').map(r=>r.j.type))].map(id=>TYP[id]).filter(Boolean);
   const st=r=>r.nb?'<span class="chip">Niet beschikbaar</span>':r.s.st==='done'?`<span class="chip ok">${I.check} Gereed</span>`:`<span class="chip bad">Niet gelukt</span>`;
   const tr=rows.map(r=>`<tr${r.d.send?'':' class="muted-row"'}><td class="mono small">${esc(fdate(r.j.date,{weekday:'short',day:'numeric',month:'short'}))}<div class="muted">${esc(r.api.cleaningTime)}</div></td><td>${plateHtml(r.j.plate)}</td>
-    <td><b>${esc(r.c.name||'?')}</b><div class="small ${r.c.bcNo?'muted':''}" ${r.c.bcNo?'':'style="color:var(--bad)"'}>${r.c.bcNo?'Deb. '+esc(r.c.bcNo):'geen debiteurnr.'}</div></td>
+    <td><b>${esc(r.ec&&r.ec!==r.c?r.ec.name:r.c.name||'?')}</b>${r.ec&&r.ec!==r.c?`<div class="small muted">factuur aan ${esc(r.c.name)}</div>`:''}<div class="small ${r.c.bcNo?'muted':''}" ${r.c.bcNo?'':'style="color:var(--bad)"'}>${r.c.bcNo?'Deb. '+esc(r.c.bcNo):'geen debiteurnr.'}</div></td>
     <td class="small">${esc(r.l.city||r.e&&r.e.city||'')}${r.l.bcShipTo?`<div class="muted">Verz. ${esc(r.l.bcShipTo)}</div>`:''}</td>
     <td class="small">${esc(r.t.name||'')}${r.api.itemNo?`<div class="muted">Art. ${esc(r.api.itemNo)}</div>`:r.s.st==='done'?'<div style="color:var(--bad)">geen artikelnr.</div>':''}</td>
     <td class="small">${esc(r.w.name||'')}</td><td>${st(r)}${r.api.reason?`<div class="small muted">${esc(r.api.reason)}</div>`:''}</td>
@@ -2926,8 +2930,19 @@ function onDrop(e){if(!DRAG)return;const z=e.target.closest('[data-drop]');if(!z
   if(k==='before'){if(ids.includes(before))return;return moveJobs(ids,wid,before)}
 }
 function onDragEnd(){DRAG=null;clearOver();document.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging'))}
+/* Eerdere variant (4 nov): bedrijven werden locaties onder de leasemaatschappij. Terugzetten: bedrijf = klant, met Factureren aan. */
+function migrateBillTo(){
+  if(D.migBillTo)return;let n=0;
+  for(const lg of (D.importLogs||[]))for(const e of (lg.entries||[])){
+    if(!e.billTo||!e.jobId)continue;const j=D.jobs.find(x=>x.id===e.jobId);if(!j)continue;const lo=D.locations.find(l=>l.id===j.locationId);
+    if(!lo||lo.customerId!==e.billTo||clean(lo.name).toLowerCase()!==clean(e.cust).toLowerCase())continue;
+    let cu=D.customers.find(x=>x.id!==e.billTo&&clean(x.name).toLowerCase()===clean(e.cust).toLowerCase());
+    if(!cu){cu={id:uid('c'),name:clean(e.cust),contact:'',phone:'',email:'',login:''};D.customers.push(cu)}
+    cu.billTo=e.billTo;lo.customerId=cu.id;lo.name=lo.address||'Locatie';n++}
+  D.migBillTo=1;if(n){index();save()}
+}
 function init(){
-  try{load()}catch(err){if(!D)D=sample();try{index()}catch(e){}setTimeout(()=>showFatal('gegevens laden',err),0)}
+  try{load();migrateBillTo()}catch(err){if(!D)D=sample();try{index()}catch(e){}setTimeout(()=>showFatal('gegevens laden',err),0)}
   try{if(window.claude&&typeof window.claude.use==='function')window.claude.use('sample').then(s=>{SAMPLE=s||null}).catch(()=>{})}catch(e){}
   document.addEventListener('click',onClick);
   if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);if(SERVER)setInterval(()=>{if(!document.hidden&&(MV||(S.tab==='planning'&&Date.now()-MSG.at>30000)))fetchMsgs(true)},15000);document.addEventListener('change',onChange);document.addEventListener('contextmenu',onContext);addEventListener('scroll',closeCtx,{passive:true});addEventListener('resize',closeCtx);

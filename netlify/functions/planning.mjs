@@ -10,6 +10,7 @@
 // Endpoints:
 //   POST /api/publiceer      planner: ritten en links opslaan          (APP_PASSWORD)
 //   GET  /api/status?date=   planner: gereed- en probleemmeldingen      (APP_PASSWORD)
+//   GET  /api/status?from=&to=  planner: alle meldingen in een periode (APP_PASSWORD)
 //   GET  /api/mijn-planning?t=<token>&date=   medewerker: eigen rit
 //   POST /api/melding        medewerker: { t, date, jobId, st, reason, note }
 //   GET  /api/berichten              planner: alle berichten (30 dagen)       (APP_PASSWORD)
@@ -106,6 +107,19 @@ export default async (req) => {
     // ---- planner: meldingen ophalen ----
     if (path.endsWith("/status")) {
       if (!plannerOk(req)) return json({ error: "Wachtwoord vereist." }, 401);
+      const from = url.searchParams.get("from"), to = url.searchParams.get("to");
+      if (isDate(from) && isDate(to)) {
+        // alle meldingen in een periode (bijv. een maand), gegroepeerd per datum
+        const { blobs } = await store.list({ prefix: "status/" });
+        const byDate = {};
+        await Promise.all(blobs.map(async (b) => {
+          const [, d, id] = b.key.split("/");
+          if (!isDate(d) || d < from || d > to) return;
+          const v = await store.get(b.key, { type: "json" });
+          if (v) (byDate[d] = byDate[d] || {})[id] = v;
+        }));
+        return json({ from, to, byDate });
+      }
       const date = url.searchParams.get("date");
       if (!isDate(date)) return json({ error: "Ongeldige datum." }, 400);
       return json({ date, status: await statusesFor(store, date) });

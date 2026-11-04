@@ -249,6 +249,8 @@ td.act{white-space:nowrap;text-align:right}
 .ctx-t{font:600 11px var(--f-body);letter-spacing:.07em;text-transform:uppercase;color:var(--muted);padding:6px 10px 4px}
 .ctx-sep{height:1px;background:var(--line);margin:4px 2px}
 
+.bcsync{background:var(--ok-soft);border-radius:var(--r);padding:8px 12px;font-size:13.5px}
+.bcwarn{background:var(--warn-soft);border-radius:var(--r);padding:9px 12px;font-size:13.5px}
 .jfbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:flex-end;margin:4px 0 12px}
 .jf{display:grid;gap:3px}.jf span{font:600 11px var(--f-body);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
 .jf input.mini,.jf select.mini{min-width:0}
@@ -934,7 +936,7 @@ async function api(path,opts={}){
   if(r.status===401)throw{code:'pw',message:d.error};if(r.status===404)throw{code:'nofn'};if(!r.ok)throw{code:'srv',message:d.error};return d;
 }
 const apiErr=e=>e.code==='nofn'?'De serverfunctie is niet gevonden. Deploy de site via GitHub, inclusief netlify/functions en package.json.':e.code==='pw'?'Het wachtwoord klopt niet.':(e.message||'Geen verbinding met de server.');
-function askPw(cb){openForm({title:'App-wachtwoord',note:'Vul het wachtwoord in dat in Netlify als APP_PASSWORD is ingesteld. Deze browser onthoudt het.',fields:[{k:'pw',label:'Wachtwoord',type:'password',req:1,wide:1}],values:{},okLabel:'Doorgaan',onSave:v=>{PWMEM=v.pw;try{localStorage.setItem(PWKEY,v.pw)}catch(e){}setTimeout(cb,0);return''}})}
+function askPw(cb){openForm({title:'App-wachtwoord',note:'Vul het wachtwoord in dat in Netlify als APP_PASSWORD is ingesteld. De app onthoudt het tot je de browser sluit of uitlogt (Beheer > Uitloggen).',fields:[{k:'pw',label:'Wachtwoord',type:'password',req:1,wide:1}],values:{},okLabel:'Doorgaan',onSave:v=>{PWMEM=v.pw;pwStore(v.pw);setTimeout(cb,0);return''}})}
 async function fetchStatus(date,force){
   if(!SERVER)return;const cur=STATUS[date];if(cur&&(cur.loading||!force))return;
   STATUS[date]={map:(cur&&cur.map)||{},loading:true};
@@ -1091,7 +1093,7 @@ function reportsPanel(st){
     const txt=i.k==='probleem'?`<b style="color:var(--bad)">${esc(i.s.reason||'Probleem')}</b>${i.s.note?' · '+esc(i.s.note):''}`:i.k==='opmerking'?`<b style="color:var(--ok)">Gereed</b> · ${esc(i.s.note)}`:'<span style="color:var(--ok)">Gereed</span>';
     return`<li class="rep rep-${i.k}${i.h?' handled':''}"><time>${esc(hm(i.s.at))}</time>
       <div class="rep-main"><div class="row"><i class="dot" style="background:${wc(i.w)}"></i><b>${esc(i.w.name)}</b>${plateBtn(i.j)}<span class="muted">${esc(cu.name||'')}, ${esc(i.l.city||'')}</span></div><div>${txt}</div></div>
-      <div class="rep-act"><button class="btn sm" data-act="visit" data-wid="${i.w.id}" data-loc="${i.l.id}">Bekijk</button>${i.k!=='gereed'?`<button class="btn sm${i.h?' on':''}" data-act="handled" data-id="${i.id}" title="${i.h?'Weer als open markeren':'Markeren als afgehandeld'}">${I.check} ${i.h?'Afgehandeld':'Afhandelen'}</button>`:''}</div></li>`}).join('');
+      <div class="rep-act"><button class="btn sm" data-act="visit" data-wid="${i.w.id}" data-loc="${i.l.id}">Bekijk</button>${i.k==='probleem'?(()=>{const d=bcDecide(i.j,i.s);return`<button class="btn sm${d.send?' on':''}" data-act="bctoggle" data-id="${i.id}" aria-pressed="${d.send}" title="${esc(d.why)}">${d.send?'Naar BC: ja':'Naar BC: nee'}</button>`})():''}${i.k!=='gereed'?`<button class="btn sm${i.h?' on':''}" data-act="handled" data-id="${i.id}" title="${i.h?'Weer als open markeren':'Markeren als afgehandeld'}">${I.check} ${i.h?'Afgehandeld':'Afhandelen'}</button>`:''}</div></li>`}).join('');
   return`<section class="panel reports"><div class="row"><h2>Meldingen van medewerkers</h2>${cnt.aandacht?`<span class="chip bad">${cnt.aandacht} open</span>`:''}<span class="sp"></span>${last}${refresh}</div>
     <div class="row" style="margin:10px 0">${chips}</div>
     ${rows?`<ul class="reps">${rows}</ul>`:`<p class="small muted" style="margin:0">${f==='aandacht'?'Alles is afgehandeld.':'Geen meldingen in deze selectie.'}</p>`}</section>`;
@@ -1355,14 +1357,17 @@ function sickApply(gs){
 function aiMode(){if(SAMPLE)return'claude';try{if(!window.claude&&/^https?:$/.test(location.protocol))return'server'}catch(e){}return null}
 const PWKEY='wasroute.aipw';
 let PWMEM='';
-function getPw(){if(PWMEM)return PWMEM;const el=$('#aiPw');if(el&&el.value)return el.value;try{return localStorage.getItem(PWKEY)||''}catch(e){return''}}
+try{localStorage.removeItem(PWKEY)}catch(e){}
+const pwStore=v=>{try{if(v)sessionStorage.setItem(PWKEY,v);else sessionStorage.removeItem(PWKEY)}catch(e){}};
+function getPw(){if(PWMEM)return PWMEM;const el=$('#aiPw');if(el&&el.value)return el.value;try{return sessionStorage.getItem(PWKEY)||''}catch(e){return''}}
+function logoutPw(){PWMEM='';pwStore('');const el=$('#aiPw');if(el)el.value='';try{localStorage.removeItem(PWKEY)}catch(e){}toast('Uitgelogd. Bij de volgende actie die het wachtwoord nodig heeft, vraagt de app er opnieuw om.')}
 async function serverAI(prompt,signal){
   const r=await fetch('/api/ai-advies',{method:'POST',headers:{'content-type':'application/json','x-app-password':getPw()},body:JSON.stringify({prompt}),signal});
   let d={};try{d=await r.json()}catch(e){}
   if(r.status===401){const el=$('#aiPw');if(el){el.hidden=false;el.focus()}throw{code:'pw'}}
   if(r.status===404)throw{code:'nofn'};
   if(!r.ok||!d.text)throw{code:'srv',message:d.error};
-  try{const el=$('#aiPw');if(el&&el.value)localStorage.setItem(PWKEY,el.value)}catch(e){}
+  {const el=$('#aiPw');if(el&&el.value)pwStore(el.value)}
   return d.text;
 }
 async function askAI(){
@@ -1429,13 +1434,16 @@ const MENU_ITEMS={
   'instellingen:planning':['Planning en reistijd','Rekenregels, pauze, werkdag en rijtijden'],
   'instellingen:types':['Reinigingstypes','Soorten reiniging, duur en vaardigheden'],
   'instellingen:data':['Gegevens en back-up','Back-up kopiëren of terugzetten'],
-  'instellingen:menu':['Menu indelen','Kies wat in het hoofdmenu en in de groepen staat']};
+  'instellingen:menu':['Menu indelen','Kies wat in het hoofdmenu en in de groepen staat'],
+  'act:logout':['Uitloggen','App-wachtwoord vergeten op deze computer'],
+  'facturatie':['Naar Business Central','Gereedmeldingen per maand voor facturatie']};
 const MENU_SHORT={'opdrachten':'Overzicht','medewerkers':'Gegevens'};
-const menuDefault=()=>({top:['planning','g:opdr','klanten','g:mw','g:beheer'],groups:{opdr:{l:'Opdrachten',items:['opdrachten','importlog','act:import']},mw:{l:'Medewerkers',items:['medewerkers','afwezigheid','act:msgs']},beheer:{l:'Beheer',items:['instellingen:planning','instellingen:types','instellingen:data','instellingen:menu']}},hidden:[]});
+const menuDefault=()=>({top:['planning','g:opdr','klanten','g:mw','g:beheer'],groups:{opdr:{l:'Opdrachten',items:['opdrachten','importlog','facturatie','act:import']},mw:{l:'Medewerkers',items:['medewerkers','afwezigheid','act:msgs']},beheer:{l:'Beheer',items:['instellingen:planning','instellingen:types','instellingen:data','instellingen:menu','act:logout']}},hidden:[]});
 function menuCfg(){
   let m=D.menu;if(!m||!m.top||!m.groups)m=D.menu=menuDefault();
   const placed=new Set([...m.top.filter(x=>!x.startsWith('g:')),...Object.values(m.groups).flatMap(g=>g.items),...(m.hidden||[])]);
-  for(const id of Object.keys(MENU_ITEMS))if(!placed.has(id)){const g=m.groups.beheer||Object.values(m.groups)[0];if(g)g.items.push(id);else m.top.push(id)}
+  const PREF={facturatie:'opdr'};
+  for(const id of Object.keys(MENU_ITEMS))if(!placed.has(id)){const g=m.groups[PREF[id]]||m.groups.beheer||Object.values(m.groups)[0];if(g)g.items.push(id);else m.top.push(id)}
   m.top=m.top.filter(x=>x.startsWith('g:')?m.groups[x.slice(2)]:MENU_ITEMS[x]);
   for(const k in m.groups)if(!m.top.includes('g:'+k))m.top.push('g:'+k);
   m.hidden=(m.hidden||[]).filter(x=>x!=='instellingen:menu');
@@ -1470,12 +1478,12 @@ function viewMenu(){
 const navCur=()=>S.tab==='instellingen'?'instellingen:'+(S.setPage||'planning'):S.tab;
 const navGroup=()=>buildNav().find(g=>g.to===S.tab||(g.items||[]).some(([t])=>t===navCur()))||{};
 function navTo(t){
-  if(t.startsWith('act:')){closeMenus();const a=t.slice(4);if(a==='import')openXlsxImport();else if(a==='msgs')openMsgs({});return}
+  if(t.startsWith('act:')){closeMenus();const a=t.slice(4);if(a==='import')openXlsxImport();else if(a==='msgs')openMsgs({});else if(a==='logout')logoutPw();return}
   const[tab,sub]=t.split(':');S.tab=tab;if(sub)S.setPage=sub;closeMenus();render();window.scrollTo(0,0);
 }
 function closeMenus(){document.querySelectorAll('.navg.open').forEach(g=>{g.classList.remove('open');const b=g.querySelector('[aria-expanded]');if(b)b.setAttribute('aria-expanded','false')})}
 function renderNav(nIss){
-  const cur=navCur(),grp=navGroup(),nLog=(()=>{const lg=curLog();if(!lg)return 0;return liveEntries({entries:lg.entries}).filter(e=>PROBLEM.has(e.st)&&!e.done).length})();
+  const cur=navCur(),grp=navGroup(),nLog=(()=>{try{const lg=curLog();if(!lg||!Array.isArray(lg.entries))return 0;return liveEntries({entries:lg.entries}).filter(e=>PROBLEM.has(e.st)&&!e.done).length}catch(e){console.error(e);return 0}})();
   const badge=(n,t,neutral)=>n?` <span class="tabbadge${neutral?' neu':''}" title="${esc(t)}">${n}</span>`:'';
   const itemBadge=t=>t==='importlog'?badge(nLog,nLog+' problemen in de laatste import',true):t==='act:msgs'?badge(msgUnread(),'ongelezen berichten'):'';
   const NAV=buildNav();
@@ -1486,11 +1494,25 @@ function renderNav(nIss){
     return`<div class="navg"><button class="tab" data-act="navg" aria-haspopup="true" aria-expanded="false" aria-pressed="${on}">${esc(g.l)}${red||neu?`<span class="navdot${red?'':' neu'}" aria-label="${red||neu} nieuw"></span>`:''}<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="navmenu" role="menu">${g.items.map(([t,l,d])=>`<button role="menuitem" data-act="navto" data-to="${t}"${t===cur?' aria-current="page"':''}><b>${esc(l)}${itemBadge(t)}</b><small>${esc(d)}</small></button>`).join('')}</div></div>`}).join('');
   const sub=$('#subnav');
-  if(grp.items){sub.hidden=false;sub.innerHTML=`<div class="subnav-in gut"><span class="subnav-t">${esc(grp.l)}</span>${grp.items.map(([t,l])=>`<button data-act="navto" data-to="${t}" aria-pressed="${t===cur}">${t.startsWith('act:')?(t==='act:import'?I.imp:I.chat)+' ':''}${esc(l)}${itemBadge(t)}</button>`).join('')}</div>`}
+  if(grp.items){sub.hidden=false;sub.innerHTML=`<div class="subnav-in gut"><span class="subnav-t">${esc(grp.l)}</span>${grp.items.map(([t,l])=>`<button data-act="navto" data-to="${t}" aria-pressed="${t===cur}">${t.startsWith('act:')?(t==='act:import'?I.imp:t==='act:msgs'?I.chat:I.unlock)+' ':''}${esc(l)}${itemBadge(t)}</button>`).join('')}</div>`}
   else{sub.hidden=true;sub.innerHTML=''}
 }
+function showFatal(where,err){
+  console.error('[Wasroute] fout in '+where,err);
+  const v=$('#view');if(!v)return;const msg=String(err&&err.message||err),st=String(err&&err.stack||'').split('\n').slice(0,4).join('\n');
+  v.innerHTML=`<section class="panel sec" style="border-color:var(--bad)"><h2>Er ging iets mis bij het tonen van deze pagina</h2>
+    <p>Je gegevens zijn niet verloren. Stuur de tekst hieronder door, dan wordt het opgelost. Maak voor de zekerheid een back-up.</p>
+    <pre class="small" style="white-space:pre-wrap;background:var(--sunk);padding:10px;border-radius:8px;margin:0">${esc(where+': '+msg+'\n'+st)}</pre>
+    <div class="row"><button class="btn primary" data-act="rawbackup">Back-up kopiëren</button><button class="btn" data-act="navto" data-to="planning">Naar Planning</button><button class="btn" data-act="navto" data-to="instellingen:data">Gegevens en back-up</button></div></section>`;
+}
 function render(){
-  const nIss=SERVER?openIssues(S.date)+msgUnread():0;
+  try{renderInner()}catch(err){
+    try{if(!$('#tabs').innerHTML)$('#tabs').innerHTML=['planning','opdrachten','klanten','medewerkers','instellingen'].map(t=>`<button class="tab" data-act="navto" data-to="${t}">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')}catch(e){}
+    showFatal('scherm '+S.tab,err);
+  }
+}
+function renderInner(){
+  let nIss=0;try{nIss=SERVER?openIssues(S.date)+msgUnread():0}catch(e){console.error(e)}
   renderNav(nIss);$('#datebar').hidden=!['planning','opdrachten'].includes(S.tab);
   $('#dateIn').value=S.date;$('#dayName').textContent=fdate(S.date,{weekday:'long'});
   const v=$('#view');
@@ -1499,6 +1521,7 @@ function render(){
   else if(S.tab==='klanten')v.innerHTML=viewCustomers();
   else if(S.tab==='medewerkers')v.innerHTML=viewWorkers();
   else if(S.tab==='afwezigheid')v.innerHTML=viewAbsence();
+  else if(S.tab==='facturatie')v.innerHTML=viewBC();
   else if(S.tab==='importlog'){v.innerHTML=viewImportLog();if(LOGSRC)logRefresh()}
   else v.innerHTML=viewSettings();
 }
@@ -1879,7 +1902,7 @@ function renderChat(){
         <button class="btn sm${c.best?' primary':''}" data-act="chatapply" data-m="${mi}" data-i="${ci}">Toepassen</button></div>`}).join('')}</div>`:''}</div>`).join('');
   log.scrollTop=log.scrollHeight;
   const pf=log.querySelector('[data-pwform]');if(pf){const inp=pf.querySelector('input');setTimeout(()=>inp.focus(),20);
-    pf.addEventListener('submit',e=>{e.preventDefault();const v=inp.value.trim();if(!v)return;PWMEM=v;try{localStorage.setItem(PWKEY,v)}catch(x){}
+    pf.addEventListener('submit',e=>{e.preventDefault();const v=inp.value.trim();if(!v)return;PWMEM=v;pwStore(v);
       const q=C.msgs[+pf.dataset.pwform].pw;C.msgs.splice(+pf.dataset.pwform-1,2);chatSend(q)})}
 }
 async function chatSend(text){
@@ -1957,16 +1980,17 @@ function viewCustomers(){
   <p class="hint">Zonder coördinaten schat de app de positie uit de postcode. Vul voor de beste reistijden de exacte breedte- en lengtegraad in (bijv. uit Google Maps: rechtsklik op de plek).</p></section>`;
 }
 function editCus(id){
-  const c=id?CUS[id]:{name:'',contact:'',phone:'',email:'',login:'',notes:'',locName:'Hoofdlocatie',address:'',postcode:'',city:'',info:''};
+  const c0=id?CUS[id]:{name:'',contact:'',phone:'',email:'',login:'',notes:'',locName:'Hoofdlocatie',address:'',postcode:'',city:'',info:''};const c=id?c0:c0;if(!c.bcFail)c.bcFail='nobill';
   const nl=id?D.locations.filter(l=>l.customerId===id):[];const nj=D.jobs.filter(j=>nl.some(l=>l.id===j.locationId)).length;
   const fields=[{k:'name',label:'Klantnaam',req:1,wide:1},{k:'contact',label:'Contactpersoon'},{k:'phone',label:'Telefoon'},{k:'email',label:'E-mail',type:'email'},{k:'login',label:'Inlog (app/account)'},
-    {k:'notes',label:'Opmerkingen over deze klant',type:'textarea',plain:1,ph:'bijv. altijd vooraf bellen, facturatie via hoofdkantoor, sleutels bij de receptie'}];
+    {k:'notes',label:'Opmerkingen over deze klant',type:'textarea',plain:1,ph:'bijv. altijd vooraf bellen, facturatie via hoofdkantoor, sleutels bij de receptie'},
+    {k:'_bc',type:'heading',label:'Business Central'},{k:'bcNo',label:'Debiteurnummer in BC',ph:'bijv. D10023'},{k:'bcFail',label:'Niet gelukt naar BC',type:'select',options:BCFAIL},{k:'bcNb',label:'"Niet beschikbaar" uit Excel naar BC',type:'select',options:[['','Nee'],['1','Ja, als niet factureerbaar']]}];
   if(!id)fields.push({k:'_h',type:'heading',label:'Adres (eerste locatie)'},{k:'locName',label:'Naam locatie',ph:'Hoofdlocatie'},{k:'address',label:'Straat en huisnummer'},{k:'postcode',label:'Postcode',ph:'5301 LK'},{k:'city',label:'Plaats'},
     {k:'info',label:'Locatie-informatie voor de medewerker',type:'textarea',plain:1,ph:'bijv. parkeergarage P2, melden bij de receptie, sleutel in kluisje'});
   openForm({title:id?'Klant bewerken':'Nieuwe klant',fields,values:c,
     note:id?(nl.length?`Locaties: ${nl.map(l=>[l.address,l.city].filter(Boolean).join(', ')||l.name).join(' · ')}. Adressen en locatie-informatie wijzig je bij Locaties; daar voeg je ook een extra locatie toe.`:'Deze klant heeft nog geen locatie. Voeg die toe bij Locaties > Nieuwe locatie.'):'Vul ook het adres in, dan kun je direct opdrachten voor deze klant aanmaken. Meer locaties voeg je later toe bij Locaties.',
     onSave:v=>{
-      const cust={name:v.name,contact:v.contact,phone:v.phone,email:v.email,login:v.login,notes:v.notes};
+      const cust={name:v.name,contact:v.contact,phone:v.phone,email:v.email,login:v.login,notes:v.notes,bcNo:v.bcNo,bcFail:v.bcFail,bcNb:v.bcNb};
       if(id){Object.assign(c,cust);replan(D.jobs.filter(j=>nl.some(l=>l.id===j.locationId)).map(j=>j.date));toast('Klant opgeslagen.');return}
       const hasAddr=v.address||v.postcode||v.city;let loc=null;
       if(hasAddr){loc={name:v.locName||'Hoofdlocatie',address:v.address,postcode:v.postcode,city:v.city,info:v.info,lat:'',lng:''};const ge=fixGeo(loc,null);if(ge)return ge}
@@ -1981,7 +2005,7 @@ function editLoc(id,custId){
   if(!D.customers.length){toast('Voeg eerst een klant toe.');return}
   const l=id?LOC[id]:{customerId:custId||D.customers[0].id,name:'Hoofdlocatie',address:'',postcode:'',city:'',lat:'',lng:''};
   const nj=id?D.jobs.filter(j=>j.locationId===id).length:0;
-  openForm({title:id?'Locatie bewerken':'Nieuwe locatie',fields:[{k:'customerId',label:'Klant',type:'select',wide:1,options:D.customers.map(c=>[c.id,c.name])},{k:'name',label:'Naam locatie',req:1},{k:'address',label:'Straat en huisnummer'},{k:'postcode',label:'Postcode',ph:'5301 LK'},{k:'city',label:'Plaats'},{k:'lat',label:'Breedtegraad (optioneel)',type:'number',step:'any',ph:'51.8175'},{k:'lng',label:'Lengtegraad (optioneel)',type:'number',step:'any',ph:'5.2620'},{k:'info',label:'Locatie-informatie',wide:1,ph:'bijv. parkeergarage P2, melden bij receptie'}],values:l,
+  openForm({title:id?'Locatie bewerken':'Nieuwe locatie',fields:[{k:'customerId',label:'Klant',type:'select',wide:1,options:D.customers.map(c=>[c.id,c.name])},{k:'name',label:'Naam locatie',req:1},{k:'address',label:'Straat en huisnummer'},{k:'postcode',label:'Postcode',ph:'5301 LK'},{k:'city',label:'Plaats'},{k:'bcShipTo',label:'Verzendadrescode in BC (optioneel)',ph:'bijv. ROYALFH'},{k:'lat',label:'Breedtegraad (optioneel)',type:'number',step:'any',ph:'51.8175'},{k:'lng',label:'Lengtegraad (optioneel)',type:'number',step:'any',ph:'5.2620'},{k:'info',label:'Locatie-informatie',wide:1,ph:'bijv. parkeergarage P2, melden bij receptie'}],values:l,
     note:'Laat de coördinaten leeg om ze te schatten uit de postcode of plaats.',
     onSave:v=>{const geo=fixGeo(v,l);if(geo)return geo;let tgt=l;if(id)Object.assign(l,v);else{tgt={id:uid('l'),...v};D.locations.push(tgt)}setTimeout(()=>pdokAfterSave(tgt),50);replan(D.jobs.filter(j=>j.locationId===id).map(j=>j.date));toast('Locatie opgeslagen'+(v.geo!=='manual'?' (positie geschat uit postcode).':'.'))},
     onDelete:id?()=>{const ds=D.jobs.filter(j=>j.locationId===id).map(j=>j.date);D.locations=D.locations.filter(x=>x.id!==id);D.jobs=D.jobs.filter(j=>j.locationId!==id);replan(ds);toast('Locatie verwijderd.')}:null,
@@ -2005,7 +2029,7 @@ function viewWorkers(){
 function editW(id){
   const w=id?WRK[id]:{name:'',postcode:'',city:'',lat:'',lng:'',start:'08:00',end:'16:30',days:[1,2,3,4,5],absent:[],skills:[],color:D.workers.length%6};
   const vals={...w,color:String(w.color)};
-  openForm({title:id?'Medewerker bewerken':'Nieuwe medewerker',fields:[{k:'name',label:'Naam',req:1},{k:'color',label:'Kleur in planning',type:'select',options:COLORS.map((c,i)=>[String(i),c])},{k:'postcode',label:'Standplaats postcode',req:1},{k:'city',label:'Plaats'},{k:'lat',label:'Breedtegraad (optioneel)',type:'number',step:'any'},{k:'lng',label:'Lengtegraad (optioneel)',type:'number',step:'any'},{k:'start',label:'Begintijd',type:'time',req:1},{k:'end',label:'Eindtijd',type:'time',req:1},{k:'days',label:'Werkdagen',type:'checks',num:1,options:DAYS},{k:'skills',label:'Vaardigheden',type:'checks',options:allSkills().map(s=>[s,s])},{k:'leaveDays',label:'Verlofdagen per jaar',type:'number',ph:'bijv. 25'}].concat(id?[{k:'newtoken',label:'Persoonlijke link voor de medewerker-app',type:'select',wide:1,options:[['','Huidige link behouden'],['1','Nieuwe link maken (de oude link werkt na publiceren niet meer)']]}]:[]),values:vals,
+  openForm({title:id?'Medewerker bewerken':'Nieuwe medewerker',fields:[{k:'name',label:'Naam',req:1},{k:'color',label:'Kleur in planning',type:'select',options:COLORS.map((c,i)=>[String(i),c])},{k:'postcode',label:'Standplaats postcode',req:1},{k:'city',label:'Plaats'},{k:'lat',label:'Breedtegraad (optioneel)',type:'number',step:'any'},{k:'lng',label:'Lengtegraad (optioneel)',type:'number',step:'any'},{k:'start',label:'Begintijd',type:'time',req:1},{k:'end',label:'Eindtijd',type:'time',req:1},{k:'days',label:'Werkdagen',type:'checks',num:1,options:DAYS},{k:'skills',label:'Vaardigheden',type:'checks',options:allSkills().map(s=>[s,s])},{k:'leaveDays',label:'Verlofdagen per jaar',type:'number',ph:'bijv. 25'},{k:'bcResource',label:'Resourcenummer in BC (optioneel)',ph:'bijv. SANNE'}].concat(id?[{k:'newtoken',label:'Persoonlijke link voor de medewerker-app',type:'select',wide:1,options:[['','Huidige link behouden'],['1','Nieuwe link maken (de oude link werkt na publiceren niet meer)']]}]:[]),values:vals,
     onSave:v=>{if(t2m(v.end)<=t2m(v.start))return'Eindtijd moet na begintijd liggen.';const ge=fixGeo(v,w);if(ge)return ge;
       v.color=+v.color;
       const nt=v.newtoken;delete v.newtoken;if(id){Object.assign(w,v);if(nt){D.revokeTokens=(D.revokeTokens||[]).concat(w.token||[]);w.token=randTok()}}else D.workers.push({id:uid('w'),token:randTok(),...v});replan([S.date]);toast('Medewerker opgeslagen, planning herberekend.')},
@@ -2050,7 +2074,7 @@ function viewSettings(){
 }
 function editType(id){
   const t=id?TYP[id]:{name:'',dur:30,skill:''};const used=id?D.jobs.filter(j=>j.type===id).length:0;
-  openForm({title:id?'Reinigingstype bewerken':'Nieuw reinigingstype',fields:[{k:'name',label:'Naam',req:1},{k:'dur',label:'Standaardduur (min)',type:'number',req:1},{k:'skill',label:'Vereiste vaardigheid (leeg = iedereen)',wide:1,ph:'bijv. coating'}],values:t,
+  openForm({title:id?'Reinigingstype bewerken':'Nieuw reinigingstype',fields:[{k:'name',label:'Naam',req:1},{k:'dur',label:'Standaardduur (min)',type:'number',req:1},{k:'skill',label:'Vereiste vaardigheid (leeg = iedereen)',wide:1,ph:'bijv. coating'},{k:'bcItem',label:'Artikel- of resourcenummer in BC',ph:'bijv. BUITENWAS'}],values:t,
     onSave:v=>{v.dur=+v.dur||30;v.skill=v.skill.toLowerCase();if(id)Object.assign(t,v);else D.types.push({id:uid('t'),...v});replan(Object.keys(D.plans));toast('Type opgeslagen.')},
     onDelete:id&&!used?()=>{D.types=D.types.filter(x=>x.id!==id);save();render()}:null});
 }
@@ -2543,6 +2567,118 @@ function logGoto(i){
   render();window.scrollTo(0,0);if(wid){S.wid=wid;S.selLoc=j.locationId;render();openVisit(wid,j.locationId)}else toast(`${j.plate} staat nog bij Niet ingepland op deze dag.`);
 }
 
+/* ---------- Business Central: wat er naar BC gaat voor facturatie (voorbereiding koppeling) ---------- */
+const BCFAIL=[['none','Niet sturen'],['nobill','Sturen, niet factureren'],['callout','Sturen als voorrijkosten']];
+const custOfJob=j=>CUS[(LOC[j.locationId]||{}).customerId]||{};
+const bcFailMode=c=>c.bcFail||'nobill';
+function bcDecide(j,s){
+  const c=custOfJob(j),ov=(D.bcOverride||{})[j.id];
+  let send,billable,why='';
+  if(s.st==='done'){send=true;billable=!/niet\s+factureren/i.test(j.notes||'');if(!billable)why='Opmerking "niet factureren" in de opdracht'}
+  else{const m=bcFailMode(c);send=m!=='none';billable=m==='callout';why=m==='none'?'Klant: niet gelukt niet sturen':m==='callout'?'Klant: voorrijkosten':'Klant: sturen, niet factureren'}
+  if(ov===true||ov===false){if(ov!==send)why='Handmatig door planner';send=ov}
+  return{send,billable:send&&billable,why,override:ov===true||ov===false};
+}
+function bcRow(j,s){
+  const l=LOC[j.locationId]||{},c=custOfJob(j),t=TYP[j.type]||{},w=WRK[s.wid]||{};const d=bcDecide(j,s);
+  const at=s.at?new Date(s.at):null;
+  return{j,s,c,l,t,w,d,
+    api:{externalId:j.id,customerNo:c.bcNo||'',shipToCode:l.bcShipTo||'',licensePlate:j.plate,cleaningDate:j.date,cleaningTime:at?at.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}):'',
+      itemNo:s.st==='done'?(t.bcItem||''):(bcFailMode(c)==='callout'&&!d.override?(D.settings.bcCalloutItem||'VOORRIJKOSTEN'):(t.bcItem||'')),resourceNo:w.bcResource||'',
+      status:s.st==='done'?'Gereed':'NietGereinigd',billable:d.billable,reason:s.st==='issue'?(s.reason||''):'',note:s.note||''},
+    missing:[!c.bcNo&&'debiteurnr.',!t.bcItem&&s.st==='done'&&'artikelnr.'].filter(Boolean)};
+}
+let BCST={month:'',data:{},loading:false,err:'',demo:false};
+function bcMonths(){const ms=[...new Set(D.jobs.map(j=>j.date.slice(0,7)))].sort();const cur=todayIso().slice(0,7);if(!ms.includes(cur))ms.push(cur);return ms.sort()}
+function demoStatuses(month){
+  const out={},today=todayIso(),R=['Auto niet aanwezig','Geen toegang tot de locatie'];
+  for(const d of Object.keys(D.plans).filter(d=>d.slice(0,7)===month&&d<=today)){const P=D.plans[d];out[d]={};
+    for(const wid in P.routes||{})for(const id of P.routes[wid]){if(!JOB[id])continue;let h=2166136261;for(const ch of id+d){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0}h%=100;
+      if(h<84)out[d][id]={st:'done',at:`${d}T${String(8+h%8).padStart(2,'0')}:${String((h*7)%60).padStart(2,'0')}:00`,wid};else if(h<94)out[d][id]={st:'issue',reason:R[h%2],note:'',at:`${d}T10:15:00`,wid}}}
+  return out;
+}
+async function bcLoad(month){
+  BCST.month=month;BCST.err='';
+  if(!SERVER){BCST.data=demoStatuses(month);BCST.demo=true;return}
+  BCST.loading=true;render();
+  try{const d=await withPw(()=>api(`/api/status?from=${month}-01&to=${month}-31`));BCST.data=d.byDate||{};BCST.demo=false}
+  catch(e){BCST.err=apiErr(e)}
+  BCST.loading=false;if(S.tab==='facturatie')render();
+}
+function bcRows(){
+  const rows=[];for(const d in BCST.data)for(const id in BCST.data[d]){const j=JOB[id],s=BCST.data[d][id];if(!j||!s||!(s.st==='done'||s.st==='issue'))continue;
+    const P=D.plans[d];let wid=s.wid;if(!wid&&P)for(const k in P.routes||{})if(P.routes[k].includes(id))wid=k;rows.push(bcRow(j,{...s,wid}))}
+  // "Niet beschikbaar" uit de Excel, alleen voor klanten die dat willen
+  for(const lg of (D.importLogs||[]))for(const e of lg.entries){if(e.status!=='nb'||!e.date||e.date.slice(0,7)!==BCST.month)continue;
+    const c=D.customers.find(x=>clean(x.name).toLowerCase()===clean(e.cust).toLowerCase());if(!c||c.bcNb!=='1')continue;
+    rows.push({nb:true,e,c,l:{},t:{},w:{},d:{send:true,billable:false,why:'Klant: niet beschikbaar ook sturen'},j:{id:'nb-'+lg.id+'-'+e.row+'-'+e.date,plate:e.plate,date:e.date},s:{st:'nb'},
+      api:{externalId:'nb-'+lg.id+'-'+e.row+'-'+e.date,customerNo:c.bcNo||'',shipToCode:'',licensePlate:e.plate,cleaningDate:e.date,cleaningTime:'',itemNo:'',resourceNo:'',status:'NietBeschikbaar',billable:false,reason:e.reason||'Niet beschikbaar',note:''},missing:[!c.bcNo&&'debiteurnr.'].filter(Boolean)})}
+  return rows.sort((a,b)=>a.j.date.localeCompare(b.j.date)||String(a.api.cleaningTime).localeCompare(String(b.api.cleaningTime)));
+}
+function viewBC(){
+  const ms=bcMonths();if(!BCST.month||!ms.includes(BCST.month)){BCST.month=todayIso().slice(0,7);setTimeout(()=>bcLoad(BCST.month).then(()=>render()),0)}
+  const all=bcRows(),f=S.bcf||(S.bcf={c:'',k:''});
+  const rows=all.filter(r=>(!f.c||r.c.id===f.c)&&(!f.k||(f.k==='send'?r.d.send:f.k==='skip'?!r.d.send:f.k==='bill'?r.d.billable:f.k==='miss'?r.missing.length&&r.d.send:true)));
+  const sent=all.filter(r=>r.d.send),miss=sent.filter(r=>r.missing.length);
+  const byC={};all.forEach(r=>{const k=r.c.id||'?';const o=byC[k]=byC[k]||{c:r.c,done:0,fail:0,failSent:0,bill:0,nb:0};if(r.s.st==='done')o.done++;else if(r.nb)o.nb++;else{o.fail++;if(r.d.send)o.failSent++}if(r.d.billable)o.bill++});
+  const missC=[...new Set(miss.filter(r=>!r.c.bcNo).map(r=>r.c.id))].map(id=>CUS[id]).filter(Boolean),missT=[...new Set(miss.filter(r=>!r.t.bcItem&&r.s.st==='done').map(r=>r.j.type))].map(id=>TYP[id]).filter(Boolean);
+  const st=r=>r.nb?'<span class="chip">Niet beschikbaar</span>':r.s.st==='done'?`<span class="chip ok">${I.check} Gereed</span>`:`<span class="chip bad">Niet gelukt</span>`;
+  const tr=rows.map(r=>`<tr${r.d.send?'':' class="muted-row"'}><td class="mono small">${esc(fdate(r.j.date,{weekday:'short',day:'numeric',month:'short'}))}<div class="muted">${esc(r.api.cleaningTime)}</div></td><td>${plateHtml(r.j.plate)}</td>
+    <td><b>${esc(r.c.name||'?')}</b><div class="small ${r.c.bcNo?'muted':''}" ${r.c.bcNo?'':'style="color:var(--bad)"'}>${r.c.bcNo?'Deb. '+esc(r.c.bcNo):'geen debiteurnr.'}</div></td>
+    <td class="small">${esc(r.l.city||r.e&&r.e.city||'')}${r.l.bcShipTo?`<div class="muted">Verz. ${esc(r.l.bcShipTo)}</div>`:''}</td>
+    <td class="small">${esc(r.t.name||'')}${r.api.itemNo?`<div class="muted">Art. ${esc(r.api.itemNo)}</div>`:r.s.st==='done'?'<div style="color:var(--bad)">geen artikelnr.</div>':''}</td>
+    <td class="small">${esc(r.w.name||'')}</td><td>${st(r)}${r.api.reason?`<div class="small muted">${esc(r.api.reason)}</div>`:''}</td>
+    <td>${r.d.send?(r.d.billable?'<span class="chip ok">Ja</span>':'<span class="chip">Nee</span>'):'<span class="muted">—</span>'}</td>
+    <td>${r.nb?'<span class="small muted">via klant</span>':`<button class="btn sm${r.d.send?' on':''}" data-act="bctoggle" data-id="${r.j.id}" aria-pressed="${r.d.send}" title="${esc(r.d.why||'')}">${r.d.send?'Naar BC: ja':'Naar BC: nee'}</button>`}${r.d.override?`<div class="small muted">handmatig · <button class="linkbtn" data-act="bcreset" data-id="${r.j.id}">standaard</button></div>`:r.d.why?`<div class="small muted">${esc(r.d.why)}</div>`:''}</td><td>${bcInBC(r)}</td></tr>`).join('');
+  const sum=Object.values(byC).sort((a,b)=>String(a.c.name).localeCompare(String(b.c.name),'nl')).map(o=>`<tr><td><b>${esc(o.c.name||'?')}</b>${o.c.bcNo?` <span class="muted small">${esc(o.c.bcNo)}</span>`:''}</td><td class="mono">${o.done}</td><td class="mono">${o.fail}${o.fail?` <span class="small muted">(${o.failSent} naar BC)</span>`:''}</td><td class="mono">${o.nb||''}</td><td class="mono"><b>${o.bill}</b></td><td class="small">${BCFAIL.find(x=>x[0]===bcFailMode(o.c))[1]}</td><td class="act"><button class="btn ghost" data-act="editcus" data-id="${o.c.id||''}" aria-label="Instellingen klant">${I.edit}</button></td></tr>`).join('');
+  const sel=(k,opts)=>`<select class="mini" data-bcf="${k}">${opts.map(([v,l])=>`<option value="${esc(v)}"${f[k]===v?' selected':''}>${esc(l)}</option>`).join('')}</select>`;
+  return`<section class="panel sec"><div class="toolbar"><h2>Naar Business Central</h2>
+    <select class="mini" data-bcmonth aria-label="Maand">${ms.map(m=>`<option value="${m}"${m===BCST.month?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>
+    <span class="sp"></span>${SERVER?`<button class="btn sm" data-act="bctest">Koppeling testen</button>`:''}<button class="btn sm" data-act="bcref">Ververs</button>${SERVER&&!BCST.demo?`<button class="btn sm primary" data-act="bcsend"${BCST.loading||BCST.sending?' disabled':''}>${BCST.sending?'Versturen\u2026':'Verstuur naar BC'}</button>`:''}<button class="btn sm" data-act="bccsv">${I.copy} Kopieer als CSV</button><button class="btn sm" data-act="bcjson">${I.copy} Kopieer als JSON (API)</button></div>
+    ${bcSyncLine()}
+    <p class="hint" style="margin:0">${SERVER?'Met <b>Verstuur naar BC</b> gaan de regels van deze maand naar Business Central. Opnieuw versturen is veilig: alleen nieuwe en gewijzigde regels gaan mee, en wat je hier op "Naar BC: nee" zet, krijgt in BC de status Vervallen.':'De koppeling met Business Central werkt in de Netlify-versie.'} Dit overzicht laat zien wat er per maand naar BC gaat: gereedmeldingen als factureerbare regel, en meldingen "niet gelukt" volgens de instelling per klant. Met de knop <b>Naar BC</b> wijk je per melding af van die instelling.</p>
+    ${BCST.demo?'<p class="small" style="margin:0;color:var(--warn)">Voorbeeldgegevens: hier zijn geen echte meldingen beschikbaar. In de Netlify-versie zie je de meldingen van je medewerkers.</p>':''}
+    ${BCST.err?`<p class="small" style="margin:0;color:var(--bad)">${esc(BCST.err)}</p>`:''}${BCST.loading?'<p class="hint" style="margin:0">Meldingen ophalen…</p>':''}
+    ${missC.length||missT.length?`<div class="bcwarn"><b>Nog niet compleet voor BC:</b> ${missC.length?`${missC.length} klant(en) zonder debiteurnummer (${missC.slice(0,4).map(c=>`<button class="linkbtn" data-act="editcus" data-id="${c.id}">${esc(c.name)}</button>`).join(', ')})`:''}${missC.length&&missT.length?' · ':''}${missT.length?`${missT.length} type(s) zonder artikelnummer (${missT.map(t=>`<button class="linkbtn" data-act="edittype" data-id="${t.id}">${esc(t.name)}</button>`).join(', ')})`:''}</div>`:''}
+    ${sum?`<div class="tbl-wrap"><table><thead><tr><th>Klant</th><th>Gereed</th><th>Niet gelukt</th><th>Niet beschikbaar</th><th>Factureerbaar</th><th>Niet gelukt naar BC</th><th></th></tr></thead><tbody>${sum}</tbody></table></div>`:''}</section>
+  <section class="panel sec"><div class="toolbar"><h2>Regels</h2><span class="small muted">${sent.length} naar BC · ${all.length-sent.length} niet</span><span class="sp"></span>${sel('c',[['','Alle klanten'],...Object.values(byC).map(o=>[o.c.id||'',o.c.name||'?'])])}${sel('k',[['','Alle regels'],['send','Naar BC'],['skip','Niet naar BC'],['bill','Factureerbaar'],['miss','Koppeling ontbreekt']])}</div>
+    ${tr?`<div class="tbl-wrap" style="max-height:62vh;overflow:auto"><table><thead><tr><th>Datum</th><th>Kenteken</th><th>Klant</th><th>Locatie</th><th>Type</th><th>Medewerker</th><th>Melding</th><th>Factureerbaar</th><th>Naar BC</th><th>In BC</th></tr></thead><tbody>${tr}</tbody></table></div>`:`<p class="empty">${all.length?'Geen regels in deze selectie.':'Nog geen gereed- of niet-gelukt-meldingen in deze maand.'}</p>`}</section>`;
+}
+function bcSync(){return((D.bcSync||{})[BCST.month])||null}
+function bcInBC(r){const x=bcSync();if(!x)return'<span class="muted small">—</span>';const b=(x.bc||{})[r.api.externalId],e=(x.errors||[]).find(q=>q.externalId===r.api.externalId);
+  if(e)return`<span class="chip bad" title="${esc(e.message)}">Fout</span><div class="small" style="color:var(--bad);max-width:24ch">${esc(e.message)}</div>`;
+  if(!b)return r.d.send?'<span class="chip warn">Nog niet</span>':'<span class="muted small">—</span>';
+  if(b.status==='Vervallen')return'<span class="chip">Vervallen</span>';
+  return b.invoiceStatus==='Gefactureerd'?`<span class="chip ok">Gefactureerd</span><div class="small muted">${esc(b.invoiceNo)}</div>`:b.invoiceStatus==='OpFactuur'?`<span class="chip acc">Op factuur</span><div class="small muted">${esc(b.invoiceNo)}</div>`:'<span class="chip">In BC, open</span>'}
+function bcSyncLine(){const x=bcSync();if(!x)return'';const t=new Date(x.at).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  return`<div class="bcsync"><b>Laatst verstuurd ${esc(t)}:</b> ${x.created||0} nieuw, ${x.updated||0} bijgewerkt, ${x.voided||0} vervallen, ${x.unchanged||0} ongewijzigd${(x.errors||[]).length?` · <span style="color:var(--bad)">${x.errors.length} niet gelukt</span>`:''}</div>`}
+async function bcSend(confirm){
+  if(BCST.demo||!SERVER)return;const all=bcRows(),rows=all.filter(r=>r.d.send&&r.api.customerNo).map(r=>r.api),skip=all.filter(r=>r.d.send&&!r.api.customerNo).length;
+  BCST.sending=true;render();
+  try{const d=await withPw(()=>api('/api/bc-sync'+(confirm?'?confirm=1':''),{method:'POST',body:JSON.stringify({month:BCST.month,rows})}));
+    D.bcSync=D.bcSync||{};D.bcSync[BCST.month]={...d,at:Date.now()};save();
+    toast(`Naar BC: ${d.created} nieuw, ${d.updated} bijgewerkt, ${d.voided} vervallen.${d.errors.length?` ${d.errors.length} niet gelukt, zie de kolom In BC.`:''}${skip?` ${skip} overgeslagen zonder debiteurnummer.`:''}`)}
+  catch(e){if(e&&e.code==='srv'&&/bevestig/.test(e.message||'')){BCST.sending=false;bcConfirm(e.message);return}toast(apiErr(e))}
+  BCST.sending=false;render();
+}
+function bcConfirm(msg){FORM=null;$('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="bcT" style="width:min(520px,100%)"><h3 id="bcT">Veel regels op Vervallen</h3><p>${esc(msg)}</p><div class="dlg-foot"><button class="btn" data-act="dlgx">Annuleren</button><span class="sp"></span><button class="btn danger" data-act="bcsendok">Toch versturen</button></div></div>`;$('#modal').hidden=false}
+async function bcTest(){
+  try{const d=await withPw(()=>api('/api/bc-sync?test=1'));FORM=null;
+    $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="btT" style="width:min(560px,100%)"><h3 id="btT">Koppeling met Business Central werkt</h3>
+      <p>Ingelogd in omgeving <b>${esc(d.environment)}</b>. Bedrijven in deze omgeving:</p>
+      <ul>${d.companies.map(c=>`<li>${esc(c.name)}${c.id===d.chosen?' <span class="chip ok">gekozen</span>':''}</li>`).join('')}</ul>
+      ${d.chosen?'':`<p class="hint" style="color:var(--warn)">Er is nog geen bedrijf gekozen. Zet in Netlify <b>BC_COMPANY_NAME</b> op een van de namen hierboven en deploy opnieuw.</p>`}
+      <div class="dlg-foot"><span class="sp"></span><button class="btn primary" data-act="dlgx">Sluiten</button></div></div>`;$('#modal').hidden=false}
+  catch(e){toast('Koppeling testen: '+apiErr(e))}
+}
+async function bcFetchState(){if(!SERVER||BCST.demo)return;try{const d=await withPw(()=>api('/api/bc-sync?month='+BCST.month));D.bcSync=D.bcSync||{};D.bcSync[BCST.month]={...(D.bcSync[BCST.month]||{}),bc:d.bc,at:(D.bcSync[BCST.month]||{}).at||Date.now()};save();render()}catch(e){toast(apiErr(e))}}
+function bcExport(kind){
+  const rows=bcRows().filter(r=>r.d.send).map(r=>r.api);
+  if(kind==='json')return copyText(JSON.stringify({value:rows},null,2),`${rows.length} regels als JSON gekopieerd (zoals ze naar de BC-API zouden gaan).`);
+  const q=v=>{const s=String(v??'');return/[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s},cols=Object.keys(rows[0]||{externalId:1});
+  copyText([cols.join(';'),...rows.map(r=>cols.map(c=>q(r[c])).join(';'))].join('\n'),`${rows.length} regels gekopieerd. Plak ze in Excel.`);
+}
+
 /* ---------- importlog: per voertuig per periode wat er met de afspraak gebeurde ---------- */
 let LOGF={st:'probleem',q:'',m:''},LOGSRC=null;
 const LOGST={unplanned:['Niet ingepland','bad'],city:['Plaats onbekend','bad'],nb:['Niet beschikbaar','warn'],cancel:['Geannuleerd','warn'],planned:['Ingepland','ok'],imp:['Te importeren','acc'],past:['In het verleden',''],dup:['Bestaat al',''],gone:['Opdracht verwijderd','']};
@@ -2646,6 +2782,14 @@ function onClick(e){
     case'jfgoto':S.date=el.dataset.date;S.wid=el.dataset.wid;S.tab='planning';render();setTimeout(()=>{const r=document.querySelector('.split');if(r)r.scrollIntoView({behavior:'smooth',block:'start'})},50);break;
     case'ctxnew':newJobAt(el.dataset.wid,el.dataset.t,el.dataset.loc);break;
     case'ctxmove':moveJobs(el.dataset.ids.split(','),el.dataset.wid||null);break;
+    case'bctoggle':{const j=JOB[el.dataset.id];if(!j)break;const st=(BCST.data[j.date]||{})[j.id]||stMap(j.date)[j.id]||{st:'issue'};const d=bcDecide(j,st);D.bcOverride=D.bcOverride||{};const nv=!d.send;delete D.bcOverride[j.id];if(bcDecide(j,st).send!==nv)D.bcOverride[j.id]=nv;save();render();toast(nv?`${j.plate} gaat naar Business Central.`:`${j.plate} gaat niet naar Business Central.`);break}
+    case'bcreset':{if(D.bcOverride)delete D.bcOverride[el.dataset.id];save();render();break}
+    case'bcref':bcLoad(BCST.month).then(()=>{render();bcFetchState()});break;
+    case'bcsend':bcSend(false);break;
+    case'bctest':bcTest();break;
+    case'bcsendok':closeForm();bcSend(true);break;
+    case'bccsv':bcExport('csv');break;case'bcjson':bcExport('json');break;
+    case'rawbackup':{let raw='';try{raw=localStorage.getItem(KEY)||''}catch(e){}if(!raw)raw=JSON.stringify(D);copyText(raw,'Back-up gekopieerd. Plak hem in een tekstbestand en bewaar dat.');break}
     case'jfclear':S.jf={...JF0,sort:jf().sort};render();break;
     case'logclr':LOGSEL=new Set();logRefresh();break;
     case'logdel':if(el.dataset.armed){const lg=curLog();D.importLogs=importLogs().filter(x=>x!==lg);S.logId=null;LOGSRC=null;save();render();toast('Log verwijderd; de opdrachten blijven staan.')}else{el.dataset.armed='1';el.textContent='Klik nogmaals om te verwijderen'}break;
@@ -2718,6 +2862,8 @@ function onChange(e){
   if(el.id==='xcust'&&XIMP){XIMP.custEdit=el.value;return xReparse()}
   if(el.dataset.menuloc){menuMove(el.dataset.menuloc,el.value);save();render();toast(`${MENU_ITEMS[el.dataset.menuloc][0]} staat nu ${el.value==='top'?'in het hoofdmenu':el.value==='hidden'?'verborgen':'onder '+menuCfg().groups[el.value.slice(2)].l}.`);return}
   if(el.dataset.menuname){const g=menuCfg().groups[el.dataset.menuname];if(g){g.l=el.value.trim()||g.l;save();render()}return}
+  if(el.dataset.bcmonth!=null){bcLoad(el.value).then(render);return}
+  if(el.dataset.bcf){(S.bcf=S.bcf||{c:'',k:''})[el.dataset.bcf]=el.value;return render()}
   if(el.id==='logM'){LOGF.m=el.value;return logRefresh()}
   if(el.id==='logC'){LOGF.c=el.value;return logRefresh()}
   if(el.id==='logSort'){LOGF.sort=el.value;return logRefresh()}
@@ -2749,7 +2895,7 @@ function onDrop(e){if(!DRAG)return;const z=e.target.closest('[data-drop]');if(!z
 }
 function onDragEnd(){DRAG=null;clearOver();document.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging'))}
 function init(){
-  load();
+  try{load()}catch(err){if(!D)D=sample();try{index()}catch(e){}setTimeout(()=>showFatal('gegevens laden',err),0)}
   try{if(window.claude&&typeof window.claude.use==='function')window.claude.use('sample').then(s=>{SAMPLE=s||null}).catch(()=>{})}catch(e){}
   document.addEventListener('click',onClick);
   if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);if(SERVER)setInterval(()=>{if(!document.hidden&&(MV||(S.tab==='planning'&&Date.now()-MSG.at>30000)))fetchMsgs(true)},15000);document.addEventListener('change',onChange);document.addEventListener('contextmenu',onContext);addEventListener('scroll',closeCtx,{passive:true});addEventListener('resize',closeCtx);

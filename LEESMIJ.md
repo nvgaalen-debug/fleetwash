@@ -55,3 +55,14 @@ Werkt automatisch, zonder sleutel:
 - Na een Excel-import loopt de app automatisch door: exacte posities (PDOK) > echte rijtijden (OpenRouteService, als die aan staat) > planning.
 - Bestaande locaties: Klanten & locaties > "Posities verbeteren via PDOK".
 Vindt PDOK een adres niet, dan blijft de geschatte positie staan en zie je bij de locatie waarom.
+
+## Voorbereiding Business Central
+Opdrachten > Naar Business Central toont per maand welke meldingen naar BC zouden gaan (gereed = factureerbaar; niet gelukt volgens de instelling per klant; per melding aan te passen met "Naar BC").
+Vul vooraf in: debiteurnummer bij Klanten, artikelnummer bij Reinigingstypes, eventueel verzendadrescode bij Locaties en resourcenummer bij Medewerkers.
+Met "Kopieer als JSON (API)" zie je precies wat er naar de BC-API gaat.
+
+Koppeling activeren (functie `netlify/functions/bc-sync.mjs`): installeer eerst de BC-extensie "Wasroute koppeling" (zie de LEESMIJ daarvan) en zet in Netlify:
+- `BC_TENANT_ID`, `BC_CLIENT_ID`, `BC_CLIENT_SECRET` (app-registratie in Entra ID met API.ReadWrite.All voor Business Central)
+- `BC_ENVIRONMENT` (bijv. Production of Sandbox) en `BC_COMPANY_NAME` (naam van het bedrijf zoals in BC; of `BC_COMPANY_ID` met de GUID)
+Controleer met Opdrachten > Naar Business Central > Koppeling testen.
+Daarna: Opdrachten > Naar Business Central > Verstuur naar BC. De kolom "In BC" toont of een regel open, op factuur of gefactureerd is.

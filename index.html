@@ -364,6 +364,25 @@ tr.muted-row td{opacity:.6}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:4px}
 .chk{display:inline-flex;gap:6px;align-items:center;font-size:14px}
 .dlg-foot{display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap}
+.dlg.wide{width:min(1180px,100%)}
+.dlg.wide .dlg-foot{position:sticky;bottom:-14px;background:var(--surface);margin:12px -18px -14px;padding:10px 18px 12px;border-top:1px solid var(--line);z-index:2}
+.ximp-top{display:grid;grid-template-columns:minmax(220px,1.4fr) minmax(160px,1fr) 130px;gap:10px 12px;align-items:end}
+.ximp-opts{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px}
+.ximp-sec{border-top:1px solid var(--line);margin-top:14px;padding-top:12px}
+.ximp-sec h4{margin:0 0 8px;font:600 13px var(--f-body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.xkpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px}
+.xkpi{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface)}
+.xkpi b{display:block;font:600 22px/1.15 var(--f-disp)}
+.xkpi span{font-size:12px;color:var(--muted)}
+.xkpi.main{border-color:var(--accent);background:var(--accent-soft)}.xkpi.main b{color:var(--accent)}
+.xkpi.bad b{color:var(--bad)}.xkpi.warn b{color:var(--warn)}
+.xwarn{margin:0;padding-left:18px;display:grid;gap:3px;font-size:13px}
+.xwarn li.bad{color:var(--bad)}.xwarn li.warn{color:var(--warn)}
+.xpv-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.xpv{max-height:380px;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.xpv table{margin:0}.xpv thead th{position:sticky;top:0;background:var(--surface);z-index:1;box-shadow:0 1px 0 var(--line)}
+.xpv td{vertical-align:top}.xpv tr.skip td{opacity:.62}
+@media (max-width:720px){.ximp-top{grid-template-columns:1fr}}
 .note{font-size:13px;color:var(--muted);margin:-4px 0 12px}
 .hint{font-size:13px;color:var(--muted);margin:6px 0 0}
 #toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:14px;z-index:60;max-width:calc(100% - 32px)}
@@ -1449,14 +1468,15 @@ const MENU_ITEMS={
   'instellingen:data':['Gegevens en back-up','Back-up kopiëren of terugzetten'],
   'instellingen:menu':['Menu indelen','Kies wat in het hoofdmenu en in de groepen staat'],
   'act:logout':['Uitloggen','App-wachtwoord vergeten op deze computer'],
-  'facturatie':['Naar Business Central','Gereedmeldingen per maand voor facturatie']};
+  'facturatie':['Business Central interface','Gereedmeldingen per maand naar BC voor facturatie'],
+  'instellingen:api':['API koppelingen','Business Central testen en exporteren, rijtijden, adressen en AI']};
 const MENU_SHORT={'opdrachten':'Overzicht','medewerkers':'Gegevens'};
-const menuDefault=()=>({top:['planning','g:opdr','klanten','g:mw','g:beheer'],groups:{opdr:{l:'Opdrachten',items:['opdrachten','importlog','facturatie','act:import']},mw:{l:'Medewerkers',items:['medewerkers','afwezigheid','act:msgs']},beheer:{l:'Beheer',items:['instellingen:planning','instellingen:types','instellingen:data','instellingen:menu','act:logout']}},hidden:[]});
+const menuDefault=()=>({top:['planning','g:opdr','klanten','g:mw','g:beheer'],groups:{opdr:{l:'Opdrachten',items:['opdrachten','importlog','facturatie','act:import']},mw:{l:'Medewerkers',items:['medewerkers','afwezigheid','act:msgs']},beheer:{l:'Beheer',items:['instellingen:planning','instellingen:types','instellingen:data','instellingen:api','instellingen:menu','act:logout']}},hidden:[]});
 function menuCfg(){
   let m=D.menu;if(!m||!m.top||!m.groups)m=D.menu=menuDefault();
   const placed=new Set([...m.top.filter(x=>!x.startsWith('g:')),...Object.values(m.groups).flatMap(g=>g.items),...(m.hidden||[])]);
   const PREF={facturatie:'opdr'};
-  for(const id of Object.keys(MENU_ITEMS))if(!placed.has(id)){const g=m.groups[PREF[id]]||m.groups.beheer||Object.values(m.groups)[0];if(g)g.items.push(id);else m.top.push(id)}
+  for(const id of Object.keys(MENU_ITEMS))if(!placed.has(id)){const g=m.groups[PREF[id]]||m.groups.beheer||Object.values(m.groups)[0];if(g){const li=g.items.indexOf('act:logout');if(li>=0)g.items.splice(li,0,id);else g.items.push(id)}else m.top.push(id)}
   m.top=m.top.filter(x=>x.startsWith('g:')?m.groups[x.slice(2)]:MENU_ITEMS[x]);
   for(const k in m.groups)if(!m.top.includes('g:'+k))m.top.push('g:'+k);
   m.hidden=(m.hidden||[]).filter(x=>x!=='instellingen:menu');
@@ -1983,13 +2003,47 @@ function openVisit(wid,lid){
 
 
 /* ---------- beheer: klanten & locaties ---------- */
+/* Klanten: zoeken en filteren */
+const CF=()=>S.cf||(S.cf={q:'',bill:'',bc:'',sort:'name'});
+const normQ=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function cusText(c){return normQ([c.name,c.contact,c.phone,c.email,c.notes,c.bcNo,(CUS[c.billTo]||{}).name].join(' '))}
+function locText(l){return normQ([l.name,l.address,l.postcode,l.city,l.info,l.bcShipTo].join(' '))}
+function cusPass(c){const f=CF();
+  if(f.bill==='self'&&c.billTo)return false;
+  if(f.bill==='lease'&&!c.billTo)return false;
+  if(f.bill==='isLease'&&!D.customers.some(x=>x.billTo===c.id))return false;
+  if(f.bill&&!['self','lease','isLease'].includes(f.bill)&&c.billTo!==f.bill&&c.id!==f.bill)return false;
+  const b=billOf(c);if(f.bc==='met'&&!b.bcNo)return false;if(f.bc==='zonder'&&b.bcNo)return false;return true}
+function cusFiltered(){const f=CF(),q=normQ(f.q).trim(),words=q?q.split(/\s+/):[];
+  const hit=t=>words.every(w=>t.includes(w));
+  const locs=D.locations.filter(l=>{const c=CUS[l.customerId];return c&&cusPass(c)&&(!words.length||hit(cusText(c)+' '+locText(l)))});
+  const withLoc=new Set(locs.map(l=>l.customerId));
+  let cus=D.customers.filter(c=>cusPass(c)&&(!words.length||hit(cusText(c))||withLoc.has(c.id)));
+  const nj={};D.jobs.forEach(j=>{const l=LOC[j.locationId];if(l)nj[l.customerId]=(nj[l.customerId]||0)+1});
+  const nl={};D.locations.forEach(l=>nl[l.customerId]=(nl[l.customerId]||0)+1);
+  cus.sort(f.sort==='jobs'?(a,b)=>(nj[b.id]||0)-(nj[a.id]||0)||a.name.localeCompare(b.name,'nl'):f.sort==='locs'?(a,b)=>(nl[b.id]||0)-(nl[a.id]||0)||a.name.localeCompare(b.name,'nl'):(a,b)=>a.name.localeCompare(b.name,'nl'));
+  locs.sort((a,b)=>String((CUS[a.customerId]||{}).name).localeCompare(String((CUS[b.customerId]||{}).name),'nl')||String(a.city).localeCompare(String(b.city),'nl'));
+  return{cus,locs,nj,nl}}
+function cusRowsHtml(r){return r.cus.map(c=>{const n=r.nl[c.id]||0,lease=CUS[c.billTo],b=billOf(c);return`<tr><td><b>${esc(c.name)}</b>${c.notes?`<div class="small muted" style="max-width:40ch">${esc(c.notes)}</div>`:''}</td><td>${esc(c.contact)}${c.phone?`<div class="small mono muted">${esc(c.phone)}</div>`:''}</td><td class="small">${esc(c.email)}</td><td>${lease?`<span class="chip acc">${esc(lease.name)}</span>`:'<span class="small muted">zelf</span>'}</td><td class="mono small">${b.bcNo?esc(b.bcNo):'<span style="color:var(--warn)">geen</span>'}</td><td>${n}</td><td>${r.nj[c.id]||0}</td><td class="act"><button class="btn ghost" data-act="editcus" data-id="${c.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('')}
+function locRowsHtml(r){return r.locs.map(l=>{const c=CUS[l.customerId]||{};const n=D.jobs.filter(j=>j.locationId===l.id).length;return`<tr><td><b>${esc(c.name)}</b><div class="small muted">${esc(l.name)}</div></td><td>${esc(l.address)}</td><td class="mono">${esc(l.postcode)}</td><td>${esc(l.city)}</td><td><span class="chip ${l.geo==='manual'||l.geo==='pdok'?'ok':l.geo==='pc4'?'acc':'warn'}" title="${esc(l.pdokLabel||l.pdokFail||'')}">${GEO_LABEL[l.geo]||'Onbekend'}</span>${l.pdokFail&&l.geo!=='pdok'?`<div class="small" style="color:var(--warn)">PDOK: ${esc(l.pdokFail)}</div>`:''}</td><td>${n}</td><td class="act"><button class="btn ghost" data-act="editloc" data-id="${l.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('')}
+function cusFilterBar(){const f=CF(),leases=D.customers.filter(c=>D.customers.some(x=>x.billTo===c.id)).sort((a,b)=>a.name.localeCompare(b.name,'nl'));
+  const sel=(k,opts,lab)=>`<label class="jf"><span>${lab}</span><select class="mini" data-cf="${k}">${opts.map(([v,l])=>`<option value="${esc(v)}"${String(f[k])===String(v)?' selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
+  return`<div class="jfbar"><label class="jf" style="flex:1 1 260px"><span>Zoeken</span><input class="mini" id="cusQ" type="search" value="${esc(f.q)}" placeholder="Naam, contact, adres, plaats, postcode, debiteurnr." autocomplete="off"></label>
+  ${sel('bill',[['','Alle klanten'],['self','Factureert zelf'],['lease','Via leasemaatschappij'],['isLease','Is leasemaatschappij'],...leases.map(c=>[c.id,'Via '+c.name])],'Facturatie')}
+  ${sel('bc',[['','Alle'],['met','Met debiteurnr.'],['zonder','Zonder debiteurnr.']],'Business Central')}
+  ${sel('sort',[['name','Naam A-Z'],['jobs','Meeste opdrachten'],['locs','Meeste locaties']],'Sorteren')}
+  ${f.q||f.bill||f.bc?'<button class="btn sm ghost" data-act="cfreset">Filters wissen</button>':''}</div>`}
+function cusCounts(r){return[`<span id="cusCount" class="muted small">${r.cus.length} van ${D.customers.length}</span>`,`<span id="locCount" class="muted small">${r.locs.length} van ${D.locations.length}</span>`]}
+function cusRefresh(){const r=cusFiltered(),c=cusCounts(r);const a=$('#cusTbody'),b=$('#locTbody');if(!a||!b)return;
+  a.innerHTML=cusRowsHtml(r)||'<tr><td colspan="8" class="empty">Geen klanten gevonden</td></tr>';b.innerHTML=locRowsHtml(r)||'<tr><td colspan="7" class="empty">Geen locaties gevonden</td></tr>';
+  $('#cusCount').outerHTML=c[0];$('#locCount').outerHTML=c[1]}
 function viewCustomers(){
-  const cr=D.customers.map(c=>{const n=D.locations.filter(l=>l.customerId===c.id).length;return`<tr><td><b>${esc(c.name)}</b>${c.notes?`<div class="small muted" style="max-width:40ch">${esc(c.notes)}</div>`:''}</td><td>${esc(c.contact)}</td><td class="mono">${esc(c.phone)}</td><td>${esc(c.email)}</td><td>${n}</td><td class="act"><button class="btn ghost" data-act="editcus" data-id="${c.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('');
-  const lr=D.locations.map(l=>{const c=CUS[l.customerId]||{};const n=D.jobs.filter(j=>j.locationId===l.id).length;return`<tr><td><b>${esc(c.name)}</b><div class="small muted">${esc(l.name)}</div></td><td>${esc(l.address)}</td><td class="mono">${esc(l.postcode)}</td><td>${esc(l.city)}</td><td><span class="chip ${l.geo==='manual'||l.geo==='pdok'?'ok':l.geo==='pc4'?'acc':'warn'}" title="${esc(l.pdokLabel||l.pdokFail||'')}">${GEO_LABEL[l.geo]||'Onbekend'}</span>${l.pdokFail&&l.geo!=='pdok'?`<div class="small" style="color:var(--warn)">PDOK: ${esc(l.pdokFail)}</div>`:''}</td><td>${n}</td><td class="act"><button class="btn ghost" data-act="editloc" data-id="${l.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('');
-  return`<section class="panel sec"><div class="toolbar"><h2>Klanten</h2><span class="sp"></span><button class="btn primary" data-act="newcus">${I.plus} Nieuwe klant</button></div>
-  <div class="tbl-wrap"><table><thead><tr><th>Klant</th><th>Contactpersoon</th><th>Telefoon</th><th>E-mail</th><th>Locaties</th><th></th></tr></thead><tbody>${cr||'<tr><td colspan="6" class="empty">Nog geen klanten</td></tr>'}</tbody></table></div></section>
-  <section class="panel sec"><div class="toolbar"><h2>Locaties</h2><span class="sp"></span>${(()=>{const n=D.locations.filter(needsPdok).length;return n?`<button class="btn" data-act="pdok"${SERVER?'':' disabled title="Werkt in de Netlify-versie"'}>${I.route} Posities verbeteren via PDOK (${n})</button>`:''})()}<button class="btn primary" data-act="newloc">${I.plus} Nieuwe locatie</button></div>
-  <div class="tbl-wrap"><table><thead><tr><th>Klant · locatie</th><th>Adres</th><th>Postcode</th><th>Plaats</th><th>Positie</th><th>Opdrachten</th><th></th></tr></thead><tbody>${lr||'<tr><td colspan="7" class="empty">Nog geen locaties</td></tr>'}</tbody></table></div>
+  const r=cusFiltered(),cr=cusRowsHtml(r),lr=locRowsHtml(r),cnt=cusCounts(r);
+  return`<section class="panel sec"><div class="toolbar"><h2>Klanten</h2>${cnt[0]}<span class="sp"></span><button class="btn primary" data-act="newcus">${I.plus} Nieuwe klant</button></div>
+  ${cusFilterBar()}
+  <div class="tbl-wrap"><table><thead><tr><th>Klant</th><th>Contactpersoon</th><th>E-mail</th><th>Factureren aan</th><th>Debiteurnr.</th><th>Locaties</th><th>Opdrachten</th><th></th></tr></thead><tbody id="cusTbody">${cr||`<tr><td colspan="8" class="empty">${D.customers.length?'Geen klanten gevonden':'Nog geen klanten'}</td></tr>`}</tbody></table></div></section>
+  <section class="panel sec"><div class="toolbar"><h2>Locaties</h2>${cnt[1]}<span class="sp"></span>${(()=>{const n=D.locations.filter(needsPdok).length;return n?`<button class="btn" data-act="pdok"${SERVER?'':' disabled title="Werkt in de Netlify-versie"'}>${I.route} Posities verbeteren via PDOK (${n})</button>`:''})()}<button class="btn primary" data-act="newloc">${I.plus} Nieuwe locatie</button></div>
+  <div class="tbl-wrap"><table><thead><tr><th>Klant · locatie</th><th>Adres</th><th>Postcode</th><th>Plaats</th><th>Positie</th><th>Opdrachten</th><th></th></tr></thead><tbody id="locTbody">${lr||`<tr><td colspan="7" class="empty">${D.locations.length?'Geen locaties gevonden':'Nog geen locaties'}</td></tr>`}</tbody></table></div>
   <p class="hint">Zonder coördinaten schat de app de positie uit de postcode. Vul voor de beste reistijden de exacte breedte- en lengtegraad in (bijv. uit Google Maps: rechtsklik op de plek).</p></section>`;
 }
 function editCus(id){
@@ -2083,7 +2137,34 @@ function viewSettings(){
   <div class="row"><button class="btn" data-act="export">${I.copy} Back-up kopiëren</button><button class="btn" data-act="restore">${I.imp} Back-up terugzetten</button><button class="btn danger" data-act="reset">Voorbeelddata herstellen</button></div>
 </section>`};
   if(S.setPage==='menu')return viewMenu();
+  if(S.setPage==='api')return viewApi();
   return pages[S.setPage]||pages.planning;
+}
+/* Beheer > API koppelingen: testen, exporteren en status van alle koppelingen */
+function viewApi(){
+  const ms=bcMonths();if(!BCST.month||!ms.includes(BCST.month)){BCST.month=todayIso().slice(0,7);setTimeout(()=>bcLoad(BCST.month).then(()=>render()),0)}
+  const t=(D.apiTest||{}).bc,rows=(()=>{try{return bcRows().filter(r=>r.d.send).length}catch(e){return 0}})();
+  const when=x=>new Date(x).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+  const st=!SERVER?'<span class="chip">Alleen in de Netlify-versie</span>':!t?'<span class="chip">Nog niet getest</span>':t.ok?`<span class="chip ok">${I.check} Werkt</span> <span class="small muted">getest ${esc(when(t.at))} · omgeving ${esc(t.env||'')}${t.company?' · bedrijf '+esc(t.company):''}</span>`:`<span class="chip bad">Fout</span> <span class="small" style="color:var(--bad)">${esc(t.error||'')}</span> <span class="small muted">${esc(when(t.at))}</span>`;
+  const nPdok=D.locations.filter(needsPdok).length,orsPts=orsPointsFor(null),orsMiss=orsMissing(orsPts);
+  const env=[['APP_PASSWORD','Wachtwoord voor planners en alle functies','Ja'],['BC_TENANT_ID','Directory-ID (tenant) uit Entra','Voor BC'],['BC_CLIENT_ID','Toepassings-ID van de app-registratie','Voor BC'],['BC_CLIENT_SECRET','Waarde van het clientgeheim (als geheim markeren)','Voor BC'],['BC_ENVIRONMENT','Naam van de BC-omgeving, bijv. Production','Voor BC'],['BC_COMPANY_NAME','Naam van het bedrijf in BC','Voor BC'],['ORS_API_KEY','Sleutel van openrouteservice.org','Optioneel'],['ANTHROPIC_API_KEY','Claude API-sleutel voor AI-advies','Optioneel']];
+  return`<section class="panel sec"><div class="toolbar"><h2>Business Central</h2><span class="sp"></span>${SERVER?'<button class="btn sm primary" data-act="bctest">Koppeling testen</button>':''}</div>
+  <p style="margin:0 0 10px">${st}</p>
+  <p class="hint" style="margin:0 0 12px">Koppeling testen logt in bij Microsoft en toont de bedrijven in de BC-omgeving. Er verandert niets in BC. Versturen doe je bij Opdrachten &gt; <button class="linkbtn" data-act="navto" data-to="facturatie">Business Central interface</button>.</p>
+  <h3 style="margin:0 0 6px">Exporteren</h3>
+  <div class="row" style="align-items:center"><select class="mini" data-bcmonth aria-label="Maand">${ms.map(m=>`<option value="${m}"${m===BCST.month?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>
+  <span class="small muted">${BCST.loading?'laden\u2026':rows+' regel(s) die naar BC gaan'}</span><span class="sp"></span>
+  <button class="btn sm" data-act="bccsv">${I.copy} Kopieer als CSV</button><button class="btn sm" data-act="bcjson">${I.copy} Kopieer als JSON (API)</button></div>
+  <p class="hint" style="margin:6px 0 0">CSV plak je in Excel; JSON laat precies zien wat de koppeling naar de BC-API stuurt.</p></section>
+  <section class="panel sec"><h2>Overige koppelingen</h2>
+  <div class="tbl-wrap"><table><thead><tr><th>Koppeling</th><th>Waarvoor</th><th>Status</th><th></th></tr></thead><tbody>
+  <tr><td><b>OpenRouteService</b></td><td class="small">Echte rijtijden tussen locaties</td><td class="small">${useORS()?`<span class="chip ok">Aan</span> ${orsPts.length?`${orsPts.length*(orsPts.length-1)-orsMiss} van ${orsPts.length*(orsPts.length-1)} rijtijden`:''}`:'<span class="chip">Uit (schatting)</span>'}</td><td class="act">${SERVER&&useORS()&&orsMiss?`<button class="btn sm" data-act="orsfetch">Rijtijden ophalen</button>`:''}<button class="btn sm ghost" data-act="navto" data-to="instellingen:planning">Instellen</button></td></tr>
+  <tr><td><b>PDOK</b></td><td class="small">Postcodes en exacte posities van adressen</td><td class="small"><span class="chip ok">Geen sleutel nodig</span> ${nPdok?nPdok+' locatie(s) met geschatte positie':''}</td><td class="act">${nPdok?`<button class="btn sm" data-act="pdok"${SERVER?'':' disabled'}>Posities verbeteren</button>`:''}</td></tr>
+  <tr><td><b>AI-advies (Claude)</b></td><td class="small">Slim voorstel en vragen over de planning</td><td class="small">${SERVER?'Via ANTHROPIC_API_KEY in Netlify':'<span class="chip ok">Actief in Claude</span>'}</td><td></td></tr>
+  <tr><td><b>Medewerker-app</b></td><td class="small">Ritten publiceren, meldingen en berichten</td><td class="small">${SERVER?'<span class="chip ok">Netlify Blobs</span>':'<span class="chip">Alleen in de Netlify-versie</span>'}</td><td></td></tr>
+  </tbody></table></div></section>
+  <section class="panel sec"><h2>Omgevingsvariabelen in Netlify</h2><p class="hint" style="margin:0 0 8px">Sleutels en wachtwoorden staan alleen in Netlify (Site configuration &gt; Environment variables), nooit in de app. Na een wijziging: Deploys &gt; Trigger deploy.</p>
+  <div class="tbl-wrap"><table><thead><tr><th>Variabele</th><th>Inhoud</th><th>Nodig</th></tr></thead><tbody>${env.map(([k,v,n])=>`<tr><td class="mono small">${k}</td><td class="small">${v}</td><td class="small">${n}</td></tr>`).join('')}</tbody></table></div></section>`;
 }
 function editType(id){
   const t=id?TYP[id]:{name:'',dur:30,skill:''};const used=id?D.jobs.filter(j=>j.type===id).length:0;
@@ -2259,15 +2340,18 @@ function xItems(){if(!XIMP)return[];const fut=$('#xfuture')&&$('#xfuture').check
 const locKey=i=>i.cust.toLowerCase()+'|'+(i.pc?i.pc.replace(/\s/g,''):(i.addr+'|'+i.city).toLowerCase());
 function openXlsxImport(){
   XIMP=null;FORM=null;const m=$('#modal');
-  m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="xT"><h3 id="xT">Opdrachten importeren uit Excel</h3>
-  <p class="note">Werkt ook met lijsten met meerdere klanten onder elkaar (titelregel, kolomnamen, voertuigen; steeds herhaald): elke titel wordt een klant. Eén rij per voertuig met Kenteken, Klant, Adres en Postcode en/of Plaats (ook "Straat 1, Plaats" in één kolom). Ontbreekt de postcode, dan zoekt de app die op via PDOK; ontbreekt de kolom Klant, dan wordt de klantnaam uit de titel boven de lijst gehaald. Verder plus per maand een kolom Datum met daarna Tijd (bijv. "08.30 tot 09.00"), en eventueel Informatie en Geannuleerd. Cellen als "Niet beschikbaar" of een ingevulde Geannuleerd worden overgeslagen. Mailadres, Inlog en Locatie informatie worden bij de klant en locatie bewaard.</p>
-  <div class="fgrid">
-    <label class="fld wide"><span>Bestand (.xlsx, .xls of .csv)</span><input type="file" id="xf" accept=".xlsx,.xls,.csv"></label>
+  m.innerHTML=`<div class="dlg wide" role="dialog" aria-modal="true" aria-labelledby="xT"><h3 id="xT">Opdrachten importeren uit Excel</h3>
+  <p class="note" style="margin-bottom:10px">Kies een bestand. Je ziet eerst precies welke regels worden ingepland en welke niet; er verandert niets tot je op Importeren klikt.
+  <details style="display:inline"><summary class="small" style="display:inline;cursor:pointer;color:var(--accent)">Welke lijsten werken?</summary><span class="small"> Eén rij per voertuig met Kenteken, Klant, Adres en Postcode en/of Plaats (ook "Straat 1, Plaats" in één kolom). Ontbreekt de postcode, dan zoekt de app die op via PDOK; ontbreekt de kolom Klant, dan komt de klantnaam uit de titel boven de lijst. Lijsten met meerdere klanten onder elkaar (titelregel, kolomnamen, voertuigen; steeds herhaald) werken ook: elke titel wordt een klant. Per maand een kolom Datum met daarna Tijd (bijv. "08.30 tot 09.00"), en eventueel Informatie en Geannuleerd. "Niet beschikbaar" of een ingevulde Geannuleerd wordt overgeslagen.</span></details></p>
+  <div class="ximp-top">
+    <label class="fld"><span>Bestand (.xlsx, .xls of .csv)</span><input type="file" id="xf" accept=".xlsx,.xls,.csv"></label>
     <label class="fld"><span>Type reiniging</span><select id="xtype">${D.types.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} (${t.dur} min)</option>`).join('')}</select></label>
-    <label class="fld"><span>Speling rond tijdvak (min)</span><input type="number" id="xslack" value="0" min="0" step="5"></label>
-    <label class="chk wide" style="grid-column:1/-1"><input type="checkbox" id="xfuture" checked> Alleen datums vanaf vandaag importeren</label>
-    <label class="chk wide" style="grid-column:1/-1"><input type="checkbox" id="xslot" checked> Reinigingsduur = lengte van het tijdvak (anders de standaardduur van het type)</label>
-    <label class="chk wide" style="grid-column:1/-1"><input type="checkbox" id="xclear"${isSample()?' checked':''}> Voorbeeldklanten en -opdrachten eerst verwijderen (medewerkers blijven staan)</label>
+    <label class="fld"><span>Speling (min)</span><input type="number" id="xslack" value="0" min="0" step="5"></label>
+  </div>
+  <div class="ximp-opts">
+    <label class="chk"><input type="checkbox" id="xfuture" checked> Alleen datums vanaf vandaag</label>
+    <label class="chk"><input type="checkbox" id="xslot" checked> Duur = lengte van het tijdvak</label>
+    <label class="chk"><input type="checkbox" id="xclear"${isSample()?' checked':''}> Voorbeeldgegevens eerst verwijderen</label>
   </div>
   <div id="xprev"></div>
   <div class="dlg-foot"><button type="button" class="btn ghost" data-act="csvimport">Of plak regels (CSV)</button><span class="sp"></span><button type="button" class="btn" data-act="dlgx">Annuleren</button><button type="button" class="btn primary" id="xgo" data-act="xdo" disabled>Importeren</button></div></div>`;
@@ -2318,40 +2402,71 @@ function xBillToHtml(X){
     <p class="hint" style="margin:0">${X.billTo?'De bedrijven uit de lijst blijven zelf de klant in de planning; alleen de factuur gaat naar deze leasemaatschappij. Op de factuur staan de kentekens gegroepeerd per bedrijf.':'Komt de lijst van een lease- of verhuurmaatschappij? Kies die hier, dan gaat de factuur daarheen. De bedrijven blijven gewoon de klant in de planning.'}</p>`;
 }
 function xReparse(){const X=XIMP;if(!X)return;const r=parseAny(X.rows,{cust:X.custEdit,names:X.names});XIMP={...X,...r};renderXPrev()}
+/* Voorbeeld: elke regel uit de lijst met wat ermee gebeurt */
+const XST={imp:['Wordt ingepland','ok'],dup:['Bestaat al',''],past:['In het verleden',''],nb:['Niet beschikbaar','warn'],cancel:['Geannuleerd','warn'],city:['Plaats onbekend','bad']};
+function xRows(X){const fut=$('#xfuture')&&$('#xfuture').checked,t=todayIso();
+  const have=new Set(D.jobs.map(j=>String(j.plate).toUpperCase().replace(/[^A-Z0-9]/g,'')+'|'+j.date));
+  return(X.log||[]).map((e,i)=>{let st=e.status;
+    if(st==='ok')st=fut&&e.date&&e.date<t?'past':have.has(String(e.plate).toUpperCase().replace(/[^A-Z0-9]/g,'')+'|'+e.date)?'dup':'imp';
+    return{...e,i,st}})}
+function xPvBody(X){const pv=X.pv||(X.pv={f:'imp',q:''}),rows=xRows(X),q=normQ(pv.q).trim(),words=q?q.split(/\s+/):[];
+  const list=rows.filter(r=>(pv.f==='all'||(pv.f==='skip'?!['imp','dup'].includes(r.st):r.st===pv.f))&&(!words.length||words.every(w=>normQ([r.plate,r.veh,r.cust,r.addr,r.pc,r.city,r.note,r.reason,r.date].join(' ')).includes(w))))
+    .sort((a,b)=>String(a.date||'9').localeCompare(String(b.date||'9'))||String(a.from||a.time||'').localeCompare(String(b.from||b.time||''))||String(a.cust).localeCompare(String(b.cust),'nl'));
+  const shown=list.slice(0,500);
+  const body=shown.map(r=>{const s=XST[r.st]||[r.st,''],skip=!['imp'].includes(r.st),tm=r.from?r.from+(r.to?'\u2013'+r.to:''):(r.time||'');
+    return`<tr${skip?' class="skip"':''}><td><span class="chip ${s[1]}">${esc(s[0])}</span></td><td class="small" style="white-space:nowrap">${r.date?esc(fdate(r.date,{weekday:'short',day:'numeric',month:'short'})):'<span class="muted">\u2014</span>'}</td><td class="mono small" style="white-space:nowrap">${esc(tm||'hele dag')}</td><td>${plateHtml(r.plate)}${r.veh?`<div class="small muted">${esc(r.veh)}</div>`:''}</td><td><b>${esc(r.cust)}</b></td><td class="small">${esc(r.addr||'')}${r.pc||r.city?`<div class="muted">${esc([r.pc,r.city].filter(Boolean).join(' '))}</div>`:''}</td><td class="small">${r.st==='imp'?esc(r.note||''):`<span class="muted">${esc(r.reason||r.note||'')}</span>`}</td></tr>`}).join('');
+  return{body:body||`<tr><td colspan="7" class="empty">Geen regels${q?' gevonden voor deze zoekterm':' in deze selectie'}</td></tr>`,more:list.length-shown.length,rows}}
+function xPvRefresh(){const X=XIMP;if(!X)return;const r=xPvBody(X),b=$('#xpvBody');if(b)b.innerHTML=r.body;const m=$('#xpvMore');if(m)m.textContent=r.more>0?`En nog ${r.more} regels; zoek om ze te vinden.`:''}
 function renderXPrev(){
-  const X=XIMP,out=$('#xprev'),clear=$('#xclear').checked,items=xItems(),past=X.items.length-items.length;
+  const X=XIMP,out=$('#xprev'),clear=$('#xclear').checked,items=xItems();
   const custs=D.customers.filter(c=>!(clear&&/^c\d+$/.test(c.id))).map(c=>clean(c.name).toLowerCase());
   const plates=new Set(items.map(i=>i.plate)),cu=new Set(items.map(i=>i.cust.toLowerCase())),locs=new Set(items.map(locKey));
   const newC=[...cu].filter(c=>!custs.includes(c)).length;
-  const byDate={};items.forEach(i=>(byDate[i.date]=byDate[i.date]||[]).push(i));
-  const dates=Object.keys(byDate).sort();
+  const lk=(c,pc,a,ci)=>normQ(c)+'|'+(pc?String(pc).replace(/\s/g,'').toUpperCase():normQ(a+'|'+ci));
+  const knownLoc=new Set(D.locations.filter(l=>!(clear&&/^l\d+$/.test(l.id))).map(l=>lk((CUS[l.customerId]||{}).name,l.postcode,l.address,l.city)));
+  const newL=[...new Set(items.map(i=>lk(i.cust,i.pc,i.addr,i.city)))].filter(k=>!knownLoc.has(k)).length;
+  const dates=[...new Set(items.map(i=>i.date))].sort();
   const wk=dates.filter(d=>{const n=wday(d);return!D.workers.some(w=>(w.days||[]).includes(n))});
   let far=0;const seen={};items.forEach(i=>{const k=locKey(i);if(seen[k])return;seen[k]=1;const g=geocode(i.pc,i.city);if(!g||!D.workers.length)return;const near=Math.min(...D.workers.map(w=>hav(g,{lat:+w.lat,lng:+w.lng})));if(near>far)far=near});
   const est=new Set(items.filter(i=>(geocode(i.pc,i.city)||{}).geo==='plaats').map(locKey)).size;
-  const rowsH=dates.map(d=>{const its=byDate[d],ts=its.map(i=>i.from).filter(Boolean).sort(),te=its.map(i=>i.to).filter(Boolean).sort(),cs=new Set(its.map(i=>i.city===i.city.toUpperCase()?i.city.charAt(0)+i.city.slice(1).toLowerCase():i.city));return`<tr><td>${esc(fdate(d,{weekday:'short',day:'numeric',month:'short',year:'numeric'}))}</td><td>${its.length}</td><td class="mono">${ts.length?ts[0]+'–'+(te[te.length-1]||''):'hele dag'}</td><td class="small">${esc([...cs].slice(0,4).join(', '))}${cs.size>4?' …':''}</td></tr>`}).join('');
-  const st=X.stat||{nb:0,cancel:0,reasons:{}};const rs=Object.entries(st.reasons||{}).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([k,v])=>`"${esc(k)}" ${v}×`).join(', ');
-  let info=[];if(st.nb)info.push(`${st.nb} keer niet gepland volgens de lijst (${rs})`);if(st.cancel)info.push(`${st.cancel} geannuleerd`);if(past)info.push(`${past} in het verleden`);
-  let warn='';
-  if(info.length)warn+=`<p class="hint" style="margin:0">Overgeslagen: ${info.join(' · ')}.</p>`;
-  if(est)warn+=`<p class="hint" style="margin:0">${est} locatie(s) zonder postcode krijgen een geschatte positie op basis van de plaats. Vul later de postcode of coördinaten in bij Klanten &amp; locaties voor nauwkeurigere reistijden.</p>`;
-  if(wk.length)warn+=`<p class="hint" style="color:var(--warn);margin:0">${wk.length} datum(s) vallen op een dag waarop geen medewerker werkt (${wk.slice(0,6).map(d=>esc(fdate(d,{weekday:'short',day:'numeric',month:'short'}))).join(', ')}${wk.length>6?' …':''}).</p>`;
-  if(D.workers.length&&far>60)warn+=`<p class="hint" style="color:var(--warn);margin:0">Sommige locaties liggen tot ${Math.round(far)} km (hemelsbreed) van de dichtstbijzijnde medewerker. Voeg medewerkers in die regio's toe voor een realistische planning.</p>`;
+  const pv=xPvBody(X),cnt={};pv.rows.forEach(r=>cnt[r.st]=(cnt[r.st]||0)+1);
+  const nImp=cnt.imp||0,nDup=cnt.dup||0,nSkip=pv.rows.length-nImp-nDup;
+  const st=X.stat||{nb:0,cancel:0,reasons:{}};
+  // aandachtspunten
+  const W=[];
   const bc=Object.entries(X.badCity||{});
-  if(bc.length)warn+=`<p class="hint" style="color:var(--bad);margin:0">${X.skipped.length} rij(en) overgeslagen omdat de plaats onbekend is: ${bc.map(([k,v])=>esc(k)+' ('+v+')').join(', ')}. Voeg een postcode-kolom toe of maak de locatie handmatig aan.</p>`;
-  else if(X.skipped.length)warn+=`<p class="hint" style="color:var(--bad);margin:0">${X.skipped.length} rij(en) overgeslagen: ${X.skipped.slice(0,5).map(esc).join('; ')}</p>`;
+  if(bc.length)W.push(['bad',`${X.skipped.length} rij(en) overgeslagen omdat de plaats onbekend is: ${bc.map(([k,v])=>esc(k)+' ('+v+')').join(', ')}. Voeg een postcode toe of maak de locatie handmatig aan.`]);
+  else if(X.skipped.length)W.push(['bad',`${X.skipped.length} rij(en) zonder kenteken of klant overgeslagen: ${X.skipped.slice(0,3).map(esc).join('; ')}${X.skipped.length>3?' \u2026':''}`]);
+  if(wk.length)W.push(['warn',`${wk.length} datum(s) vallen op een dag waarop geen medewerker werkt: ${wk.slice(0,5).map(d=>esc(fdate(d,{weekday:'short',day:'numeric',month:'short'}))).join(', ')}${wk.length>5?' \u2026':''}.`]);
+  if(D.workers.length&&far>60)W.push(['warn',`Sommige locaties liggen tot ${Math.round(far)} km van de dichtstbijzijnde medewerker.`]);
   const gr=X.geoRes||[],grOk=gr.filter(g=>g.ok).length;
-  let geoH='';
-  if(gr.length)geoH=`<details${gr.length-grOk?' open':''}><summary class="small"><b>${grOk} van ${gr.length}</b> adressen zonder postcode gevonden via PDOK${gr.length-grOk?`, <span style="color:var(--bad)">${gr.length-grOk} niet gevonden</span>`:''}</summary><div class="tbl-wrap" style="max-height:180px;overflow:auto;margin-top:6px"><table><thead><tr><th>Adres in de lijst</th><th>Gevonden</th></tr></thead><tbody>${gr.map(g=>`<tr><td class="small">${esc(g.addr)}, ${esc(g.city)}</td><td class="small">${g.ok?`<span class="chip ok">${esc(g.postcode)}</span> ${esc(g.label)}`:`<span style="color:var(--bad)">${esc(g.why)}</span>`}</td></tr>`).join('')}</tbody></table></div></details>`;
-  else if(X.geoErr)geoH=`<p class="hint" style="color:var(--bad);margin:0">Postcodes opzoeken via PDOK lukte niet: ${esc(X.geoErr)} De app schat de positie op basis van de plaats.</p>`;
-  else if(!SERVER&&X.lookups&&X.lookups.length)geoH=`<p class="hint" style="margin:0">${X.lookups.length} adres(sen) zonder postcode. In de Netlify-versie zoekt de app de postcode op via PDOK; hier wordt de positie geschat op basis van de plaats.</p>`;
-  const blkH=X.multi&&X.blocks?`<div class="tbl-wrap" style="max-height:260px;overflow:auto"><table><thead><tr><th>Klant (aan te passen)</th><th>Voertuigen</th><th>Afspraken</th><th>Vanaf vandaag</th></tr></thead><tbody>${X.blocks.map(b=>`<tr><td><input class="mini" data-xname="${b.i}" value="${esc(b.cust)}" aria-label="Klantnaam blok rij ${b.row}" style="width:100%;min-width:180px"><div class="small muted">rij ${b.row}${b.meta.info.length?' \u00b7 '+esc(b.meta.info.filter(x=>!/^datum/i.test(x)).slice(0,2).join(' \u00b7 ')):''}</div></td><td>${b.plates}</td><td>${b.ok}</td><td><b>${b.future}</b></td></tr>`).join('')}</tbody></table></div>`:'';
+  if(gr.length)W.push([gr.length-grOk?'warn':'',`${grOk} van ${gr.length} adressen zonder postcode gevonden via PDOK. <details style="display:inline"><summary style="display:inline;cursor:pointer;color:var(--accent)">Bekijk</summary><div class="tbl-wrap" style="max-height:180px;overflow:auto;margin-top:6px"><table><thead><tr><th>Adres in de lijst</th><th>Gevonden</th></tr></thead><tbody>${gr.map(g=>`<tr><td class="small">${esc(g.addr)}, ${esc(g.city)}</td><td class="small">${g.ok?`<span class="chip ok">${esc(g.postcode)}</span> ${esc(g.label)}`:`<span style="color:var(--bad)">${esc(g.why)}</span>`}</td></tr>`).join('')}</tbody></table></div></details>`]);
+  else if(X.geoErr)W.push(['bad',`Postcodes opzoeken via PDOK lukte niet: ${esc(X.geoErr)} De positie wordt geschat op basis van de plaats.`]);
+  if(est)W.push(['',`${est} locatie(s) zonder postcode krijgen een geschatte positie op basis van de plaats.`]);
+  if(nDup)W.push(['',`${nDup} regel(s) staan al in de planning (zelfde kenteken en datum) en worden niet dubbel aangemaakt.`]);
+  // blokken (lijst met meerdere klanten)
+  const blkH=X.multi&&X.blocks?`<details class="ximp-sec"${X.blocks.length<=6?' open':''}><summary style="cursor:pointer"><b>Klanten in de lijst (${X.blocks.length})</b> <span class="small muted">namen zijn aan te passen</span></summary><div class="tbl-wrap" style="max-height:220px;overflow:auto;margin-top:8px"><table><thead><tr><th>Klant</th><th>Voertuigen</th><th>Afspraken</th><th>Vanaf vandaag</th></tr></thead><tbody>${X.blocks.map(b=>`<tr><td><input class="mini" data-xname="${b.i}" value="${esc(b.cust)}" aria-label="Klantnaam blok rij ${b.row}" style="width:100%;min-width:180px"><div class="small muted">rij ${b.row}${b.meta.info.length?' \u00b7 '+esc(b.meta.info.filter(x=>!/^datum/i.test(x)).slice(0,2).join(' \u00b7 ')):''}</div></td><td>${b.plates}</td><td>${b.ok}</td><td><b>${b.future}</b></td></tr>`).join('')}</tbody></table></div></details>`:'';
   const custH=(X.noCust?`<label class="fld" style="max-width:360px"><span>Klant (geen kolom Klant in de lijst${X.meta&&X.meta.cust?', gevonden in de titel':''})</span><input id="xcust" value="${esc(X.custEdit!=null?X.custEdit:X.cust)}" placeholder="Naam van de klant"></label>`:'')+xBillToHtml(X);
-  out.innerHTML=`<div style="margin-top:14px;display:grid;gap:8px"><p style="margin:0"><b>${esc(X.file)}</b> <span class="muted small">(blad "${esc(X.sheet)}")</span></p>${custH}${blkH}${geoH}
-  <p style="margin:0">${plates.size} voertuigen · ${X.billTo?`${cu.size} klanten · factuur naar <b id="xbillname">${esc(xBillName(X)||'(naam invullen)')}</b>`:`${cu.size} klanten (${newC} nieuw)`} · ${locs.size} locaties · <b>${items.length} opdrachten</b> op ${dates.length} datum(s)</p>
-  ${items.length?`<div class="tbl-wrap" style="max-height:240px;overflow:auto"><table><thead><tr><th>Datum</th><th>Voertuigen</th><th>Tijden</th><th>Plaatsen</th></tr></thead><tbody>${rowsH}</tbody></table></div>`:'<p class="hint" style="margin:0">Geen opdrachten om te importeren met deze instellingen.</p>'}${warn}
-  <div class="row"><button class="btn sm" data-act="xlog">Bekijk alle regels per voertuig (${X.log.length})</button></div><div id="xlogBox"></div>
-  <p class="hint" style="margin:0">Opdrachten die al bestaan (zelfde kenteken, datum en locatie) worden overgeslagen, dus opnieuw importeren is veilig. Na het importeren zie je in het importlog wat wel en niet is ingepland.</p></div>`;
-  $('#xgo').disabled=!items.length;
+  const f=X.pv.f,segB=(k,l,n)=>`<button type="button" data-act="xpvf" data-f="${k}" aria-pressed="${f===k}">${l} <b>${n}</b></button>`;
+  const per=dates.length?(dates.length===1?esc(fdate(dates[0],{day:'numeric',month:'short'})):`${esc(fdate(dates[0],{day:'numeric',month:'short'}))} \u2013 ${esc(fdate(dates[dates.length-1],{day:'numeric',month:'short'}))}`):'\u2014';
+  out.innerHTML=`<div class="ximp-sec"><h4>${esc(X.file)} <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">\u00b7 blad "${esc(X.sheet)}"</span></h4>
+  <div class="xkpis">
+    <div class="xkpi main"><b>${nImp}</b><span>opdrachten worden ingepland</span></div>
+    <div class="xkpi"><b>${plates.size}</b><span>voertuigen</span></div>
+    <div class="xkpi"><b>${cu.size}</b><span>klanten${newC?` \u00b7 ${newC} nieuw`:''}</span></div>
+    <div class="xkpi"><b>${locs.size}</b><span>locaties${newL?` \u00b7 ${newL} nieuw`:''}</span></div>
+    <div class="xkpi"><b style="font-size:16px;line-height:1.7">${per}</b><span>${dates.length} datum(s)</span></div>
+    <div class="xkpi${nSkip?' warn':''}"><b>${nSkip}</b><span>niet ingepland${nSkip?` (${[cnt.past?cnt.past+' in het verleden':'',cnt.nb?cnt.nb+' niet beschikbaar':'',cnt.cancel?cnt.cancel+' geannuleerd':'',cnt.city?cnt.city+' plaats onbekend':''].filter(Boolean).join(', ')})`:''}</span></div>
+  </div>
+  ${W.length?`<div style="margin-top:10px"><ul class="xwarn">${W.map(([c,t])=>`<li class="${c}">${t}</li>`).join('')}</ul></div>`:''}</div>
+  <div class="ximp-sec"><h4>Klant en facturatie</h4>${custH}</div>${blkH}
+  <div class="ximp-sec"><h4>Regels uit de lijst</h4>
+  <div class="xpv-bar"><div class="seg">${segB('imp','Wordt ingepland',nImp)}${segB('skip','Niet ingepland',nSkip)}${nDup?segB('dup','Bestaat al',nDup):''}${segB('all','Alles',pv.rows.length)}</div>
+  <input class="mini" id="xpvq" type="search" placeholder="Zoek kenteken, klant, plaats\u2026" value="${esc(X.pv.q||'')}" style="flex:1 1 200px;max-width:320px" autocomplete="off"></div>
+  <div class="xpv"><table><thead><tr><th>Status</th><th>Datum</th><th>Tijd</th><th>Kenteken</th><th>Klant</th><th>Adres</th><th>Opmerking / reden</th></tr></thead><tbody id="xpvBody">${pv.body}</tbody></table></div>
+  <p class="hint" id="xpvMore" style="margin:6px 0 0">${pv.more>0?`En nog ${pv.more} regels; zoek om ze te vinden.`:''}</p>
+  <p class="hint" style="margin:4px 0 0">Opnieuw importeren is veilig: wat al bestaat (zelfde kenteken, datum en locatie) wordt overgeslagen. Na het importeren staat alles ook in het Importlog.</p></div>`;
+  const go=$('#xgo');go.disabled=!nImp;go.textContent=nImp?`${nImp} opdracht${nImp===1?'':'en'} importeren`:'Importeren';
 }
 function doXImport(){
   const items=xItems();if(!items.length)return;
@@ -2666,9 +2781,9 @@ function viewBC(){
     <td>${r.nb?'<span class="small muted">via klant</span>':`<button class="btn sm${r.d.send?' on':''}" data-act="bctoggle" data-id="${r.j.id}" aria-pressed="${r.d.send}" title="${esc(r.d.why||'')}">${r.d.send?'Naar BC: ja':'Naar BC: nee'}</button>`}${r.d.override?`<div class="small muted">handmatig · <button class="linkbtn" data-act="bcreset" data-id="${r.j.id}">standaard</button></div>`:r.d.why?`<div class="small muted">${esc(r.d.why)}</div>`:''}</td><td>${bcInBC(r)}</td></tr>`).join('');
   const sum=Object.values(byC).sort((a,b)=>String(a.c.name).localeCompare(String(b.c.name),'nl')).map(o=>`<tr><td><b>${esc(o.c.name||'?')}</b>${o.c.bcNo?` <span class="muted small">${esc(o.c.bcNo)}</span>`:''}</td><td class="mono">${o.done}</td><td class="mono">${o.fail}${o.fail?` <span class="small muted">(${o.failSent} naar BC)</span>`:''}</td><td class="mono">${o.nb||''}</td><td class="mono"><b>${o.bill}</b></td><td class="small">${BCFAIL.find(x=>x[0]===bcFailMode(o.c))[1]}</td><td class="act"><button class="btn ghost" data-act="editcus" data-id="${o.c.id||''}" aria-label="Instellingen klant">${I.edit}</button></td></tr>`).join('');
   const sel=(k,opts)=>`<select class="mini" data-bcf="${k}">${opts.map(([v,l])=>`<option value="${esc(v)}"${f[k]===v?' selected':''}>${esc(l)}</option>`).join('')}</select>`;
-  return`<section class="panel sec"><div class="toolbar"><h2>Naar Business Central</h2>
+  return`<section class="panel sec"><div class="toolbar"><h2>Business Central interface</h2>
     <select class="mini" data-bcmonth aria-label="Maand">${ms.map(m=>`<option value="${m}"${m===BCST.month?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>
-    <span class="sp"></span>${SERVER?`<button class="btn sm" data-act="bctest">Koppeling testen</button>`:''}<button class="btn sm" data-act="bcref">Ververs</button>${SERVER&&!BCST.demo?`<button class="btn sm primary" data-act="bcsend"${BCST.loading||BCST.sending?' disabled':''}>${BCST.sending?'Versturen\u2026':'Verstuur naar BC'}</button>`:''}<button class="btn sm" data-act="bccsv">${I.copy} Kopieer als CSV</button><button class="btn sm" data-act="bcjson">${I.copy} Kopieer als JSON (API)</button></div>
+    <span class="sp"></span><button class="btn sm ghost" data-act="navto" data-to="instellingen:api" title="Koppeling testen en exporteren als CSV of JSON">API koppelingen</button><button class="btn sm" data-act="bcref">Ververs</button>${SERVER&&!BCST.demo?`<button class="btn sm primary" data-act="bcsend"${BCST.loading||BCST.sending?' disabled':''}>${BCST.sending?'Versturen\u2026':'Verstuur naar BC'}</button>`:''}</div>
     ${bcSyncLine()}
     <p class="hint" style="margin:0">${SERVER?'Met <b>Verstuur naar BC</b> gaan de regels van deze maand naar Business Central. Opnieuw versturen is veilig: alleen nieuwe en gewijzigde regels gaan mee, en wat je hier op "Naar BC: nee" zet, krijgt in BC de status Vervallen.':'De koppeling met Business Central werkt in de Netlify-versie.'} Dit overzicht laat zien wat er per maand naar BC gaat: gereedmeldingen als factureerbare regel, en meldingen "niet gelukt" volgens de instelling per klant. Met de knop <b>Naar BC</b> wijk je per melding af van die instelling.</p>
     ${BCST.demo?'<p class="small" style="margin:0;color:var(--warn)">Voorbeeldgegevens: hier zijn geen echte meldingen beschikbaar. In de Netlify-versie zie je de meldingen van je medewerkers.</p>':''}
@@ -2697,13 +2812,13 @@ async function bcSend(confirm){
 }
 function bcConfirm(msg){FORM=null;$('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="bcT" style="width:min(520px,100%)"><h3 id="bcT">Veel regels op Vervallen</h3><p>${esc(msg)}</p><div class="dlg-foot"><button class="btn" data-act="dlgx">Annuleren</button><span class="sp"></span><button class="btn danger" data-act="bcsendok">Toch versturen</button></div></div>`;$('#modal').hidden=false}
 async function bcTest(){
-  try{const d=await withPw(()=>api('/api/bc-sync?test=1'));FORM=null;
+  try{const d=await withPw(()=>api('/api/bc-sync?test=1'));FORM=null;D.apiTest={...(D.apiTest||{}),bc:{ok:!!d.chosen,at:Date.now(),env:d.environment,company:((d.companies||[]).find(c=>c.id===d.chosen)||{}).name||'',error:d.chosen?'':'Geen bedrijf gekozen: zet BC_COMPANY_NAME in Netlify'}};save();if(S.tab==='instellingen')render();
     $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="btT" style="width:min(560px,100%)"><h3 id="btT">Koppeling met Business Central werkt</h3>
       <p>Ingelogd in omgeving <b>${esc(d.environment)}</b>. Bedrijven in deze omgeving:</p>
       <ul>${d.companies.map(c=>`<li>${esc(c.name)}${c.id===d.chosen?' <span class="chip ok">gekozen</span>':''}</li>`).join('')}</ul>
       ${d.chosen?'':`<p class="hint" style="color:var(--warn)">Er is nog geen bedrijf gekozen. Zet in Netlify <b>BC_COMPANY_NAME</b> op een van de namen hierboven en deploy opnieuw.</p>`}
       <div class="dlg-foot"><span class="sp"></span><button class="btn primary" data-act="dlgx">Sluiten</button></div></div>`;$('#modal').hidden=false}
-  catch(e){toast('Koppeling testen: '+apiErr(e))}
+  catch(e){D.apiTest={...(D.apiTest||{}),bc:{ok:false,at:Date.now(),error:apiErr(e)}};save();if(S.tab==='instellingen')render();toast('Koppeling testen: '+apiErr(e))}
 }
 async function bcFetchState(){if(!SERVER||BCST.demo)return;try{const d=await withPw(()=>api('/api/bc-sync?month='+BCST.month));D.bcSync=D.bcSync||{};D.bcSync[BCST.month]={...(D.bcSync[BCST.month]||{}),bc:d.bc,at:(D.bcSync[BCST.month]||{}).at||Date.now()};save();render()}catch(e){toast(apiErr(e))}}
 function bcExport(kind){
@@ -2829,6 +2944,8 @@ function onClick(e){
     case'logdel':if(el.dataset.armed){const lg=curLog();D.importLogs=importLogs().filter(x=>x!==lg);S.logId=null;LOGSRC=null;save();render();toast('Log verwijderd; de opdrachten blijven staan.')}else{el.dataset.armed='1';el.textContent='Klik nogmaals om te verwijderen'}break;
     case'ximport':openXlsxImport();break;
     case'logcsv':logCsv();break;
+    case'cfreset':{S.cf={q:'',bill:'',bc:'',sort:CF().sort};render();break}
+    case'xpvf':{if(XIMP){XIMP.pv.f=el.dataset.f;renderXPrev()}break}
     case'xlog':{const box=$('#xlogBox');if(box.innerHTML){box.innerHTML='';el.textContent=`Bekijk alle regels per voertuig (${XIMP.log.length})`}else{LOGSRC={entries:XIMP.log,preview:true};LOGF={st:'alle',q:'',m:''};box.innerHTML=logShell();logRefresh();el.textContent='Verberg regels'}break}
     case'publish':openPublish();break;
     case'wlink':copyWorkerLink(el.dataset.id);break;
@@ -2898,6 +3015,7 @@ function onChange(e){
   if(el.id==='xbillnew'&&XIMP){XIMP.billToNew=el.value;const n=$('#xbillname');if(n)n.textContent=xBillName(XIMP)||'(naam invullen)';return}
   if(el.dataset.menuloc){menuMove(el.dataset.menuloc,el.value);save();render();toast(`${MENU_ITEMS[el.dataset.menuloc][0]} staat nu ${el.value==='top'?'in het hoofdmenu':el.value==='hidden'?'verborgen':'onder '+menuCfg().groups[el.value.slice(2)].l}.`);return}
   if(el.dataset.menuname){const g=menuCfg().groups[el.dataset.menuname];if(g){g.l=el.value.trim()||g.l;save();render()}return}
+  if(el.dataset.cf){CF()[el.dataset.cf]=el.value;render();return}
   if(el.dataset.bcmonth!=null){bcLoad(el.value).then(render);return}
   if(el.dataset.bcf){(S.bcf=S.bcf||{c:'',k:''})[el.dataset.bcf]=el.value;return render()}
   if(el.id==='logM'){LOGF.m=el.value;return logRefresh()}
@@ -2946,7 +3064,7 @@ function init(){
   try{if(window.claude&&typeof window.claude.use==='function')window.claude.use('sample').then(s=>{SAMPLE=s||null}).catch(()=>{})}catch(e){}
   document.addEventListener('click',onClick);
   if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);if(SERVER)setInterval(()=>{if(!document.hidden&&(MV||(S.tab==='planning'&&Date.now()-MSG.at>30000)))fetchMsgs(true)},15000);document.addEventListener('change',onChange);document.addEventListener('contextmenu',onContext);addEventListener('scroll',closeCtx,{passive:true});addEventListener('resize',closeCtx);
-  document.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.combo){const k=e.target.dataset.combo;$('#f_'+k).value='';comboShow(k,e.target.value);return}if(e.target.id==='jobQ'){S.jobQ=e.target.value;$('#jobsTbl').innerHTML=jobsTable()}if(e.target.id==='logQ'){LOGF.q=e.target.value;logRefresh()}});
+  document.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.combo){const k=e.target.dataset.combo;$('#f_'+k).value='';comboShow(k,e.target.value);return}if(e.target.id==='jobQ'){S.jobQ=e.target.value;$('#jobsTbl').innerHTML=jobsTable()}if(e.target.id==='logQ'){LOGF.q=e.target.value;logRefresh()}if(e.target.id==='cusQ'){CF().q=e.target.value;cusRefresh()}if(e.target.id==='xpvq'&&XIMP){XIMP.pv.q=e.target.value;xPvRefresh()}});
   document.addEventListener('dragstart',onDragStart);document.addEventListener('dragover',onDragOver);document.addEventListener('drop',onDrop);document.addEventListener('dragend',onDragEnd);
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#ctx')){closeCtx();return}if(e.key==='Escape'){if(document.querySelector('.navg.open')){const b=document.querySelector('.navg.open > .tab');closeMenus();if(b)b.focus();return}if(!$('#modal').hidden)closeForm()}});
   $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeForm()});

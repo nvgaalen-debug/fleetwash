@@ -30,10 +30,11 @@ const ENV = () => ({
   companyName: process.env.BC_COMPANY_NAME,
 });
 
-const FIELDS = ["externalId", "customerNo", "shipToCode", "licensePlate", "cleaningDate", "cleaningTime", "itemNo", "resourceNo", "status", "billable", "reason", "note", "locationName", "locationAddress", "locationCity"];
+const FIELDS = ["externalId", "customerNo", "shipToCode", "licensePlate", "cleaningDate", "cleaningTime", "itemNo", "resourceNo", "status", "billable", "reason", "note", "locationName", "locationAddress", "locationCity", "durationMinutes"];
 // Velden die geen invloed hebben op het factuurbedrag: die mogen ook bijgewerkt worden als de regel al op een factuur staat.
 const INFO = ["resourceNo", "note", "reason", "cleaningTime", "locationName", "locationAddress", "locationCity"];
-const LOCF = ["locationName", "locationAddress", "locationCity"];
+// Velden die pas in latere versies van de BC-extensie bestaan: alleen meesturen als BC ze kent.
+const OPTIONAL = ["locationName", "locationAddress", "locationCity", "durationMinutes"];
 const STATUSES = new Set(["Gereed", "NietGereinigd", "NietBeschikbaar", "Vervallen"]);
 const isMonth = (s) => /^\d{4}-\d{2}$/.test(s || "");
 const lastDay = (m) => { const [y, mo] = m.split("-").map(Number); return `${m}-${String(new Date(y, mo, 0).getDate()).padStart(2, "0")}`; };
@@ -67,6 +68,7 @@ function clean(row) {
     locationName: cut(row.locationName, 100),
     locationAddress: cut(row.locationAddress, 100),
     locationCity: cut(row.locationCity, 30),
+    durationMinutes: Math.max(0, Math.min(1440, Math.round(+row.durationMinutes || 0))),
   };
   if (/^\d{1,2}:\d{2}$/.test(row.cleaningTime || "")) b.cleaningTime = row.cleaningTime.padStart(5, "0") + ":00";
   return b;
@@ -142,9 +144,9 @@ export default async (req) => {
   }
   const statusMap = () => Object.fromEntries([...existing.values()].map((x) => [x.externalId, { invoiceStatus: x.invoiceStatus, invoiceNo: x.postedInvoiceNo || x.salesInvoiceNo || "", status: x.status }]));
   if (!rows) return json({ bc: statusMap() });
-  // Oudere BC-extensie (voor 1.0.4.0) kent de locatievelden nog niet: dan niet meesturen.
+  // Oudere BC-extensie kent nieuwere velden nog niet: die dan niet meesturen.
   const first = existing.values().next().value;
-  const hasLoc = !first || "locationName" in first;
+  const unknown = first ? OPTIONAL.filter((f) => !(f in first)) : [];
 
   // 2. Bepalen wat er moet gebeuren
   const ops = [], errors = [];
@@ -152,7 +154,7 @@ export default async (req) => {
   const seen = new Set();
   for (const raw of rows) {
     const b = clean(raw);
-    if (!hasLoc) for (const f of LOCF) delete b[f];
+    for (const f of unknown) delete b[f];
     if (!b.externalId || seen.has(b.externalId)) continue;
     seen.add(b.externalId);
     if (!b.customerNo) { errors.push({ externalId: b.externalId, message: "Geen debiteurnummer" }); continue; }

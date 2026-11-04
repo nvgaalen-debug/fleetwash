@@ -2618,7 +2618,7 @@ function bcRow(j,s){
   const at=s.at?new Date(s.at):null;
   return{j,s,c,ec,l,t,w,d,
     api:{externalId:j.id,customerNo:c.bcNo||'',shipToCode:l.bcShipTo||'',licensePlate:j.plate,cleaningDate:j.date,cleaningTime:at?at.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'}):'',
-      itemNo:s.st==='done'?(t.bcItem||''):(bcFailMode(c)==='callout'&&!d.override?(D.settings.bcCalloutItem||'VOORRIJKOSTEN'):(t.bcItem||'')),resourceNo:w.bcResource||'',locationName:ec!==c?ec.name||'':l.name||'',locationAddress:[l.address,l.postcode].filter(Boolean).join(', '),locationCity:l.city||'',
+      itemNo:s.st==='done'?(t.bcItem||''):(bcFailMode(c)==='callout'&&!d.override?(D.settings.bcCalloutItem||'VOORRIJKOSTEN'):(t.bcItem||'')),resourceNo:w.bcResource||'',durationMinutes:s.st==='done'?jobDur(j):0,locationName:ec!==c?ec.name||'':l.name||'',locationAddress:[l.address,l.postcode].filter(Boolean).join(', '),locationCity:l.city||'',
       status:s.st==='done'?'Gereed':'NietGereinigd',billable:d.billable,reason:s.st==='issue'?(s.reason||''):'',note:s.note||''},
     missing:[!c.bcNo&&'debiteurnr.',!t.bcItem&&s.st==='done'&&'artikelnr.'].filter(Boolean)};
 }
@@ -2660,7 +2660,7 @@ function viewBC(){
   const tr=rows.map(r=>`<tr${r.d.send?'':' class="muted-row"'}><td class="mono small">${esc(fdate(r.j.date,{weekday:'short',day:'numeric',month:'short'}))}<div class="muted">${esc(r.api.cleaningTime)}</div></td><td>${plateHtml(r.j.plate)}</td>
     <td><b>${esc(r.ec&&r.ec!==r.c?r.ec.name:r.c.name||'?')}</b>${r.ec&&r.ec!==r.c?`<div class="small muted">factuur aan ${esc(r.c.name)}</div>`:''}<div class="small ${r.c.bcNo?'muted':''}" ${r.c.bcNo?'':'style="color:var(--bad)"'}>${r.c.bcNo?'Deb. '+esc(r.c.bcNo):'geen debiteurnr.'}</div></td>
     <td class="small">${esc(r.l.city||r.e&&r.e.city||'')}${r.l.bcShipTo?`<div class="muted">Verz. ${esc(r.l.bcShipTo)}</div>`:''}</td>
-    <td class="small">${esc(r.t.name||'')}${r.api.itemNo?`<div class="muted">Art. ${esc(r.api.itemNo)}</div>`:r.s.st==='done'?'<div style="color:var(--bad)">geen artikelnr.</div>':''}</td>
+    <td class="small">${esc(r.t.name||'')}${r.api.durationMinutes?` <span class="muted">· ${r.api.durationMinutes} min</span>`:''}${r.api.itemNo?`<div class="muted">Art. ${esc(r.api.itemNo)}</div>`:r.s.st==='done'?'<div style="color:var(--bad)">geen artikelnr.</div>':''}</td>
     <td class="small">${esc(r.w.name||'')}</td><td>${st(r)}${r.api.reason?`<div class="small muted">${esc(r.api.reason)}</div>`:''}</td>
     <td>${r.d.send?(r.d.billable?'<span class="chip ok">Ja</span>':'<span class="chip">Nee</span>'):'<span class="muted">—</span>'}</td>
     <td>${r.nb?'<span class="small muted">via klant</span>':`<button class="btn sm${r.d.send?' on':''}" data-act="bctoggle" data-id="${r.j.id}" aria-pressed="${r.d.send}" title="${esc(r.d.why||'')}">${r.d.send?'Naar BC: ja':'Naar BC: nee'}</button>`}${r.d.override?`<div class="small muted">handmatig · <button class="linkbtn" data-act="bcreset" data-id="${r.j.id}">standaard</button></div>`:r.d.why?`<div class="small muted">${esc(r.d.why)}</div>`:''}</td><td>${bcInBC(r)}</td></tr>`).join('');

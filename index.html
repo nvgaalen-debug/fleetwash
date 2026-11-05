@@ -352,6 +352,7 @@ tr.muted-row td{opacity:.6}
 .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 /* Formulier */
 #modal{position:fixed;inset:0;z-index:50;background:rgba(5,15,20,.45);display:grid;place-items:center;padding:16px}
+#pwModal{position:fixed;inset:0;z-index:80;background:rgba(5,15,20,.5);display:grid;place-items:center;padding:16px}#pwModal[hidden]{display:none}
 .dlg{background:var(--surface);border-radius:12px;border:1px solid var(--line);width:min(640px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:18px 18px 14px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .dlg h3{font-size:21px;margin-bottom:12px}
 .fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
@@ -364,6 +365,13 @@ tr.muted-row td{opacity:.6}
 .checks{display:flex;flex-wrap:wrap;gap:6px 14px;padding-top:4px}
 .chk{display:inline-flex;gap:6px;align-items:center;font-size:14px}
 .dlg-foot{display:flex;gap:8px;align-items:center;margin-top:16px;flex-wrap:wrap}
+[hidden]{display:none!important}
+.apibox{padding:0}.apibox>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:14px 18px}
+.apibox>summary::-webkit-details-marker{display:none}
+.apibox>summary::before{content:'';width:8px;height:8px;border-right:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(-45deg);transition:transform .15s;flex:none}
+.apibox[open]>summary::before{transform:rotate(45deg)}
+.apibox .apit{display:flex;flex-direction:column;gap:2px}.apibox .apit b{font-size:16px}
+.apibox .apibody{padding:0 18px 16px 38px}
 .dlg.wide{width:min(1180px,100%)}
 .dlg.wide .dlg-foot{position:sticky;bottom:-14px;background:var(--surface);margin:12px -18px -14px;padding:10px 18px 12px;border-top:1px solid var(--line);z-index:2}
 .ximp-top{display:grid;grid-template-columns:minmax(220px,1.4fr) minmax(160px,1fr) 130px;gap:10px 12px;align-items:end}
@@ -375,6 +383,16 @@ tr.muted-row td{opacity:.6}
 .xkpi b{display:block;font:600 22px/1.15 var(--f-disp)}
 .xkpi span{font-size:12px;color:var(--muted)}
 .xkpi.main{border-color:var(--accent);background:var(--accent-soft)}.xkpi.main b{color:var(--accent)}
+button.xkpi{text-align:left;font:inherit;color:inherit;cursor:pointer;position:relative;transition:border-color .12s,box-shadow .12s;display:flex;flex-direction:column;justify-content:flex-start;align-items:flex-start}
+button.xkpi .xmore{margin-top:auto!important;padding-top:4px}
+button.xkpi:hover{border-color:var(--accent)}button.xkpi:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button.xkpi[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+button.xkpi .xmore{display:block;margin-top:4px;font-size:11.5px;color:var(--accent)}
+.xdet{margin-top:10px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--bg)}
+.xdet h5{margin:0 0 8px;font:600 14px var(--f-body);display:flex;gap:8px;align-items:center}
+.xdet .tbl-wrap{max-height:260px;overflow:auto;background:var(--surface)}
+.xdet tr[data-act]{cursor:pointer}.xdet tr[data-act]:hover td{background:var(--accent-soft)}
+.xreason{display:flex;flex-wrap:wrap;gap:8px}
 .xkpi.bad b{color:var(--bad)}.xkpi.warn b{color:var(--warn)}
 .xwarn{margin:0;padding-left:18px;display:grid;gap:3px;font-size:13px}
 .xwarn li.bad{color:var(--bad)}.xwarn li.warn{color:var(--warn)}
@@ -599,7 +617,15 @@ async function pdokImprove(){
     toast(`${r.ok} van ${r.total} locaties hebben nu een exacte positie.${r.fail.length?` ${r.fail.length} niet gevonden; controleer het adres (zie kolom Positie).`:''}${useORS()&&r.ok?' Haal daarna de rijtijden opnieuw op.':''}`)}
   catch(e){save();render();if(e&&e.code==='pw'){askPw(pdokImprove);return}toast(apiErr(e))}
 }
-async function withPw(fn){try{return await fn()}catch(e){if(e&&e.code==='pw'){if(!getPw()&&await peerPw())return await fn();await new Promise(res=>askPw(res));return await fn()}throw e}}
+async function withPw(fn){
+  try{return await fn()}catch(e){
+    if(!(e&&e.code==='pw'))throw e;
+    // Intussen al een (nieuw) wachtwoord ingevuld, bijv. in een ander verzoek of tabblad: gewoon opnieuw proberen
+    if(getPw()&&getPw()!==e.used){try{return await fn()}catch(e2){if(!(e2&&e2.code==='pw'))throw e2;e=e2}}
+    if(!getPw()&&await peerPw()){try{return await fn()}catch(e2){if(!(e2&&e2.code==='pw'))throw e2;e=e2}}
+    if(e.used)pwForget(e.used);
+    if(!await askPw())throw e;
+    return await fn()}}
 /* Na een Excel-import: exacte posities -> echte rijtijden -> planning, met voortgang */
 async function importPipeline(ds,newLocs,msg){
   const steps=[['pdok','Exacte posities opzoeken via PDOK'],['ors','Echte rijtijden ophalen via OpenRouteService'],['plan','Planning maken']];
@@ -950,14 +976,44 @@ function stKpi(date,rows,P){if(!SERVER)return'';const ids=rows.flatMap(w=>P.rout
   const done=ids.filter(id=>m[id]&&m[id].st==='done').length,iss=ids.filter(id=>m[id]&&m[id].st==='issue').length;
   return`<div class="kpi ${iss?'bad':done===ids.length?'okk':''}"><b>${done} / ${ids.length}</b><span>gereed gemeld${iss?` · ${iss} probleem`:''}</span></div>`}
 async function api(path,opts={}){
-  const r=await fetch(path,{cache:'no-store',...opts,headers:{'content-type':'application/json','x-app-password':getPw(),...(opts.headers||{})}});
+  const sent=getPw();
+  const r=await fetch(path,{cache:'no-store',...opts,headers:{'content-type':'application/json','x-app-password':sent,...(opts.headers||{})}});
   let d={};try{d=await r.json()}catch(e){}
-  if(r.status===401)throw{code:'pw',message:d.error};if(r.status===404)throw{code:'nofn'};if(!r.ok)throw{code:'srv',message:d.error};return d;
+  if(r.status===401)throw{code:'pw',message:d.error,used:sent};if(r.status===404)throw{code:'nofn'};if(!r.ok)throw{code:'srv',message:d.error};return d;
 }
 const apiErr=e=>e.code==='nofn'?'De serverfunctie is niet gevonden. Deploy de site via GitHub, inclusief netlify/functions en package.json.':e.code==='pw'?'Het wachtwoord klopt niet.':(e.message||'Geen verbinding met de server.');
-function askPw(cb){let keep=false;try{keep=!!localStorage.getItem(PWKEEP)}catch(e){}
-  openForm({title:'App-wachtwoord',note:'Vul het wachtwoord in dat in Netlify als APP_PASSWORD is ingesteld. Standaard onthoudt de app het tot je de browser sluit; andere open tabbladen nemen het over. Uitloggen kan via Beheer > Uitloggen.',fields:[{k:'pw',label:'Wachtwoord',type:'password',req:1,wide:1},{k:'keep',label:'Onthouden',type:'checks',options:[['1','Onthoud op deze computer (alleen op je eigen, beveiligde computer)']]}],values:{keep:keep?['1']:[]},okLabel:'Doorgaan',
-  onSave:v=>{PWMEM=v.pw;pwStore(v.pw,(v.keep||[]).includes('1'));try{PWBC&&PWBC.postMessage({pw:v.pw})}catch(e){}setTimeout(cb,0);return''}})}
+/* Wachtwoordvenster: één tegelijk, in een eigen laag (een open importvenster blijft staan), en eerst gecontroleerd bij de server */
+let PWASK=null;
+function askPw(cb){
+  if(!PWASK)PWASK=new Promise(res=>pwDialog(res)).finally(()=>{PWASK=null});
+  return PWASK.then(ok=>{if(ok&&typeof cb==='function')setTimeout(cb,0);return ok});
+}
+async function pwCheck(pw){try{const r=await fetch('/api/status?date='+todayIso(),{cache:'no-store',headers:{'x-app-password':pw}});if(r.status===401)return false;return true}catch(e){return null}}
+function pwDialog(done){
+  let ov=document.getElementById('pwModal');if(!ov){ov=document.createElement('div');ov.id='pwModal';document.body.appendChild(ov)}
+  let pref=true;try{pref=localStorage.getItem('wasroute.pwpref')!=='0'}catch(e){}
+  ov.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="pwT" style="width:min(460px,100%)"><form id="pwF" autocomplete="on">
+    <h3 id="pwT">App-wachtwoord</h3>
+    <p class="note">Vul het wachtwoord in dat in Netlify als APP_PASSWORD is ingesteld. De app controleert het meteen.</p>
+    <input type="text" name="username" value="wasroute" autocomplete="username" hidden>
+    <label class="fld"><span>Wachtwoord</span><input type="password" id="pwI" name="password" autocomplete="current-password" required></label>
+    <label class="chk" style="margin-top:12px"><input type="checkbox" id="pwK"${pref?' checked':''}> <span>Onthoud op deze computer <span class="muted small">(zet uit op een gedeelde computer)</span></span></label>
+    <p id="pwE" class="small" role="alert" style="color:var(--bad);min-height:1.3em;margin:8px 0 0"></p>
+    <div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" id="pwC">Annuleren</button><button type="submit" class="btn primary" id="pwOk">Doorgaan</button></div>
+  </form></div>`;
+  ov.hidden=false;setTimeout(()=>{const i=$('#pwI');if(i)i.focus()},20);
+  const close=ok=>{ov.hidden=true;ov.innerHTML='';done(ok)};
+  $('#pwC').onclick=()=>close(false);
+  ov.onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();close(false)}};
+  $('#pwF').onsubmit=async e=>{e.preventDefault();const raw=$('#pwI').value;if(!raw)return;
+    const btn=$('#pwOk'),err=$('#pwE');btn.disabled=true;btn.textContent='Controleren\u2026';err.textContent='';
+    let pw=raw,ok=await pwCheck(raw);
+    if(ok===false&&raw.trim()!==raw&&raw.trim()){const ok2=await pwCheck(raw.trim());if(ok2!==false){pw=raw.trim();ok=ok2}}
+    if(ok===false){btn.disabled=false;btn.textContent='Doorgaan';err.textContent='Dit wachtwoord klopt niet. Let op hoofdletters; het moet precies gelijk zijn aan APP_PASSWORD in Netlify.';const i=$('#pwI');i.select();return}
+    const keep=$('#pwK').checked;try{localStorage.setItem('wasroute.pwpref',keep?'1':'0')}catch(x){}
+    PWMEM=pw;pwStore(pw,keep);try{PWBC&&PWBC.postMessage({pw,force:true})}catch(x){}
+    close(true)};
+}
 async function fetchStatus(date,force){
   if(!SERVER)return;const cur=STATUS[date];if(cur&&(cur.loading||!force))return;
   STATUS[date]={map:(cur&&cur.map)||{},loading:true};
@@ -1383,12 +1439,15 @@ const PWKEEP='wasroute.pwkeep';
 /* keep: true = ook op deze computer onthouden, false = alleen deze sessie, undefined = bestaande keuze volgen */
 const pwStore=(v,keep)=>{try{if(v)sessionStorage.setItem(PWKEY,v);else sessionStorage.removeItem(PWKEY)}catch(e){}
   try{if(!v||keep===false)localStorage.removeItem(PWKEEP);else if(keep===true||localStorage.getItem(PWKEEP))localStorage.setItem(PWKEEP,v)}catch(e){}};
-function getPw(){if(PWMEM)return PWMEM;const el=$('#aiPw');if(el&&el.value)return el.value;try{const v=sessionStorage.getItem(PWKEY)||localStorage.getItem(PWKEEP)||'';if(v)PWMEM=v;return v}catch(e){return''}}
+function getPw(){if(PWMEM)return PWMEM;let v='';try{v=sessionStorage.getItem(PWKEY)||localStorage.getItem(PWKEEP)||''}catch(e){}if(!v){const el=$('#aiPw');if(el&&el.value)v=el.value}if(v)PWMEM=v;return v}
+/* Een bewaard wachtwoord dat de server afwijst, overal weggooien (ook in andere tabbladen) */
+function pwForget(bad){if(bad&&getPw()!==bad)return;PWMEM='';try{sessionStorage.removeItem(PWKEY);if(!bad||localStorage.getItem(PWKEEP)===bad)localStorage.removeItem(PWKEEP)}catch(e){}try{PWBC&&PWBC.postMessage({forget:bad||''})}catch(e){}}
 /* Open tabbladen delen het wachtwoord, zodat een nieuw tabblad er niet opnieuw om vraagt */
 let PWBC=null;try{PWBC=new BroadcastChannel('wasroute.pw')}catch(e){}
 if(PWBC){PWBC.onmessage=e=>{const m=e.data||{};
   if(m.q){const v=getPw();if(v)PWBC.postMessage({pw:v})}
-  else if(m.pw&&!getPw()){PWMEM=m.pw;try{sessionStorage.setItem(PWKEY,m.pw)}catch(x){}}
+  else if(m.pw&&(m.force||!getPw())){PWMEM=m.pw;try{sessionStorage.setItem(PWKEY,m.pw);if(m.force&&localStorage.getItem(PWKEEP))localStorage.setItem(PWKEEP,m.pw)}catch(x){}}
+  else if(m.forget!=null){if(!m.forget||PWMEM===m.forget){PWMEM='';try{sessionStorage.removeItem(PWKEY)}catch(x){}}}
   else if(m.logout){PWMEM='';try{sessionStorage.removeItem(PWKEY)}catch(x){}}};
   if(!getPw())PWBC.postMessage({q:1})}
 function peerPw(){return new Promise(res=>{if(getPw()||!PWBC)return res(getPw());PWBC.postMessage({q:1});let t=0;const iv=setInterval(()=>{if(getPw()||++t>10){clearInterval(iv);res(getPw())}},50)})}
@@ -2140,31 +2199,35 @@ function viewSettings(){
   if(S.setPage==='api')return viewApi();
   return pages[S.setPage]||pages.planning;
 }
-/* Beheer > API koppelingen: testen, exporteren en status van alle koppelingen */
+/* Beheer > API koppelingen: per koppeling een uitklapvenster met status, testen en exporteren */
+const API_OPEN=()=>S.apiOpen||(S.apiOpen={bc:true});
 function viewApi(){
   const ms=bcMonths();if(!BCST.month||!ms.includes(BCST.month)){BCST.month=todayIso().slice(0,7);setTimeout(()=>bcLoad(BCST.month).then(()=>render()),0)}
   const t=(D.apiTest||{}).bc,rows=(()=>{try{return bcRows().filter(r=>r.d.send).length}catch(e){return 0}})();
   const when=x=>new Date(x).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-  const st=!SERVER?'<span class="chip">Alleen in de Netlify-versie</span>':!t?'<span class="chip">Nog niet getest</span>':t.ok?`<span class="chip ok">${I.check} Werkt</span> <span class="small muted">getest ${esc(when(t.at))} · omgeving ${esc(t.env||'')}${t.company?' · bedrijf '+esc(t.company):''}</span>`:`<span class="chip bad">Fout</span> <span class="small" style="color:var(--bad)">${esc(t.error||'')}</span> <span class="small muted">${esc(when(t.at))}</span>`;
-  const nPdok=D.locations.filter(needsPdok).length,orsPts=orsPointsFor(null),orsMiss=orsMissing(orsPts);
-  const env=[['APP_PASSWORD','Wachtwoord voor planners en alle functies','Ja'],['BC_TENANT_ID','Directory-ID (tenant) uit Entra','Voor BC'],['BC_CLIENT_ID','Toepassings-ID van de app-registratie','Voor BC'],['BC_CLIENT_SECRET','Waarde van het clientgeheim (als geheim markeren)','Voor BC'],['BC_ENVIRONMENT','Naam van de BC-omgeving, bijv. Production','Voor BC'],['BC_COMPANY_NAME','Naam van het bedrijf in BC','Voor BC'],['ORS_API_KEY','Sleutel van openrouteservice.org','Optioneel'],['ANTHROPIC_API_KEY','Claude API-sleutel voor AI-advies','Optioneel']];
-  return`<section class="panel sec"><div class="toolbar"><h2>Business Central</h2><span class="sp"></span>${SERVER?'<button class="btn sm primary" data-act="bctest">Koppeling testen</button>':''}</div>
-  <p style="margin:0 0 10px">${st}</p>
-  <p class="hint" style="margin:0 0 12px">Koppeling testen logt in bij Microsoft en toont de bedrijven in de BC-omgeving. Er verandert niets in BC. Versturen doe je bij Opdrachten &gt; <button class="linkbtn" data-act="navto" data-to="facturatie">Business Central interface</button>.</p>
-  <h3 style="margin:0 0 6px">Exporteren</h3>
-  <div class="row" style="align-items:center"><select class="mini" data-bcmonth aria-label="Maand">${ms.map(m=>`<option value="${m}"${m===BCST.month?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>
-  <span class="small muted">${BCST.loading?'laden\u2026':rows+' regel(s) die naar BC gaan'}</span><span class="sp"></span>
-  <button class="btn sm" data-act="bccsv">${I.copy} Kopieer als CSV</button><button class="btn sm" data-act="bcjson">${I.copy} Kopieer als JSON (API)</button></div>
-  <p class="hint" style="margin:6px 0 0">CSV plak je in Excel; JSON laat precies zien wat de koppeling naar de BC-API stuurt.</p></section>
-  <section class="panel sec"><h2>Overige koppelingen</h2>
-  <div class="tbl-wrap"><table><thead><tr><th>Koppeling</th><th>Waarvoor</th><th>Status</th><th></th></tr></thead><tbody>
-  <tr><td><b>OpenRouteService</b></td><td class="small">Echte rijtijden tussen locaties</td><td class="small">${useORS()?`<span class="chip ok">Aan</span> ${orsPts.length?`${orsPts.length*(orsPts.length-1)-orsMiss} van ${orsPts.length*(orsPts.length-1)} rijtijden`:''}`:'<span class="chip">Uit (schatting)</span>'}</td><td class="act">${SERVER&&useORS()&&orsMiss?`<button class="btn sm" data-act="orsfetch">Rijtijden ophalen</button>`:''}<button class="btn sm ghost" data-act="navto" data-to="instellingen:planning">Instellen</button></td></tr>
-  <tr><td><b>PDOK</b></td><td class="small">Postcodes en exacte posities van adressen</td><td class="small"><span class="chip ok">Geen sleutel nodig</span> ${nPdok?nPdok+' locatie(s) met geschatte positie':''}</td><td class="act">${nPdok?`<button class="btn sm" data-act="pdok"${SERVER?'':' disabled'}>Posities verbeteren</button>`:''}</td></tr>
-  <tr><td><b>AI-advies (Claude)</b></td><td class="small">Slim voorstel en vragen over de planning</td><td class="small">${SERVER?'Via ANTHROPIC_API_KEY in Netlify':'<span class="chip ok">Actief in Claude</span>'}</td><td></td></tr>
-  <tr><td><b>Medewerker-app</b></td><td class="small">Ritten publiceren, meldingen en berichten</td><td class="small">${SERVER?'<span class="chip ok">Netlify Blobs</span>':'<span class="chip">Alleen in de Netlify-versie</span>'}</td><td></td></tr>
-  </tbody></table></div></section>
-  <section class="panel sec"><h2>Omgevingsvariabelen in Netlify</h2><p class="hint" style="margin:0 0 8px">Sleutels en wachtwoorden staan alleen in Netlify (Site configuration &gt; Environment variables), nooit in de app. Na een wijziging: Deploys &gt; Trigger deploy.</p>
-  <div class="tbl-wrap"><table><thead><tr><th>Variabele</th><th>Inhoud</th><th>Nodig</th></tr></thead><tbody>${env.map(([k,v,n])=>`<tr><td class="mono small">${k}</td><td class="small">${v}</td><td class="small">${n}</td></tr>`).join('')}</tbody></table></div></section>`;
+  const bcChip=!SERVER?'<span class="chip">Alleen in de Netlify-versie</span>':!t?'<span class="chip">Nog niet getest</span>':t.ok?`<span class="chip ok">${I.check} Werkt</span>`:'<span class="chip bad">Fout</span>';
+  const bcInfo=!SERVER||!t?'':t.ok?`Getest ${esc(when(t.at))} \u00b7 omgeving <b>${esc(t.env||'')}</b>${t.company?' \u00b7 bedrijf <b>'+esc(t.company)+'</b>':''}`:`<span style="color:var(--bad)">${esc(t.error||'')}</span> <span class="muted">(${esc(when(t.at))})</span>`;
+  const nPdok=D.locations.filter(needsPdok).length,orsPts=orsPointsFor(null),orsMiss=orsMissing(orsPts),orsTot=orsPts.length*(orsPts.length-1);
+  const box=(k,title,sub,chip,body)=>`<details class="panel sec apibox" data-apibox="${k}"${API_OPEN()[k]?' open':''}><summary><span class="apit"><b>${title}</b><span class="small muted">${sub}</span></span><span class="sp"></span>${chip}</summary><div class="apibody">${body}</div></details>`;
+  return box('bc','Business Central','Reinigingen naar BC voor facturatie',bcChip,`
+    ${bcInfo?`<p style="margin:0 0 10px" class="small">${bcInfo}</p>`:''}
+    <div class="row" style="align-items:center;margin-bottom:6px">${SERVER?'<button class="btn sm primary" data-act="bctest">Koppeling testen</button>':''}<span class="small muted">Logt in bij Microsoft en toont de bedrijven in BC. Er verandert niets in BC.</span></div>
+    <h3 style="margin:14px 0 6px;font-size:15px">Exporteren</h3>
+    <div class="row" style="align-items:center"><select class="mini" data-bcmonth aria-label="Maand">${ms.map(m=>`<option value="${m}"${m===BCST.month?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>
+    <span class="small muted">${BCST.loading?'laden\u2026':rows+' regel(s) die naar BC gaan'}</span><span class="sp"></span>
+    <button class="btn sm" data-act="bccsv">${I.copy} Kopieer als CSV</button><button class="btn sm" data-act="bcjson">${I.copy} Kopieer als JSON (API)</button></div>
+    <p class="hint" style="margin:6px 0 0">CSV plak je in Excel; JSON laat precies zien wat de koppeling naar de BC-API stuurt. Versturen doe je bij Opdrachten &gt; <button class="linkbtn" data-act="navto" data-to="facturatie">Business Central interface</button>.</p>`)
+  +box('ors','OpenRouteService','Echte rijtijden tussen locaties',useORS()?'<span class="chip ok">Aan</span>':'<span class="chip">Uit (schatting)</span>',`
+    <p class="small" style="margin:0 0 10px">${useORS()?(orsTot?`${orsTot-orsMiss} van ${orsTot} rijtijden opgehaald${D.orsAt?' \u00b7 bijgewerkt '+esc(when(D.orsAt)):''}.`:'Nog geen locaties.'):'De planner rekent nu met een schatting (hemelsbreed \u00d7 wegfactor). Zet OpenRouteService aan bij Planning en reistijd voor echte rijtijden.'}</p>
+    <div class="row">${SERVER&&useORS()&&orsMiss?`<button class="btn sm primary" data-act="orsfetch">Ontbrekende rijtijden ophalen (${orsMiss})</button>`:''}<button class="btn sm" data-act="navto" data-to="instellingen:planning">Instellen bij Planning en reistijd</button></div>`)
+  +box('pdok','PDOK','Postcodes en exacte posities van adressen',nPdok?`<span class="chip warn">${nPdok} geschat</span>`:'<span class="chip ok">Alles exact</span>',`
+    <p class="small" style="margin:0 0 10px">Gratis, zonder sleutel. Nieuwe locaties en adressen zonder postcode bij een import worden automatisch opgezocht.${nPdok?` ${nPdok} locatie(s) hebben nog een geschatte positie.`:''}</p>
+    ${nPdok?`<div class="row"><button class="btn sm primary" data-act="pdok"${SERVER?'':' disabled title="Werkt in de Netlify-versie"'}>Posities verbeteren via PDOK (${nPdok})</button></div>`:''}`)
+  +box('ai','AI-advies (Claude)','Slim voorstel en vragen over de planning',SERVER?'<span class="chip">Via Netlify</span>':'<span class="chip ok">Actief in Claude</span>',`
+    <p class="small" style="margin:0">${SERVER?'Werkt via de Netlify-functie ai-advies met je eigen API-sleutel. Bij een fout vraagt de app om het app-wachtwoord.':'In Claude werkt het AI-advies direct, zonder sleutel.'}</p>`)
+  +box('app','Medewerker-app','Ritten publiceren, meldingen en berichten',SERVER?'<span class="chip ok">Actief</span>':'<span class="chip">Alleen in de Netlify-versie</span>',`
+    <p class="small" style="margin:0 0 10px">Ritten, gereedmeldingen en berichten worden bewaard in Netlify Blobs. Elke medewerker heeft een persoonlijke link.</p>
+    <div class="row"><button class="btn sm" data-act="navto" data-to="medewerkers">Links van medewerkers</button></div>`);
 }
 function editType(id){
   const t=id?TYP[id]:{name:'',dur:30,skill:''};const used=id?D.jobs.filter(j=>j.type===id).length:0;
@@ -2409,14 +2472,44 @@ function xRows(X){const fut=$('#xfuture')&&$('#xfuture').checked,t=todayIso();
   return(X.log||[]).map((e,i)=>{let st=e.status;
     if(st==='ok')st=fut&&e.date&&e.date<t?'past':have.has(String(e.plate).toUpperCase().replace(/[^A-Z0-9]/g,'')+'|'+e.date)?'dup':'imp';
     return{...e,i,st}})}
+/* Duur per regel, volgens dezelfde regels als bij het importeren */
+function xDurFn(){const slot=$('#xslot')&&$('#xslot').checked,typ=TYP[$('#xtype')&&$('#xtype').value]||D.types[0]||{dur:30,name:''};
+  const share={};xItems().forEach(it=>{if(it.from&&it.to){const k=locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to;share[k]=(share[k]||0)+1}});
+  return r=>{const len=r.from&&r.to?t2m(r.to)-t2m(r.from):0;
+    if(slot&&len>0&&!r.win){const n=share[locKey({cust:String(r.cust||''),pc:r.pc||'',addr:r.addr||'',city:r.city||''})+'|'+r.date+'|'+r.from+'|'+r.to]||1;return{m:Math.max(10,Math.floor(len/n)),src:n>1?`tijdslot gedeeld door ${n}`:'tijdslot'}}
+    return{m:typ.dur,src:r.win&&slot&&len>0?`venster, dus ${typ.name}`:typ.name}}}
 function xPvBody(X){const pv=X.pv||(X.pv={f:'imp',q:''}),rows=xRows(X),q=normQ(pv.q).trim(),words=q?q.split(/\s+/):[];
   const list=rows.filter(r=>(pv.f==='all'||(pv.f==='skip'?!['imp','dup'].includes(r.st):r.st===pv.f))&&(!words.length||words.every(w=>normQ([r.plate,r.veh,r.cust,r.addr,r.pc,r.city,r.note,r.reason,r.date].join(' ')).includes(w))))
     .sort((a,b)=>String(a.date||'9').localeCompare(String(b.date||'9'))||String(a.from||a.time||'').localeCompare(String(b.from||b.time||''))||String(a.cust).localeCompare(String(b.cust),'nl'));
-  const shown=list.slice(0,500);
+  const shown=list.slice(0,500),dur=xDurFn();
   const body=shown.map(r=>{const s=XST[r.st]||[r.st,''],skip=!['imp'].includes(r.st),tm=r.from?r.from+(r.to?'\u2013'+r.to:''):(r.time||'');
-    return`<tr${skip?' class="skip"':''}><td><span class="chip ${s[1]}">${esc(s[0])}</span></td><td class="small" style="white-space:nowrap">${r.date?esc(fdate(r.date,{weekday:'short',day:'numeric',month:'short'})):'<span class="muted">\u2014</span>'}</td><td class="mono small" style="white-space:nowrap">${esc(tm||'hele dag')}</td><td>${plateHtml(r.plate)}${r.veh?`<div class="small muted">${esc(r.veh)}</div>`:''}</td><td><b>${esc(r.cust)}</b></td><td class="small">${esc(r.addr||'')}${r.pc||r.city?`<div class="muted">${esc([r.pc,r.city].filter(Boolean).join(' '))}</div>`:''}</td><td class="small">${r.st==='imp'?esc(r.note||''):`<span class="muted">${esc(r.reason||r.note||'')}</span>`}</td></tr>`}).join('');
-  return{body:body||`<tr><td colspan="7" class="empty">Geen regels${q?' gevonden voor deze zoekterm':' in deze selectie'}</td></tr>`,more:list.length-shown.length,rows}}
+    return`<tr${skip?' class="skip"':''}><td><span class="chip ${s[1]}">${esc(s[0])}</span></td><td class="small" style="white-space:nowrap">${r.date?esc(fdate(r.date,{weekday:'short',day:'numeric',month:'short'})):'<span class="muted">\u2014</span>'}</td><td class="mono small" style="white-space:nowrap">${esc(tm||'hele dag')}</td><td class="small" style="white-space:nowrap">${['imp','dup'].includes(r.st)?(d=>`<b>${d.m} min</b><div class="muted">${esc(d.src)}</div>`)(dur(r)):'<span class="muted">\u2014</span>'}</td><td>${plateHtml(r.plate)}${r.veh?`<div class="small muted">${esc(r.veh)}</div>`:''}</td><td><b>${esc(r.cust)}</b></td><td class="small">${esc(r.addr||'')}${r.pc||r.city?`<div class="muted">${esc([r.pc,r.city].filter(Boolean).join(' '))}</div>`:''}</td><td class="small">${r.st==='imp'?esc(r.note||''):`<span class="muted">${esc(r.reason||r.note||'')}</span>`}</td></tr>`}).join('');
+  return{body:body||`<tr><td colspan="8" class="empty">Geen regels${q?' gevonden voor deze zoekterm':' in deze selectie'}</td></tr>`,more:list.length-shown.length,rows}}
+function xScrollTbl(){setTimeout(()=>{const t=$('.xpv');if(t)t.scrollIntoView({behavior:'smooth',block:'center'})},30)}
 function xPvRefresh(){const X=XIMP;if(!X)return;const r=xPvBody(X),b=$('#xpvBody');if(b)b.innerHTML=r.body;const m=$('#xpvMore');if(m)m.textContent=r.more>0?`En nog ${r.more} regels; zoek om ze te vinden.`:''}
+/* Details onder een aangeklikte tegel */
+function xDetHtml(X,ctx){const k=X.det;if(!k)return'';const{items,custs,knownLoc,lk,cnt,rows}=ctx;
+  const head=(t,sub)=>`<h5>${t}<span class="small muted" style="font-weight:400">${sub||''}</span><span class="sp" style="flex:1"></span><button type="button" class="btn sm ghost" data-act="xdet" data-k="${k}">Sluiten</button></h5>`;
+  const tbl=(th,tr)=>`<div class="tbl-wrap"><table><thead><tr>${th.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${tr||`<tr><td colspan="${th.length}" class="empty">Niets om te tonen</td></tr>`}</tbody></table></div>`;
+  const go=(q)=>`data-act="xpvq" data-q="${esc(q)}" title="Toon deze regels in de tabel"`;
+  const nd=d=>esc(fdate(d,{weekday:'short',day:'numeric',month:'short'}));
+  const grp=(keyf)=>{const m=new Map();items.forEach(i=>{const k=keyf(i);if(!m.has(k))m.set(k,[]);m.get(k).push(i)});return[...m.entries()]};
+  if(k==='veh'){const g=grp(i=>i.plate).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0]));
+    return head('Voertuigen',` \u00b7 klik op een regel om de afspraken te zien`)+tbl(['Kenteken','Voertuig','Klant','Afspraken','Datums'],g.map(([pl,its])=>{const ds=[...new Set(its.map(i=>i.date))].sort();return`<tr ${go(pl)}><td>${plateHtml(pl)}</td><td class="small">${esc(its[0].veh||'')}</td><td>${esc(its[0].cust)}</td><td>${its.length}</td><td class="small">${ds.slice(0,4).map(nd).join(', ')}${ds.length>4?' \u2026':''}</td></tr>`}).join(''))}
+  if(k==='cus'){const g=grp(i=>i.cust).sort((a,b)=>a[0].localeCompare(b[0],'nl'));
+    return head('Klanten',` \u00b7 ${X.billTo?'factuur naar '+esc(xBillName(X)||'\u2026'):'elk bedrijf is zelf de klant'}`)+tbl(['Klant','','Voertuigen','Locaties','Opdrachten'],g.map(([c,its])=>`<tr ${go(c)}><td><b>${esc(c)}</b></td><td>${custs.includes(c.toLowerCase())?'<span class="chip">bestaat al</span>':'<span class="chip acc">nieuw</span>'}</td><td>${new Set(its.map(i=>i.plate)).size}</td><td>${new Set(its.map(locKey)).size}</td><td>${its.length}</td></tr>`).join(''))}
+  if(k==='loc'){const g=grp(locKey).sort((a,b)=>a[1][0].cust.localeCompare(b[1][0].cust,'nl'));const GL={pdok:['exact (PDOK)','ok'],manual:['exact','ok'],pc6:['postcode','ok'],pc4:['postcode (4 cijfers)','acc'],plaats:['geschat op plaats','warn']};
+    return head('Locaties',` \u00b7 positie bepaalt de rijtijden`)+tbl(['Klant','Adres','Postcode en plaats','Positie','','Opdrachten'],g.map(([key,its])=>{const i=its[0],geo=i.lat?{geo:'pdok'}:(geocode(i.pc,i.city)||{}),gl=GL[geo.geo]||[geo.geo?geo.geo:'onbekend',geo.geo?'':'bad'];const isNew=!knownLoc.has(lk(i.cust,i.pc,i.addr,i.city));
+      return`<tr ${go(i.addr||i.city||i.cust)}><td>${esc(i.cust)}</td><td class="small">${esc(i.addr||'')}</td><td class="small">${esc([i.pc,i.city].filter(Boolean).join(' '))}</td><td><span class="chip ${gl[1]}">${esc(gl[0])}</span></td><td>${isNew?'<span class="chip acc">nieuw</span>':'<span class="chip">bestaat al</span>'}</td><td>${its.length}</td></tr>`}).join(''))}
+  if(k==='per'){const g=grp(i=>i.date).sort((a,b)=>a[0].localeCompare(b[0]));
+    return head('Per datum',` \u00b7 rood = op die dag werkt geen medewerker`)+tbl(['Datum','Opdrachten','Voertuigen','Tijden','Plaatsen','Medewerkers'],g.map(([d,its])=>{const ts=its.map(i=>i.from).filter(Boolean).sort(),te=its.map(i=>i.to).filter(Boolean).sort(),cs=[...new Set(its.map(i=>i.city===i.city.toUpperCase()?i.city.charAt(0)+i.city.slice(1).toLowerCase():i.city))],n=wday(d),nw=D.workers.filter(w=>(w.days||[]).includes(n)&&!(w.absent||[]).includes(d)).length;
+      return`<tr ${go(d)}><td style="white-space:nowrap"><b>${nd(d)}</b></td><td>${its.length}</td><td>${new Set(its.map(i=>i.plate)).size}</td><td class="mono small">${ts.length?ts[0]+'\u2013'+(te[te.length-1]||''):'hele dag'}</td><td class="small">${esc(cs.slice(0,5).join(', '))}${cs.length>5?' \u2026':''}</td><td>${nw?nw:'<span class="chip bad">geen</span>'}</td></tr>`}).join(''))}
+  if(k==='skip'){const R=[['past','In het verleden','Datum ligt v\u00f3\u00f3r vandaag; zet "Alleen datums vanaf vandaag" uit om ze toch te importeren.'],['nb','Niet beschikbaar','Volgens de lijst kon de auto niet.'],['cancel','Geannuleerd','In de kolom Geannuleerd staat iets ingevuld.'],['city','Plaats onbekend','Adres niet gevonden; voeg een postcode toe of maak de locatie handmatig aan.'],['dup','Bestaat al','Staat al in de planning (zelfde kenteken en datum).']].filter(r=>cnt[r[0]]);
+    const reasons={};rows.filter(r=>r.st==='nb'||r.st==='cancel').forEach(r=>{const t=(r.reason||r.note||'').trim();if(t)reasons[t]=(reasons[t]||0)+1});const top=Object.entries(reasons).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    return head('Niet ingepland',` \u00b7 klik om die regels te tonen`)+`<div class="xreason">${R.map(([st,l,why])=>`<button type="button" class="btn sm" data-act="xpvf" data-f="${st}" title="${esc(why)}">${esc(l)} <b>${cnt[st]}</b></button>`).join('')}</div>
+      <ul class="xwarn" style="margin-top:8px">${R.map(([st,l,why])=>`<li><b>${esc(l)}:</b> ${esc(why)}</li>`).join('')}</ul>${top.length?`<p class="small muted" style="margin:8px 0 0">Meest genoemd in de lijst: ${top.map(([t,n])=>`"${esc(t)}" ${n}\u00d7`).join(', ')}</p>`:''}`}
+  return'';
+}
 function renderXPrev(){
   const X=XIMP,out=$('#xprev'),clear=$('#xclear').checked,items=xItems();
   const custs=D.customers.filter(c=>!(clear&&/^c\d+$/.test(c.id))).map(c=>clean(c.name).toLowerCase());
@@ -2447,24 +2540,27 @@ function renderXPrev(){
   // blokken (lijst met meerdere klanten)
   const blkH=X.multi&&X.blocks?`<details class="ximp-sec"${X.blocks.length<=6?' open':''}><summary style="cursor:pointer"><b>Klanten in de lijst (${X.blocks.length})</b> <span class="small muted">namen zijn aan te passen</span></summary><div class="tbl-wrap" style="max-height:220px;overflow:auto;margin-top:8px"><table><thead><tr><th>Klant</th><th>Voertuigen</th><th>Afspraken</th><th>Vanaf vandaag</th></tr></thead><tbody>${X.blocks.map(b=>`<tr><td><input class="mini" data-xname="${b.i}" value="${esc(b.cust)}" aria-label="Klantnaam blok rij ${b.row}" style="width:100%;min-width:180px"><div class="small muted">rij ${b.row}${b.meta.info.length?' \u00b7 '+esc(b.meta.info.filter(x=>!/^datum/i.test(x)).slice(0,2).join(' \u00b7 ')):''}</div></td><td>${b.plates}</td><td>${b.ok}</td><td><b>${b.future}</b></td></tr>`).join('')}</tbody></table></div></details>`:'';
   const custH=(X.noCust?`<label class="fld" style="max-width:360px"><span>Klant (geen kolom Klant in de lijst${X.meta&&X.meta.cust?', gevonden in de titel':''})</span><input id="xcust" value="${esc(X.custEdit!=null?X.custEdit:X.cust)}" placeholder="Naam van de klant"></label>`:'')+xBillToHtml(X);
+  const tile=(k,cls,inner,more)=>`<button type="button" class="${cls}" data-act="xdet" data-k="${k}" aria-pressed="${X.det===k}">${inner}<span class="xmore">${X.det===k?'Verberg details':(more||'Details')} \u203a</span></button>`;
   const f=X.pv.f,segB=(k,l,n)=>`<button type="button" data-act="xpvf" data-f="${k}" aria-pressed="${f===k}">${l} <b>${n}</b></button>`;
   const per=dates.length?(dates.length===1?esc(fdate(dates[0],{day:'numeric',month:'short'})):`${esc(fdate(dates[0],{day:'numeric',month:'short'}))} \u2013 ${esc(fdate(dates[dates.length-1],{day:'numeric',month:'short'}))}`):'\u2014';
   out.innerHTML=`<div class="ximp-sec"><h4>${esc(X.file)} <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">\u00b7 blad "${esc(X.sheet)}"</span></h4>
   <div class="xkpis">
-    <div class="xkpi main"><b>${nImp}</b><span>opdrachten worden ingepland</span></div>
-    <div class="xkpi"><b>${plates.size}</b><span>voertuigen</span></div>
-    <div class="xkpi"><b>${cu.size}</b><span>klanten${newC?` \u00b7 ${newC} nieuw`:''}</span></div>
-    <div class="xkpi"><b>${locs.size}</b><span>locaties${newL?` \u00b7 ${newL} nieuw`:''}</span></div>
-    <div class="xkpi"><b style="font-size:16px;line-height:1.7">${per}</b><span>${dates.length} datum(s)</span></div>
-    <div class="xkpi${nSkip?' warn':''}"><b>${nSkip}</b><span>niet ingepland${nSkip?` (${[cnt.past?cnt.past+' in het verleden':'',cnt.nb?cnt.nb+' niet beschikbaar':'',cnt.cancel?cnt.cancel+' geannuleerd':'',cnt.city?cnt.city+' plaats onbekend':''].filter(Boolean).join(', ')})`:''}</span></div>
+    ${tile('imp','xkpi main',`<b>${nImp}</b><span>opdrachten worden ingepland</span>`,'Toon in de tabel')}
+    ${tile('veh','xkpi',`<b>${plates.size}</b><span>voertuigen</span>`)}
+    ${tile('cus','xkpi',`<b>${cu.size}</b><span>klanten${newC?` \u00b7 ${newC} nieuw`:''}</span>`)}
+    ${tile('loc','xkpi',`<b>${locs.size}</b><span>locaties${newL?` \u00b7 ${newL} nieuw`:''}</span>`)}
+    ${tile('per','xkpi',`<b style="font-size:16px;line-height:1.7">${per}</b><span>${dates.length} datum(s)</span>`,'Per datum')}
+    ${tile('skip','xkpi'+(nSkip?' warn':''),`<b>${nSkip}</b><span>niet ingepland${nSkip?` (${[cnt.past?cnt.past+' in het verleden':'',cnt.nb?cnt.nb+' niet beschikbaar':'',cnt.cancel?cnt.cancel+' geannuleerd':'',cnt.city?cnt.city+' plaats onbekend':''].filter(Boolean).join(', ')})`:''}</span>`,'Waarom?')}
   </div>
+  <div id="xdet">${(h=>h?`<div class="xdet">${h}</div>`:'')(xDetHtml(X,{items,custs,knownLoc,lk,cnt,rows:pv.rows}))}</div>
   ${W.length?`<div style="margin-top:10px"><ul class="xwarn">${W.map(([c,t])=>`<li class="${c}">${t}</li>`).join('')}</ul></div>`:''}</div>
   <div class="ximp-sec"><h4>Klant en facturatie</h4>${custH}</div>${blkH}
   <div class="ximp-sec"><h4>Regels uit de lijst</h4>
   <div class="xpv-bar"><div class="seg">${segB('imp','Wordt ingepland',nImp)}${segB('skip','Niet ingepland',nSkip)}${nDup?segB('dup','Bestaat al',nDup):''}${segB('all','Alles',pv.rows.length)}</div>
   <input class="mini" id="xpvq" type="search" placeholder="Zoek kenteken, klant, plaats\u2026" value="${esc(X.pv.q||'')}" style="flex:1 1 200px;max-width:320px" autocomplete="off"></div>
-  <div class="xpv"><table><thead><tr><th>Status</th><th>Datum</th><th>Tijd</th><th>Kenteken</th><th>Klant</th><th>Adres</th><th>Opmerking / reden</th></tr></thead><tbody id="xpvBody">${pv.body}</tbody></table></div>
+  <div class="xpv"><table><thead><tr><th>Status</th><th>Datum</th><th>Tijd</th><th>Duur</th><th>Kenteken</th><th>Klant</th><th>Adres</th><th>Opmerking / reden</th></tr></thead><tbody id="xpvBody">${pv.body}</tbody></table></div>
   <p class="hint" id="xpvMore" style="margin:6px 0 0">${pv.more>0?`En nog ${pv.more} regels; zoek om ze te vinden.`:''}</p>
+  <p class="hint" style="margin:4px 0 0">Duur: met "Duur = lengte van het tijdvak" aan telt het tijdslot uit de lijst (gedeeld als meer auto's op hetzelfde adres hetzelfde slot hebben); een venster als "tussen 08.00 en 12.00", alleen een begintijd of geen tijd gebruikt de standaardduur van het gekozen type.</p>
   <p class="hint" style="margin:4px 0 0">Opnieuw importeren is veilig: wat al bestaat (zelfde kenteken, datum en locatie) wordt overgeslagen. Na het importeren staat alles ook in het Importlog.</p></div>`;
   const go=$('#xgo');go.disabled=!nImp;go.textContent=nImp?`${nImp} opdracht${nImp===1?'':'en'} importeren`:'Importeren';
 }
@@ -2783,7 +2879,7 @@ function viewBC(){
   const sel=(k,opts)=>`<select class="mini" data-bcf="${k}">${opts.map(([v,l])=>`<option value="${esc(v)}"${f[k]===v?' selected':''}>${esc(l)}</option>`).join('')}</select>`;
   return`<section class="panel sec"><div class="toolbar"><h2>Business Central interface</h2>
     <select class="mini" data-bcmonth aria-label="Maand">${ms.map(m=>`<option value="${m}"${m===BCST.month?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>
-    <span class="sp"></span><button class="btn sm ghost" data-act="navto" data-to="instellingen:api" title="Koppeling testen en exporteren als CSV of JSON">API koppelingen</button><button class="btn sm" data-act="bcref">Ververs</button>${SERVER&&!BCST.demo?`<button class="btn sm primary" data-act="bcsend"${BCST.loading||BCST.sending?' disabled':''}>${BCST.sending?'Versturen\u2026':'Verstuur naar BC'}</button>`:''}</div>
+    <span class="sp"></span><button class="btn sm" data-act="bcref">Ververs</button>${SERVER&&!BCST.demo?`<button class="btn sm primary" data-act="bcsend"${BCST.loading||BCST.sending?' disabled':''}>${BCST.sending?'Versturen\u2026':'Verstuur naar BC'}</button>`:''}</div>
     ${bcSyncLine()}
     <p class="hint" style="margin:0">${SERVER?'Met <b>Verstuur naar BC</b> gaan de regels van deze maand naar Business Central. Opnieuw versturen is veilig: alleen nieuwe en gewijzigde regels gaan mee, en wat je hier op "Naar BC: nee" zet, krijgt in BC de status Vervallen.':'De koppeling met Business Central werkt in de Netlify-versie.'} Dit overzicht laat zien wat er per maand naar BC gaat: gereedmeldingen als factureerbare regel, en meldingen "niet gelukt" volgens de instelling per klant. Met de knop <b>Naar BC</b> wijk je per melding af van die instelling.</p>
     ${BCST.demo?'<p class="small" style="margin:0;color:var(--warn)">Voorbeeldgegevens: hier zijn geen echte meldingen beschikbaar. In de Netlify-versie zie je de meldingen van je medewerkers.</p>':''}
@@ -2945,7 +3041,9 @@ function onClick(e){
     case'ximport':openXlsxImport();break;
     case'logcsv':logCsv();break;
     case'cfreset':{S.cf={q:'',bill:'',bc:'',sort:CF().sort};render();break}
-    case'xpvf':{if(XIMP){XIMP.pv.f=el.dataset.f;renderXPrev()}break}
+    case'xpvf':{if(XIMP){XIMP.pv.f=el.dataset.f;renderXPrev();if(el.closest('#xdet'))xScrollTbl()}break}
+    case'xdet':{if(XIMP){const k=el.dataset.k;if(k==='imp'){XIMP.det=XIMP.det==='imp'?null:'imp';XIMP.pv.f='imp';XIMP.pv.q='';renderXPrev();xScrollTbl()}else{XIMP.det=XIMP.det===k?null:k;if(k==='skip'&&XIMP.det)XIMP.pv.f='skip';renderXPrev()}}break}
+    case'xpvq':{if(XIMP){XIMP.pv.q=el.dataset.q;XIMP.pv.f='all';renderXPrev();xScrollTbl()}break}
     case'xlog':{const box=$('#xlogBox');if(box.innerHTML){box.innerHTML='';el.textContent=`Bekijk alle regels per voertuig (${XIMP.log.length})`}else{LOGSRC={entries:XIMP.log,preview:true};LOGF={st:'alle',q:'',m:''};box.innerHTML=logShell();logRefresh();el.textContent='Verberg regels'}break}
     case'publish':openPublish();break;
     case'wlink':copyWorkerLink(el.dataset.id);break;
@@ -3008,7 +3106,7 @@ function onClick(e){
 function onChange(e){
   const el=e.target;
   if(el.id==='xf'&&el.files&&el.files[0])return readXlsx(el.files[0]);
-  if((el.id==='xclear'||el.id==='xfuture')&&XIMP)return renderXPrev();
+  if((el.id==='xclear'||el.id==='xfuture'||el.id==='xslot'||el.id==='xtype')&&XIMP)return renderXPrev();
   if(el.dataset.xname!=null&&XIMP){XIMP.names=Object.assign({},XIMP.names,{[el.dataset.xname]:el.value});return xReparse()}
   if(el.id==='xcust'&&XIMP){XIMP.custEdit=el.value;return xReparse()}
   if(el.id==='xbill'&&XIMP){XIMP.billTo=el.value;renderXPrev();if(el.value==='__new')setTimeout(()=>{const i=$('#xbillnew');if(i)i.focus()},0);return}
@@ -3065,6 +3163,7 @@ function init(){
   document.addEventListener('click',onClick);
   if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);if(SERVER)setInterval(()=>{if(!document.hidden&&(MV||(S.tab==='planning'&&Date.now()-MSG.at>30000)))fetchMsgs(true)},15000);document.addEventListener('change',onChange);document.addEventListener('contextmenu',onContext);addEventListener('scroll',closeCtx,{passive:true});addEventListener('resize',closeCtx);
   document.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.combo){const k=e.target.dataset.combo;$('#f_'+k).value='';comboShow(k,e.target.value);return}if(e.target.id==='jobQ'){S.jobQ=e.target.value;$('#jobsTbl').innerHTML=jobsTable()}if(e.target.id==='logQ'){LOGF.q=e.target.value;logRefresh()}if(e.target.id==='cusQ'){CF().q=e.target.value;cusRefresh()}if(e.target.id==='xpvq'&&XIMP){XIMP.pv.q=e.target.value;xPvRefresh()}});
+  document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.dataset&&d.dataset.apibox)API_OPEN()[d.dataset.apibox]=d.open},true);
   document.addEventListener('dragstart',onDragStart);document.addEventListener('dragover',onDragOver);document.addEventListener('drop',onDrop);document.addEventListener('dragend',onDragEnd);
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#ctx')){closeCtx();return}if(e.key==='Escape'){if(document.querySelector('.navg.open')){const b=document.querySelector('.navg.open > .tab');closeMenus();if(b)b.focus();return}if(!$('#modal').hidden)closeForm()}});
   $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeForm()});

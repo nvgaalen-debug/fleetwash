@@ -351,6 +351,19 @@ tr.muted-row td{opacity:.6}
 .search input{border:0;background:none;padding:8px 0;width:100%;min-width:0;outline:none;color:var(--ink)}
 .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 /* Formulier */
+#pviewSeg button{padding:6px 10px}
+.wk-wrap{overflow-x:auto}.wk{table-layout:fixed;min-width:980px}.wk th,.wk td{vertical-align:top}
+.wk thead th{text-align:left;white-space:normal;text-transform:none;letter-spacing:0;font-size:13px;vertical-align:top}.wk thead th:first-child,.wk td.wk-who{width:150px}.wk td.wk-who{white-space:nowrap}
+.wk-hit>*{max-width:100%;overflow:hidden;text-overflow:ellipsis}.wk-hit .small{white-space:normal}
+.wk th.is-today{box-shadow:inset 0 3px 0 var(--accent)}.wk th.is-sel,.mo td.is-sel{background:var(--accent-soft)}
+.wk-cell{padding:4px!important}.wk-cell.wk-off{background:repeating-linear-gradient(135deg,var(--sunk) 0 6px,transparent 6px 12px)}
+.wk-hit,.mo-hit{all:unset;box-sizing:border-box;display:flex;flex-direction:column;gap:3px;width:100%;min-height:58px;padding:6px 8px;border-radius:8px;cursor:pointer}
+.wk-cell.has .wk-hit{border-left:4px solid var(--c);background:var(--surface)}
+.wk-hit:hover,.mo-hit:hover{background:var(--accent-soft)}.wk-hit:focus-visible,.mo-hit:focus-visible{outline:2px solid var(--accent)}
+.wk-bar{display:block;height:5px;border-radius:3px;background:var(--sunk);overflow:hidden}.wk-bar i{display:block;height:100%;background:var(--accent)}
+.mo{table-layout:fixed;min-width:760px}.mo th{text-align:left;text-transform:none;letter-spacing:0}.mo thead th:first-child{width:56px}.mo td.wkend .mo-hit{background:var(--bg)}.mo th.mo-wk{width:56px}.mo td{padding:3px!important;vertical-align:top;height:96px}
+.mo td.other .mo-hit{opacity:.45}.mo td.is-today .mo-d{background:var(--accent);color:#fff;border-radius:999px;padding:0 7px}
+.mo-d{font-weight:700;align-self:flex-start}.mo-n{font-size:13px}
 #modal{position:fixed;inset:0;z-index:50;background:rgba(5,15,20,.45);display:grid;place-items:center;padding:16px}
 #pwModal{position:fixed;inset:0;z-index:80;background:rgba(5,15,20,.5);display:grid;place-items:center;padding:16px}#pwModal[hidden]{display:none}
 .dlg{background:var(--surface);border-radius:12px;border:1px solid var(--line);width:min(640px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:18px 18px 14px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
@@ -418,9 +431,11 @@ button.xkpi .xmore{display:block;margin-top:4px;font-size:11.5px;color:var(--acc
   <div class="brand"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="var(--accent)"/><path d="M9.5 15.5c1.2 1.8 4.6 2.2 6.4-.4" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round"/></svg>Wasroute <small>dispatch &amp; routeplanning</small></div>
   <nav class="tabs" id="tabs" aria-label="Hoofdmenu"></nav>
   <div class="datebar" id="datebar">
-    <button class="iconbtn" data-act="day" data-d="-1" aria-label="Vorige dag"><svg class="ic" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div class="seg" id="pviewSeg" role="group" aria-label="Weergave"><button type="button" data-act="pview" data-v="dag">Dag</button><button type="button" data-act="pview" data-v="week">Week</button><button type="button" data-act="pview" data-v="maand">Maand</button></div>
+    <button class="btn sm" data-act="today" title="Naar vandaag (T)">Vandaag</button>
+    <button class="iconbtn" data-act="day" data-d="-1" aria-label="Vorige periode" title="Vorige (pijl links)"><svg class="ic" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <input type="date" id="dateIn" aria-label="Planningsdatum">
-    <button class="iconbtn" data-act="day" data-d="1" aria-label="Volgende dag"><svg class="ic" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="iconbtn" data-act="day" data-d="1" aria-label="Volgende periode" title="Volgende (pijl rechts)"><svg class="ic" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <span class="dlabel" id="dayName"></span>
   </div>
 </div><nav class="subnav" id="subnav" aria-label="Submenu" hidden></nav>
@@ -518,10 +533,10 @@ function sample(){
     {id:'a_s5',wid:'w4',type:'vrij',from:'2026-11-19',to:'2026-11-19',part:'',time:'',note:'',at:0}];
   return d;
 }
-function load(){try{const raw=typeof localStorage!=='undefined'&&localStorage.getItem(KEY);if(raw){const x=JSON.parse(raw);if(x&&x.version)D=x}}catch(e){}if(!D)D=sample();if(D.ui&&D.ui.date)S.date=D.ui.date;index();D.workers.forEach(w=>{if(!w.token)w.token=randTok()});
+function load(){try{const raw=typeof localStorage!=='undefined'&&localStorage.getItem(KEY);if(raw){const x=JSON.parse(raw);if(x&&x.version)D=x}}catch(e){}if(!D)D=sample();if(D.ui&&D.ui.date)S.date=D.ui.date;if(D.ui&&D.ui.pview)S.pview=D.ui.pview;index();D.workers.forEach(w=>{if(!w.token)w.token=randTok()});
   if(D.settings.maxPreTravel===undefined)D.settings.maxPreTravel=60;if(!D.settings.travelSource)D.settings.travelSource='schatting';
   if(D.settings.startAtFirst===undefined){D.settings.startAtFirst=true;D.settings.endAtLast=false;for(const d of Object.keys(D.plans))if(!D.plans[d].edited&&jobsOn(d).length)autoPlan(d);save()}}
-function save(){D.ui={date:S.date};LEGS.clear();index();try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}}
+function save(){D.ui={date:S.date,pview:S.pview||'dag'};LEGS.clear();index();try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}}
 
 /* ---------- regels ---------- */
 const jobsOn=date=>D.jobs.filter(j=>j.date===date);
@@ -1606,9 +1621,10 @@ function render(){
 function renderInner(){
   let nIss=0;try{nIss=SERVER?openIssues(S.date)+msgUnread():0}catch(e){console.error(e)}
   renderNav(nIss);$('#datebar').hidden=!['planning','opdrachten'].includes(S.tab);
-  $('#dateIn').value=S.date;$('#dayName').textContent=fdate(S.date,{weekday:'long'});
+  $('#dateIn').value=S.date;{const pv=S.tab==='planning'?pview():'dag';$('#dayName').textContent=pv==='week'?weekLabel(S.date):pv==='maand'?fdate(S.date,{month:'long',year:'numeric'}):fdate(S.date,{weekday:'long'});
+    const sg=$('#pviewSeg');if(sg){sg.hidden=S.tab!=='planning';sg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.v===pv)))}}
   const v=$('#view');
-  if(S.tab==='planning')v.innerHTML=viewPlanning();
+  if(S.tab==='planning')v.innerHTML=pview()==='week'?viewWeek():pview()==='maand'?viewMonth():viewPlanning();
   else if(S.tab==='opdrachten')v.innerHTML=viewJobs();
   else if(S.tab==='klanten')v.innerHTML=viewCustomers();
   else if(S.tab==='medewerkers')v.innerHTML=viewWorkers();
@@ -1617,15 +1633,60 @@ function renderInner(){
   else if(S.tab==='importlog'){v.innerHTML=viewImportLog();if(LOGSRC)logRefresh()}
   else v.innerHTML=viewSettings();
 }
-function dayState(){
-  const date=S.date,jobs=jobsOn(date);
-  if(!hasPlan(date)&&jobs.length){autoPlan(date);save()}
+function dayState(date=S.date,noAuto){
+  const jobs=jobsOn(date);
+  if(!noAuto&&!hasPlan(date)&&jobs.length){autoPlan(date);save()}
   const P=cleanPlan(date);
   const rows=D.workers.filter(w=>avail(w,date)||(P.routes[w.id]||[]).length);
   const sims={};rows.forEach(w=>sims[w.id]=simulate(w,P.routes[w.id]||[],date));
   const planned=new Set(rows.flatMap(w=>P.routes[w.id]||[]));
   const un=jobs.filter(j=>!planned.has(j.id));
   return{date,jobs,P,rows,sims,un,off:D.workers.filter(w=>!avail(w,date))};
+}
+/* ---------- Planning per week en per maand ---------- */
+const pview=()=>S.pview||'dag';
+const weekStart=d=>addDays(d,-((wday(d)+6)%7));
+function isoWeek(d){const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+3-((x.getDay()+6)%7));const w1=new Date(x.getFullYear(),0,4);return 1+Math.round(((x-w1)/864e5-3+((w1.getDay()+6)%7))/7)}
+function weekLabel(d){const a=weekStart(d),b=addDays(a,6);return`week ${isoWeek(d)} · ${fdate(a,{day:'numeric',month:a.slice(5,7)===b.slice(5,7)?undefined:'short'})}–${fdate(b,{day:'numeric',month:'short'})}`}
+function addMonths(d,n){const[y,m,dd]=d.split('-').map(Number);const t=new Date(y,m-1+n,1,12);const last=new Date(t.getFullYear(),t.getMonth()+1,0).getDate();t.setDate(Math.min(dd,last));return`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`}
+function stepPeriod(n){const v=S.tab==='planning'?pview():'dag';S.date=v==='week'?addDays(S.date,7*n):v==='maand'?addMonths(S.date,n):addDays(S.date,n);S.selLoc=null;save();render()}
+function viewWeek(){
+  const a=weekStart(S.date),days=[...Array(7)].map((_,i)=>addDays(a,i)),today=todayIso();
+  const st=days.map(d=>dayState(d));
+  const ws=D.workers.slice();
+  let tot=0,pl=0,unT=0;st.forEach(x=>{tot+=x.jobs.length;unT+=x.un.length;pl+=x.jobs.length-x.un.length});
+  const head=days.map((d,i)=>{const x=st[i];return`<th class="wk-day${d===today?' is-today':''}${d===S.date?' is-sel':''}"><button class="linkbtn" data-act="gotoday" data-date="${d}">${esc(fdate(d,{weekday:'short',day:'numeric',month:'short'}))}</button>
+    <div class="small">${x.jobs.length?`<b>${x.jobs.length-x.un.length}/${x.jobs.length}</b> gepland${x.un.length?` <span class="chip bad">${x.un.length} open</span>`:''}`:'<span class="muted">geen opdrachten</span>'}</div></th>`}).join('');
+  const body=ws.map(w=>`<tr><td class="wk-who"><b><i class="dot" style="background:${wc(w)}"></i> ${esc(w.name)}</b><div class="small muted">${esc(w.start||'')}–${esc(w.end||'')}</div></td>${days.map((d,i)=>{const x=st[i],why=availWhy(w,d),ids=x.P.routes[w.id]||[];
+      if(why&&!ids.length)return`<td class="wk-cell wk-off" title="${esc(why)}"><span class="small muted">${esc(why.length>22?why.slice(0,20)+'…':why)}</span></td>`;
+      if(!ids.length)return`<td class="wk-cell"><button class="wk-hit" data-act="gotoday" data-date="${d}" data-wid="${w.id}" aria-label="${esc(w.name)} op ${esc(fdate(d))}"><span class="small muted">—</span></button></td>`;
+      const s=x.sims[w.id]||simulate(w,ids,d),stops=s.stops.map(p=>(CUS[p.loc.customerId]||{}).name||'');const u=Math.min(100,Math.round(s.serv/Math.max(1,s.end-s.start)*100));
+      return`<td class="wk-cell has" style="--c:${wc(w)}"><button class="wk-hit" data-act="gotoday" data-date="${d}" data-wid="${w.id}" title="${esc(stops.join(', '))}">
+        <b>${s.n} voert.</b> <span class="small muted">${m2t(s.depart)}–${m2t(s.finish)}</span>
+        <span class="wk-bar"><i style="width:${u}%"></i></span>
+        <span class="small">${esc([...new Set(stops)].slice(0,3).join(', '))}${new Set(stops).size>3?' …':''}</span>
+        <span class="small muted">${fkm(s.km)} · ${fdur(s.trav)} rijden</span>${s.lateJobs.length||s.over>.5?'<span class="chip bad">let op</span>':''}</button></td>`}).join('')}</tr>`).join('');
+  return`<section class="panel kpis"><div class="kpi ${unT?'':'okk'}"><b>${pl} / ${tot}</b><span>voertuigen gepland deze week</span></div><div class="kpi ${unT?'bad':'okk'}"><b>${unT}</b><span>niet ingepland</span></div><div class="kpi"><b>${days.filter((d,i)=>st[i].jobs.length).length}</b><span>dagen met opdrachten</span></div>
+    <div class="acts"><span class="small muted">Klik op een dag of medewerker om de dagplanning te openen · pijltjestoetsen = vorige/volgende week</span></div></section>
+    <section class="panel sec"><h2>${esc(weekLabel(S.date))}</h2><div class="tbl-wrap wk-wrap"><table class="wk"><thead><tr><th></th>${head}</tr></thead><tbody>${body||'<tr><td colspan="8" class="empty">Nog geen medewerkers</td></tr>'}</tbody></table></div></section>`;
+}
+function viewMonth(){
+  const [y,m]=S.date.split('-').map(Number),first=`${y}-${String(m).padStart(2,'0')}-01`,start=weekStart(first),today=todayIso();
+  const weeks=[];let d=start;do{weeks.push([...Array(7)].map((_,i)=>addDays(d,i)));d=addDays(d,7)}while(d.slice(0,7)<=first.slice(0,7)&&weeks.length<6);
+  let tot=0,pl=0,openDays=0;
+  const cell=dd=>{const inM=dd.slice(0,7)===first.slice(0,7),jobs=jobsOn(dd),planned=hasPlan(dd);let p=0;
+    if(planned){const P=D.plans[dd];const ids=new Set(Object.values(P.routes||{}).flat());p=jobs.filter(j=>ids.has(j.id)).length}
+    const free=D.workers.filter(w=>avail(w,dd)).length,abs=D.workers.filter(w=>(w.absent||[]).includes(dd)).length,un=planned?jobs.length-p:0;
+    if(inM){tot+=jobs.length;pl+=p;if(jobs.length&&(un||!planned))openDays++}
+    const pct=jobs.length?Math.round(p/jobs.length*100):0;
+    return`<td class="mo-cell${inM?'':' other'}${wday(dd)%6===0?' wkend':''}${dd===today?' is-today':''}${dd===S.date?' is-sel':''}"><button class="mo-hit" data-act="gotoday" data-date="${dd}" aria-label="${esc(fdate(dd))}">
+      <span class="mo-d">${Number(dd.slice(8))}</span>
+      ${jobs.length?`<span class="mo-n"><b>${jobs.length}</b> opdr.</span><span class="wk-bar"><i style="width:${pct}%"></i></span><span class="small">${planned?(un?`<span style="color:var(--bad)">${un} open</span>`:'alles gepland'):'<span class="muted">nog niet gepland</span>'}</span>`:''}
+      <span class="small muted">${free} medew.${abs?` · ${abs} afwezig`:''}</span>${jobs.length&&!free?'<span class="chip bad">geen medewerker</span>':''}</button></td>`};
+  const rows=weeks.map(w=>`<tr><th class="mo-wk"><button class="linkbtn" data-act="gotoweek" data-date="${w[0]}" title="Open deze week">wk ${isoWeek(w[0])}</button></th>${w.map(cell).join('')}</tr>`).join('');
+  return`<section class="panel kpis"><div class="kpi"><b>${tot}</b><span>opdrachten in ${esc(fdate(first,{month:'long'}))}</span></div><div class="kpi ${pl<tot?'':'okk'}"><b>${pl} / ${tot}</b><span>ingepland</span></div><div class="kpi ${openDays?'bad':'okk'}"><b>${openDays}</b><span>dagen met open opdrachten</span></div>
+    <div class="acts"><span class="small muted">Klik op een dag voor de dagplanning, op een weeknummer voor de week</span></div></section>
+    <section class="panel sec"><h2>${esc(fdate(first,{month:'long',year:'numeric'}))}</h2><div class="tbl-wrap"><table class="mo"><thead><tr><th></th>${['ma','di','wo','do','vr','za','zo'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div></section>`;
 }
 function viewPlanning(){
   const st=dayState(),{jobs,P,rows,sims,un,off}=st;
@@ -3002,7 +3063,11 @@ function onClick(e){
     case'menudelg':{const m=menuCfg(),k=el.dataset.k;if(m.groups[k]&&!m.groups[k].items.length){delete m.groups[k];m.top=m.top.filter(x=>x!=='g:'+k);save();render()}break}
     case'menureset':D.menu=menuDefault();save();render();toast('Standaardindeling hersteld.');break;
     case'navg':{const g=el.closest('.navg'),open=!g.classList.contains('open');closeMenus();if(open){g.classList.add('open');el.setAttribute('aria-expanded','true');const f=g.querySelector('[role=menuitem]');if(f&&e.detail===0)f.focus()}break}
-    case'day':S.date=addDays(S.date,+el.dataset.d);S.selLoc=null;save();render();break;
+    case'day':stepPeriod(+el.dataset.d);break;
+    case'today':S.date=todayIso();S.selLoc=null;save();render();break;
+    case'pview':S.pview=el.dataset.v;D.ui=D.ui||{};save();render();window.scrollTo(0,0);break;
+    case'gotoday':S.date=el.dataset.date;S.pview='dag';if(el.dataset.wid)S.wid=el.dataset.wid;S.selLoc=null;save();render();window.scrollTo(0,0);break;
+    case'gotoweek':S.date=el.dataset.date;S.pview='week';save();render();break;
     case'auto':autoPlan(S.date);save();render();toast('Planning automatisch opnieuw gemaakt. Vastgezette bezoeken zijn gerespecteerd.');break;
     case'unpinall':{const P=getPlan(S.date);P.pinned={};P.edited=Date.now();save();render();toast('Alle vastzettingen opgeheven. Klik Automatisch plannen om vrij te optimaliseren.');break}
     case'selw':S.wid=el.dataset.wid;S.selLoc=null;render();break;
@@ -3165,6 +3230,10 @@ function init(){
   document.addEventListener('input',e=>{if(e.target.dataset&&e.target.dataset.combo){const k=e.target.dataset.combo;$('#f_'+k).value='';comboShow(k,e.target.value);return}if(e.target.id==='jobQ'){S.jobQ=e.target.value;$('#jobsTbl').innerHTML=jobsTable()}if(e.target.id==='logQ'){LOGF.q=e.target.value;logRefresh()}if(e.target.id==='cusQ'){CF().q=e.target.value;cusRefresh()}if(e.target.id==='xpvq'&&XIMP){XIMP.pv.q=e.target.value;xPvRefresh()}});
   document.addEventListener('toggle',e=>{const d=e.target;if(d&&d.dataset&&d.dataset.apibox)API_OPEN()[d.dataset.apibox]=d.open},true);
   document.addEventListener('dragstart',onDragStart);document.addEventListener('dragover',onDragOver);document.addEventListener('drop',onDrop);document.addEventListener('dragend',onDragEnd);
+  document.addEventListener('keydown',e=>{const t=e.target;if(S.tab==='planning'&&!e.altKey&&!e.ctrlKey&&!e.metaKey&&$('#modal').hidden&&!(t&&(/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)||t.isContentEditable))){
+    if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();stepPeriod(e.key==='ArrowLeft'?-1:1);return}
+    if(e.key==='t'||e.key==='T'){S.date=todayIso();save();render();return}
+    if(e.key==='d'||e.key==='w'||e.key==='m'){S.pview={d:'dag',w:'week',m:'maand'}[e.key];save();render();return}}});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#ctx')){closeCtx();return}if(e.key==='Escape'){if(document.querySelector('.navg.open')){const b=document.querySelector('.navg.open > .tab');closeMenus();if(b)b.focus();return}if(!$('#modal').hidden)closeForm()}});
   $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeForm()});
   render();

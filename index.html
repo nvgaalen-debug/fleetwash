@@ -533,10 +533,10 @@ function sample(){
     {id:'a_s5',wid:'w4',type:'vrij',from:'2026-11-19',to:'2026-11-19',part:'',time:'',note:'',at:0}];
   return d;
 }
-function load(){try{const raw=typeof localStorage!=='undefined'&&localStorage.getItem(KEY);if(raw){const x=JSON.parse(raw);if(x&&x.version)D=x}}catch(e){}if(!D)D=sample();if(D.ui&&D.ui.date)S.date=D.ui.date;if(D.ui&&D.ui.pview)S.pview=D.ui.pview;index();D.workers.forEach(w=>{if(!w.token)w.token=randTok()});
+function load(){try{const raw=typeof localStorage!=='undefined'&&localStorage.getItem(KEY);if(raw){const x=JSON.parse(raw);if(x&&x.version)D=x}}catch(e){}if(!D)D=sample();/* Bij openen altijd vandaag; binnen hetzelfde tabblad (herladen) blijft de gekozen datum staan */S.date=todayIso();try{const sd=sessionStorage.getItem('wasroute.date');if(sd&&/^\d{4}-\d\d-\d\d$/.test(sd))S.date=sd}catch(e){}if(D.ui&&D.ui.pview)S.pview=D.ui.pview;index();D.workers.forEach(w=>{if(!w.token)w.token=randTok()});
   if(D.settings.maxPreTravel===undefined)D.settings.maxPreTravel=60;if(!D.settings.travelSource)D.settings.travelSource='schatting';
   if(D.settings.startAtFirst===undefined){D.settings.startAtFirst=true;D.settings.endAtLast=false;for(const d of Object.keys(D.plans))if(!D.plans[d].edited&&jobsOn(d).length)autoPlan(d);save()}}
-function save(){D.ui={date:S.date,pview:S.pview||'dag'};LEGS.clear();index();try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}}
+function save(){D.ui={date:S.date,pview:S.pview||'dag'};try{sessionStorage.setItem('wasroute.date',S.date)}catch(e){}LEGS.clear();index();try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}}
 
 /* ---------- regels ---------- */
 const jobsOn=date=>D.jobs.filter(j=>j.date===date);
@@ -2956,7 +2956,7 @@ function bcInBC(r){const x=bcSync();if(!x)return'<span class="muted small">—</
   if(!b)return r.d.send?'<span class="chip warn">Nog niet</span>':'<span class="muted small">—</span>';
   if(b.status==='Vervallen')return'<span class="chip">Vervallen</span>';
   return b.invoiceStatus==='Gefactureerd'?`<span class="chip ok">Gefactureerd</span><div class="small muted">${esc(b.invoiceNo)}</div>`:b.invoiceStatus==='OpFactuur'?`<span class="chip acc">Op factuur</span><div class="small muted">${esc(b.invoiceNo)}</div>`:'<span class="chip">In BC, open</span>'}
-function bcSyncLine(){const x=bcSync();if(!x)return'';const t=new Date(x.at).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+function bcSyncLine(){const x=bcSync();if(!x||x.created===undefined)return'';const t=new Date(x.at).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
   return`<div class="bcsync"><b>Laatst verstuurd ${esc(t)}:</b> ${x.created||0} nieuw, ${x.updated||0} bijgewerkt, ${x.voided||0} vervallen, ${x.unchanged||0} ongewijzigd${(x.errors||[]).length?` · <span style="color:var(--bad)">${x.errors.length} niet gelukt</span>`:''}</div>`}
 async function bcSend(confirm){
   if(BCST.demo||!SERVER)return;const all=bcRows(),rows=all.filter(r=>r.d.send&&r.api.customerNo).map(r=>r.api),skip=all.filter(r=>r.d.send&&!r.api.customerNo).length;
@@ -2977,7 +2977,7 @@ async function bcTest(){
       <div class="dlg-foot"><span class="sp"></span><button class="btn primary" data-act="dlgx">Sluiten</button></div></div>`;$('#modal').hidden=false}
   catch(e){D.apiTest={...(D.apiTest||{}),bc:{ok:false,at:Date.now(),error:apiErr(e)}};save();if(S.tab==='instellingen')render();toast('Koppeling testen: '+apiErr(e))}
 }
-async function bcFetchState(){if(!SERVER||BCST.demo)return;try{const d=await withPw(()=>api('/api/bc-sync?month='+BCST.month));D.bcSync=D.bcSync||{};D.bcSync[BCST.month]={...(D.bcSync[BCST.month]||{}),bc:d.bc,at:(D.bcSync[BCST.month]||{}).at||Date.now()};save();render()}catch(e){toast(apiErr(e))}}
+async function bcFetchState(){if(!SERVER||BCST.demo)return;try{const d=await withPw(()=>api('/api/bc-sync?month='+BCST.month));D.bcSync=D.bcSync||{};D.bcSync[BCST.month]={bc:d.bc,at:(D.bcSync[BCST.month]||{}).at||Date.now()};save();render()}catch(e){toast(apiErr(e))}}
 function bcExport(kind){
   const rows=bcRows().filter(r=>r.d.send).map(r=>r.api);
   if(kind==='json')return copyText(JSON.stringify({value:rows},null,2),`${rows.length} regels als JSON gekopieerd (zoals ze naar de BC-API zouden gaan).`);
@@ -3240,6 +3240,3 @@ function init(){
 }
 if(typeof document!=='undefined'&&document.getElementById('view'))init();
 </script>
-
-</body>
-</html>

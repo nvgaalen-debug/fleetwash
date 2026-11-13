@@ -156,7 +156,7 @@ function onDragOver(e){if(!DRAG)return;const z=e.target.closest('[data-drop]');i
 function onDrop(e){if(!DRAG)return;const z=e.target.closest('[data-drop]');if(!z)return;e.preventDefault();const ids=DRAG;DRAG=null;clearOver();
   const[k,wid,before]=z.dataset.drop.split(':');
   if(k==='un')return moveJobs(ids,null);
-  if(k==='row')return moveJobs(ids,wid,'best');
+  if(k==='row')return moveJobsAt(ids,wid,timeAt(z,e));
   if(k==='end')return moveJobs(ids,wid,null);
   if(k==='before'){if(ids.includes(before))return;return moveJobs(ids,wid,before)}
 }

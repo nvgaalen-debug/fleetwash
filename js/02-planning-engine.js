@@ -267,7 +267,7 @@ function simulate(w,ids,date){
       seg.push({k:'drive',a:t,b:t+mins,km:g.km});t+=mins;km+=g.km;trav+=mins;pos=p;
       cur={loc:l,arrive:t,travel:mins,km:g.km,jobs:[],start:null,end:null,wait:0,late:false};stops.push(cur);
     }
-    const ws=t2m(j.from),we=t2m(j.to);
+    const pf=(D.plans[dt]&&D.plans[dt].prefs||{})[id];let ws=t2m(j.from);if(pf!=null&&(ws==null||pf>ws))ws=pf;const we=t2m(j.to);
     if(ws!=null&&t<ws){seg.push({k:'wait',a:t,b:ws});wait+=ws-t;cur.wait+=ws-t;if(!pauseDone&&ws-t>=pm&&ws>pAt)pauseDone=true;t=ws}
     else if(!pauseDone&&t>=pAt&&cur.jobs.length&&pauseFits(i,t,pos))pause();
     const d=jobDur(j),s=t,e=t+d,isLate=we!=null&&e>we+.5;
@@ -420,6 +420,7 @@ function whyUnplanned(j,date){
 /* ---------- handmatige aanpassingen ---------- */
 function moveJobs(ids,wid,before){
   const P=getPlan(S.date);
+  if(P.prefs)ids.forEach(id=>delete P.prefs[id]);
   for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));
   if(!wid){ids.forEach(id=>delete P.pinned[id])}
   else{
@@ -439,6 +440,24 @@ function moveJobs(ids,wid,before){
       toast(`Let op: ${WRK[wid].name} komt niet binnen het tijdvak bij ${parts.join('; ')}. De reistijd tussen de klussen is hierbij meegenomen; verplaats of kies een ander moment.`,9000);
     }
   }
+}
+function timeAt(z,e){const r=z.getBoundingClientRect(),rs=+z.dataset.rs,re=+z.dataset.re;const m=rs+(e.clientX-r.left)/r.width*(re-rs);return Math.max(rs,Math.round(m/5)*5)}
+function lateWarn(wid){
+  const P=getPlan(S.date);const s=simulate(WRK[wid],P.routes[wid]||[]),late=s.lateJobs||[];if(!late.length)return;
+  const parts=late.slice(0,3).map(id=>{const j=JOB[id]||{},seg=s.seg.find(x=>x.k==='job'&&x.id===id),tm=seg?m2t(seg.a):'?';const win=(j.from||j.to)?` (tijdvak klant ${j.from||'?'}-${j.to||'?'})`:'';return `${j.plate||id} om ${tm}${win}`});
+  toast(`Let op: ${WRK[wid].name} komt niet binnen het tijdvak bij ${parts.join('; ')}. De reistijd tussen de klussen is hierbij meegenomen; verplaats of kies een ander moment.`,9000);
+}
+function moveJobsAt(ids,wid,minutes){
+  const P=getPlan(S.date);
+  for(const k of Object.keys(P.routes))P.routes[k]=P.routes[k].filter(id=>!ids.includes(id));
+  const r=P.routes[wid]=P.routes[wid]||[];
+  const st=simulate(WRK[wid],r);
+  let idx=r.length;for(let i=0;i<r.length;i++){const g=st.seg.find(x=>x.k==='job'&&x.id===r[i]);if(g&&g.a>minutes){idx=i;break}}
+  r.splice(idx,0,...ids);
+  P.prefs=P.prefs||{};ids.forEach(id=>{P.prefs[id]=minutes;P.pinned[id]=wid});
+  P.edited=Date.now();save();render();
+  toast(`Gezet op ${m2t(minutes)} bij ${WRK[wid].name}. Tijden en route zijn herberekend.`);
+  lateWarn(wid);
 }
 function bestWorkerFor(ids){
   const date=S.date,P=getPlan(date),ws=D.workers.filter(w=>avail(w,date));let best=null;

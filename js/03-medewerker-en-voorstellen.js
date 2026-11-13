@@ -14,7 +14,7 @@ async function api(path,opts={}){
   const sent=getPw();
   const r=await fetch(path,{cache:'no-store',...opts,headers:{'content-type':'application/json','x-app-password':sent,...(opts.headers||{})}});
   let d={};try{d=await r.json()}catch(e){}
-  if(r.status===401)throw{code:'pw',message:d.error,used:sent};if(r.status===404)throw{code:'nofn'};if(!r.ok)throw{code:'srv',message:d.error};return d;
+  if(r.status===401)throw{code:'pw',message:d.error,used:sent};if(r.status===404)throw{code:'nofn'};if(!r.ok)throw{code:'srv',status:r.status,message:d.error};return d;
 }
 const apiErr=e=>e.code==='nofn'?'De serverfunctie is niet gevonden. Deploy de site via GitHub, inclusief netlify/functions en package.json.':e.code==='pw'?'Het wachtwoord klopt niet.':(e.message||'Geen verbinding met de server.');
 /* Wachtwoordvenster: één tegelijk, in een eigen laag (een open importvenster blijft staan), en eerst gecontroleerd bij de server */

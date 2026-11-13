@@ -49,7 +49,6 @@ async function handler(req) {
       body: JSON.stringify({
         model: process.env.AI_MODEL || "claude-sonnet-5-5",
         max_tokens: 6000,
-        temperature: 0,
         messages: [{ role: "user", content: prompt }],
       }),
     });

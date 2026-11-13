@@ -18,6 +18,7 @@ function onClick(e){
     case'pview':S.pview=el.dataset.v;D.ui=D.ui||{};save();render();window.scrollTo(0,0);break;
     case'gotoday':S.date=el.dataset.date;S.pview='dag';if(el.dataset.wid)S.wid=el.dataset.wid;S.selLoc=null;save();render();window.scrollTo(0,0);break;
     case'gotoweek':S.date=el.dataset.date;S.pview='week';save();render();break;
+    case'mailklant':mailKlantKies(S.date);break;
     case'aiday':aiVoorstel([S.date]);break;
     case'aiweek':aiVoorstel([...Array(7)].map((_,i)=>addDays(weekStart(S.date),i)));break;
     case'auto':{const P0=getPlan(S.date);P0.skip={};}autoPlan(S.date);save();render();toast('Planning automatisch opnieuw gemaakt. Vastgezette bezoeken zijn gerespecteerd.');break;

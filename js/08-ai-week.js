@@ -127,3 +127,24 @@ function aiOverzicht(rijen,samen){
 
 /* Klantnaam en locatienaam voor in het overzicht */
 function aiKlantLoc(j){const l=LOC[j.locationId];if(!l)return'';const c=D.customers.find(x=>x.id===l.customerId);return[c?c.name:'',l.name].filter(Boolean).join(' · ')}
+
+/* Planning per klant mailen: datum, tijden en kentekens. De mail wordt klaargezet in het mailprogramma; de gebruiker verstuurt zelf. */
+function mailKlantKies(date){
+  const per={};
+  jobsOn(date).forEach(j=>{const l=LOC[j.locationId];if(!l)return;(per[l.customerId]=per[l.customerId]||[]).push(j)});
+  const cids=Object.keys(per);
+  if(!cids.length){toast('Geen bezoeken op deze dag.');return}
+  const rijen=cids.map(cid=>{const c=D.customers.find(x=>x.id===cid);return{cid,naam:c?c.name:'Onbekende klant',mail:(c&&c.email)||''}});
+  const m=$('#modal');
+  m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="mkT" style="max-width:680px"><h3 id="mkT">Planning mailen naar klant</h3><p class="note">${esc(fdate(date,{weekday:'long',day:'numeric',month:'long'}))}. De mail wordt klaargezet in je mailprogramma; jij controleert en verstuurt hem.</p><div class="tbl-wrap" style="max-height:55vh;overflow:auto"><table><thead><tr><th>Klant</th><th>E-mail</th><th>Bezoeken</th><th></th></tr></thead><tbody>${rijen.map((r,i)=>`<tr><td>${esc(r.naam)}</td><td>${r.mail?esc(r.mail):'<span class="muted">geen e-mailadres</span>'}</td><td>${per[r.cid].length}</td><td>${r.mail?`<button class="btn sm" data-mk="${i}">Mail klaarzetten</button>`:''}</td></tr>`).join('')}</tbody></table></div><div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" id="mkSluit">Sluiten</button></div></div>`;
+  m.hidden=false;
+  $('#mkSluit').onclick=()=>{m.hidden=true;m.innerHTML=''};
+  m.querySelectorAll('[data-mk]').forEach(b=>b.onclick=()=>{
+    const r=rijen[+b.dataset.mk];
+    const regels=per[r.cid].map(j=>{const wj=jobWhere(j.id);return{t:wj&&wj.start!=null?m2t(wj.start):'',plate:j.plate}}).sort((a,b)=>a.t.localeCompare(b.t)).map(x=>`${x.t||'tijd nog te bevestigen'}  ${x.plate}`);
+    const onderwerp=`Planning reiniging ${fdate(date,{weekday:'long',day:'numeric',month:'long'})}`;
+    const tekst=`Beste ${r.naam},\n\nHierbij de planning voor ${fdate(date,{weekday:'long',day:'numeric',month:'long'})}:\n\n${regels.join('\n')}\n\nMet vriendelijke groet`;
+    m.hidden=true;m.innerHTML='';
+    window.location.href=`mailto:${encodeURIComponent(r.mail)}?subject=${encodeURIComponent(onderwerp)}&body=${encodeURIComponent(tekst)}`;
+  });
+}

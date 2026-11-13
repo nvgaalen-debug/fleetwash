@@ -1,0 +1,8 @@
+{
+  "name": "wasroute",
+  "private": true,
+  "description": "Wasroute Planner: dispatch- en routeplanning met medewerker-app",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Wasroute Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="css/app.css">
+<style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}</style>
+</head>
+<body>
+
+<header class="top"><div class="top-in gut">
+  <div class="brand"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="var(--accent)"/><path d="M9.5 15.5c1.2 1.8 4.6 2.2 6.4-.4" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round"/></svg>Wasroute <small>dispatch &amp; routeplanning</small></div>
+  <nav class="tabs" id="tabs" aria-label="Hoofdmenu"></nav>
+  <div class="datebar" id="datebar">
+    <div class="seg" id="pviewSeg" role="group" aria-label="Weergave"><button type="button" data-act="pview" data-v="dag">Dag</button><button type="button" data-act="pview" data-v="week">Week</button><button type="button" data-act="pview" data-v="maand">Maand</button></div>
+    <button class="btn sm" data-act="today" title="Naar vandaag (T)">Vandaag</button>
+    <button class="iconbtn" data-act="day" data-d="-1" aria-label="Vorige periode" title="Vorige (pijl links)"><svg class="ic" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <input type="date" id="dateIn" aria-label="Planningsdatum">
+    <button class="iconbtn" data-act="day" data-d="1" aria-label="Volgende periode" title="Volgende (pijl rechts)"><svg class="ic" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <span class="dlabel" id="dayName"></span>
+  </div>
+</div><nav class="subnav" id="subnav" aria-label="Submenu" hidden></nav>
+</header>
+<main class="gut" id="view"></main>
+<div id="modal" hidden></div>
+<div id="toast" hidden></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
+
+<script src="js/01-kern.js"></script>
+<script src="js/02-planning-engine.js"></script>
+<script src="js/03-medewerker-en-voorstellen.js"></script>
+<script src="js/04-weergave-beheer.js"></script>
+<script src="js/05-import-en-bc.js"></script>
+<script src="js/05b-sync.js"></script>
+<script src="js/06-events.js"></script>
+<script src="js/07-archief.js"></script>
+

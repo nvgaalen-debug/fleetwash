@@ -14,12 +14,13 @@ const MENU_ITEMS={
   'instellingen:planning':['Planning en reistijd','Rekenregels, pauze, werkdag en rijtijden'],
   'instellingen:types':['Reinigingstypes','Soorten reiniging, duur en vaardigheden'],
   'instellingen:data':['Gegevens en back-up','Back-up kopiëren of terugzetten'],
+  'instellingen:archief':['Archief','Gereed gemelde bezoeken archiveren, bekijken en oude planningen opruimen'],
   'instellingen:menu':['Menu indelen','Kies wat in het hoofdmenu en in de groepen staat'],
   'act:logout':['Uitloggen','App-wachtwoord vergeten op deze computer'],
   'facturatie':['Business Central interface','Gereedmeldingen per maand naar BC voor facturatie'],
   'instellingen:api':['API koppelingen','Business Central testen en exporteren, rijtijden, adressen en AI']};
 const MENU_SHORT={'opdrachten':'Overzicht','medewerkers':'Gegevens'};
-const menuDefault=()=>({top:['planning','g:opdr','klanten','g:mw','g:beheer'],groups:{opdr:{l:'Opdrachten',items:['opdrachten','importlog','facturatie','act:import']},mw:{l:'Medewerkers',items:['medewerkers','afwezigheid','act:msgs']},beheer:{l:'Beheer',items:['instellingen:planning','instellingen:types','instellingen:data','instellingen:api','instellingen:menu','act:logout']}},hidden:[]});
+const menuDefault=()=>({top:['planning','g:opdr','klanten','g:mw','g:beheer'],groups:{opdr:{l:'Opdrachten',items:['opdrachten','importlog','facturatie','act:import']},mw:{l:'Medewerkers',items:['medewerkers','afwezigheid','act:msgs']},beheer:{l:'Beheer',items:['instellingen:planning','instellingen:types','instellingen:data','instellingen:archief','instellingen:api','instellingen:menu','act:logout']}},hidden:[]});
 function menuCfg(){
   let m=D.menu;if(!m||!m.top||!m.groups)m=D.menu=menuDefault();
   const placed=new Set([...m.top.filter(x=>!x.startsWith('g:')),...Object.values(m.groups).flatMap(g=>g.items),...(m.hidden||[])]);
@@ -719,12 +720,12 @@ function viewSettings(){
   <div class="settings">${num('maxPreTravel','Maximale aanrijtijd vóór de begintijd (min)','Rijtijd naar de eerste klant die buiten werktijd valt. Is de rit langer, dan begint de eerste klus later.')}</div>
   <div style="display:grid;gap:8px"><label class="chk"><input type="checkbox" id="set_startAtFirst" data-set="startAtFirst"${s.startAtFirst!==false?' checked':''}> Begintijd = aanwezig bij de eerste klant (aanrijden vanaf standplaats valt vóór de begintijd)</label><label class="chk"><input type="checkbox" id="set_endAtLast" data-set="endAtLast"${s.endAtLast===true?' checked':''}> Eindtijd = klaar bij de laatste klant (terugrit naar standplaats valt na de eindtijd)</label></div>
   <div class="row"><button class="btn primary" data-act="saveset">Opslaan en opnieuw plannen</button></div></section>
-  <section class="panel sec"><h2>Archief</h2><p class="small">Gereed gemelde bezoeken worden naar het archief gekopieerd. De planning zelf blijft ongewijzigd.</p>${archiefHtml()}</section>
   <section class="panel sec"><div class="help"><h3 style="margin-top:14px">Zo rekent de planner</h3>
   <p>Per dag simuleert de app voor elke medewerker de rit: vertrek op begintijd vanaf de standplaats, rijden, parkeren, eventueel wachten tot het tijdvenster opent, reinigen, pauze, en terug naar de standplaats. Een rit is geldig als alle voertuigen binnen hun venster klaar zijn, de medewerker voor de eindtijd terug is en de vaardigheden kloppen.</p>
   <p>Staat "Begintijd = aanwezig bij de eerste klant" aan, dan vertrekt de medewerker zo vroeg dat hij precies op zijn begintijd bij de eerste klant is. Bij begintijd 08:00 kan de eerste klus dus om 08:00 beginnen, waar de medewerker ook woont.</p>
   <p>Het plannen gebeurt in twee stappen. Eerst wordt opdracht voor opdracht ingevoegd op de goedkoopste plek; opdrachten met hoge prioriteit en weinig alternatieven gaan voor. Daarna verschuift de app hele klantlocaties tussen medewerkers en draait volgordes om zolang reistijd en kilometers dalen. Auto's op dezelfde locatie blijven zo vanzelf bij elkaar.</p>
   <p>Reistijden zijn een schatting op basis van hemelsbrede afstand. Voor productie koppel je een routeservice (bijv. OSRM, Google of TomTom) voor echte rijtijden en wegroutes.</p></div></section>`,
+  archief:`<section class="panel sec"><h2>Archief</h2><p class="small">Gereed gemelde bezoeken worden naar het archief gekopieerd. De planning zelf blijft ongewijzigd.</p>${archiefHtml()}</section>`,
   types:`<section class="panel sec"><div class="toolbar"><h2>Reinigingstypes</h2><span class="sp"></span><button class="btn" data-act="edittype">${I.plus} Nieuw type</button></div>
   <div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Standaardduur</th><th>Vereiste vaardigheid</th><th></th></tr></thead><tbody>${tr}</tbody></table></div></section>`,
   data:`<section class="panel sec"><h2>Gegevens</h2>

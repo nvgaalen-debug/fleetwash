@@ -1,0 +1,68 @@
+# Wasroute Planner op Netlify
+
+## Inhoud
+- `index.html`: de planner (planning, kaart, import, Slim voorstel)
+- `medewerker.html`: de mobiele app voor medewerkers
+- `netlify/functions/planning.mjs`: publiceren van ritten en gereed-/probleemmeldingen (opslag in Netlify Blobs)
+- `netlify/functions/ai-advies.mjs`: AI-advies via je Claude API-sleutel
+- `netlify/functions/reistijden.mjs`: echte rijtijden via OpenRouteService (optioneel)
+- `netlify/functions/adres.mjs`: exacte posities van adressen via PDOK (gratis, geen sleutel nodig)
+- `package.json`: vertelt Netlify dat `@netlify/blobs` nodig is
+- `netlify.toml`: waar de app en de functies staan
+
+## Installeren (via GitHub; slepen naar Netlify Drop werkt niet voor de functies)
+1. Zet alle bestanden en mappen in een GitHub-repository, met `index.html` in de hoofdmap.
+2. Netlify: Add new site > Import an existing project > kies de repository. Laat het build command leeg.
+3. Netlify: Site configuration > Environment variables:
+   - `APP_PASSWORD` = een wachtwoord voor planners. Sterk aangeraden: zonder wachtwoord kan iedereen met het adres ritten publiceren en meldingen lezen.
+   - `ANTHROPIC_API_KEY` = je Claude API-sleutel (alleen nodig voor AI-advies)
+   - `ORS_API_KEY` = sleutel van openrouteservice.org (alleen nodig voor echte rijtijden; gratis account)
+4. Deploys > Trigger deploy > Deploy site.
+
+Netlify Blobs hoef je niet apart aan te zetten; het werkt automatisch op elke Netlify-site.
+
+## Werken met de medewerker-app
+1. Planner: Medewerkers > Kopieer link, en stuur de link naar de medewerker (bijv. via WhatsApp).
+   De medewerker opent hem op de telefoon en kan hem op het beginscherm zetten.
+2. Planner: Planning > Publiceer naar medewerkers (1, 7 of 14 dagen).
+   Na wijzigingen staat er "Gewijzigd na publicatie"; publiceer dan opnieuw.
+3. Medewerker: ziet per dag zijn bezoeken, adressen (met navigatie), locatie-info, inlog en opmerkingen,
+   en meldt per auto Gereed of Probleem. Zonder bereik worden meldingen later verstuurd.
+4. Planner: meldingen verschijnen automatisch (elke minuut) in de rit, de dagplanning en de opdrachtenlijst.
+
+## Berichten tussen planner en medewerkers
+- Planner: Planning > Berichten, of in een bezoek "Bericht aan …" (het bericht gaat dan over die klant en die auto's).
+  Kies één medewerker of "Bericht aan meerdere", gebruik eventueel een standaardtekst en vink Urgent aan als het direct gezien moet worden.
+- Medewerker: nieuwe berichten staan bovenaan de planning (urgent in rood, de telefoon trilt) met de knoppen Gelezen en Antwoorden.
+  Via het ballonnetje rechtsboven staat het hele gesprek, en kan de medewerker zelf een bericht sturen.
+- Planner ziet per bericht "gelezen 10:15" en krijgt een rode teller bij Planning en Berichten voor ongelezen antwoorden.
+- De app haalt elke 15 tot 45 seconden nieuwe berichten op zolang hij open staat. Berichten worden 30 dagen bewaard.
+- De medewerker moet wel een geactiveerde link hebben (Medewerkers > Kopieer link, of één keer publiceren).
+
+Telefoon kwijt of medewerker uit dienst? Medewerker bewerken > "Nieuwe link maken", en daarna publiceren.
+
+## Echte rijtijden met OpenRouteService (optioneel)
+1. Maak een gratis account op https://openrouteservice.org en kopieer je API-sleutel.
+2. Netlify: voeg `ORS_API_KEY` toe en deploy opnieuw.
+3. Planner: Instellingen > Bron voor reistijden > OpenRouteService > Opslaan, en klik op "Rijtijden ophalen".
+4. Klik in Planning op "Automatisch plannen" om de planning op de echte rijtijden af te stemmen.
+Nieuwe locaties? Op de Planning-pagina verschijnt "… rijtijden ophalen"; alleen wat ontbreekt wordt opgevraagd.
+Het gratis abonnement heeft een daglimiet; de app haalt per keer alleen ontbrekende rijtijden op en bewaart ze.
+
+## Exacte posities met PDOK
+Werkt automatisch, zonder sleutel:
+- Nieuwe locaties (formulier of klant aanmaken) krijgen na opslaan hun exacte positie via PDOK.
+- Na een Excel-import loopt de app automatisch door: exacte posities (PDOK) > echte rijtijden (OpenRouteService, als die aan staat) > planning.
+- Bestaande locaties: Klanten & locaties > "Posities verbeteren via PDOK".
+Vindt PDOK een adres niet, dan blijft de geschatte positie staan en zie je bij de locatie waarom.
+
+## Voorbereiding Business Central
+Opdrachten > Naar Business Central toont per maand welke meldingen naar BC zouden gaan (gereed = factureerbaar; niet gelukt volgens de instelling per klant; per melding aan te passen met "Naar BC").
+Vul vooraf in: debiteurnummer bij Klanten, artikelnummer bij Reinigingstypes, eventueel verzendadrescode bij Locaties en resourcenummer bij Medewerkers.
+Met "Kopieer als JSON (API)" zie je precies wat er naar de BC-API gaat.
+
+Koppeling activeren (functie `netlify/functions/bc-sync.mjs`): installeer eerst de BC-extensie "Wasroute koppeling" (zie de LEESMIJ daarvan) en zet in Netlify:
+- `BC_TENANT_ID`, `BC_CLIENT_ID`, `BC_CLIENT_SECRET` (app-registratie in Entra ID met API.ReadWrite.All voor Business Central)
+- `BC_ENVIRONMENT` (bijv. Production of Sandbox) en `BC_COMPANY_NAME` (naam van het bedrijf zoals in BC; of `BC_COMPANY_ID` met de GUID)
+Controleer met Opdrachten > Naar Business Central > Koppeling testen.
+Daarna: Opdrachten > Naar Business Central > Verstuur naar BC. De kolom "In BC" toont of een regel open, op factuur of gefactureerd is.

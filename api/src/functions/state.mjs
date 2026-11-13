@@ -8,16 +8,18 @@
 // GET  /api/state                    -> { data, version }   (data = null als er nog niets is)
 // PUT  /api/state  { data, version } -> { version }          (409 als iemand anders al opsloeg)
 //
-// Het versienummer voorkomt dat twee planners elkaars werk overschrijven: wie een oude
-// versie opslaat, krijgt een 409 en moet eerst verversen.
+// Opslag in Table Storage: één metadata-rij (versie, aantal stukken) en daarnaast de planning
+// in stukken van 30.000 tekens, elk in een eigen rij. Table Storage staat maximaal 64 KB per
+// property en 1 MB per rij toe, daarom niet alles in één rij.
 
 import { app } from "@azure/functions";
 import { TableClient } from "@azure/data-tables";
 
 const TABLE = "plannerstate";
 const PK = "planner";
-const RK = "main";
-const MAX_BYTES = 5 * 1024 * 1024; // Table Storage: max 64 KB per property, dus data in stukken
+const META = "meta";
+const CHUNK = 30000;          // tekens per rij (ruim onder de limiet van 64 KB)
+const MAX_CHUNKS = 400;       // ~12 MB planning als bovengrens
 
 const json = (data, status = 200) => ({
   status,
@@ -36,19 +38,13 @@ function table() {
   return tableReady;
 }
 
-// Table Storage slaat per property maximaal 64 KB op: de JSON wordt in stukken van 60 KB gesplitst.
-const CHUNK = 60000;
-function splitData(text) {
-  const parts = {};
-  let n = 0;
-  for (let i = 0; i < text.length; i += CHUNK) parts[`d${n++}`] = text.slice(i, i + CHUNK);
-  return { parts, count: n };
-}
-function joinData(entity) {
-  const n = Number(entity.chunks || 0);
-  let text = "";
-  for (let i = 0; i < n; i++) text += entity[`d${i}`] || "";
-  return text;
+const chunkKey = (i) => "c" + String(i).padStart(4, "0");
+
+async function readChunks(t, count) {
+  const parts = await Promise.all(
+    Array.from({ length: count }, (_, i) => t.getEntity(PK, chunkKey(i)).then((e) => e.d || ""))
+  );
+  return parts.join("");
 }
 
 async function handler(req) {
@@ -63,12 +59,18 @@ async function handler(req) {
   }
 
   if (req.method === "GET") {
+    let meta;
     try {
-      const e = await t.getEntity(PK, RK);
-      return json({ data: JSON.parse(joinData(e)), version: Number(e.version || 0) });
+      meta = await t.getEntity(PK, META);
     } catch (e) {
       if (e.statusCode === 404) return json({ data: null, version: 0 });
-      return json({ error: "Kon de planning niet lezen." }, 502);
+      return json({ error: "Kon de planning niet lezen (metadata)." }, 502);
+    }
+    try {
+      const text = await readChunks(t, Number(meta.chunks || 0));
+      return json({ data: JSON.parse(text), version: Number(meta.version || 0) });
+    } catch (e) {
+      return json({ error: "Kon de planning niet lezen (stukken): " + String(e.message || e).slice(0, 200) }, 502);
     }
   }
 
@@ -81,32 +83,42 @@ async function handler(req) {
     }
     if (!body || typeof body.data !== "object" || body.data === null) return json({ error: "Geen planning meegestuurd." }, 400);
     const text = JSON.stringify(body.data);
-    if (text.length > MAX_BYTES) return json({ error: "Planning is te groot." }, 413);
+    const count = Math.ceil(text.length / CHUNK);
+    if (count > MAX_CHUNKS) return json({ error: "Planning is te groot." }, 413);
     const expected = Number(body.version || 0);
 
-    // Huidige versie ophalen (en etag voor een atomaire update)
-    let current = null;
+    // Huidige metadata en versie controleren
+    let meta = null;
     try {
-      current = await t.getEntity(PK, RK);
+      meta = await t.getEntity(PK, META);
     } catch (e) {
-      if (e.statusCode !== 404) return json({ error: "Kon de planning niet lezen." }, 502);
+      if (e.statusCode !== 404) return json({ error: "Kon de metadata niet lezen." }, 502);
     }
-    const currentVersion = current ? Number(current.version || 0) : 0;
+    const currentVersion = meta ? Number(meta.version || 0) : 0;
     if (currentVersion !== expected) {
       return json({ error: "Iemand anders heeft de planning al opgeslagen. Ververs de pagina.", version: currentVersion }, 409);
     }
 
-    const { parts, count } = splitData(text);
-    const entity = { partitionKey: PK, rowKey: RK, version: currentVersion + 1, chunks: count, ...parts, updatedAt: new Date().toISOString() };
     try {
-      if (current) await t.updateEntity(entity, "Replace", { etag: current.etag || "*" });
-      else await t.createEntity(entity);
+      // 1. Stukken wegschrijven
+      await Promise.all(
+        Array.from({ length: count }, (_, i) =>
+          t.upsertEntity({ partitionKey: PK, rowKey: chunkKey(i), d: text.slice(i * CHUNK, (i + 1) * CHUNK) }, "Replace")
+        )
+      );
+      // 2. Oude, overbodige stukken opruimen
+      const oldCount = meta ? Number(meta.chunks || 0) : 0;
+      for (let i = count; i < oldCount; i++) await t.deleteEntity(PK, chunkKey(i)).catch(() => {});
+      // 3. Metadata als laatste bijwerken: dan is de nieuwe versie pas zichtbaar als alle stukken er staan
+      const newMeta = { partitionKey: PK, rowKey: META, version: currentVersion + 1, chunks: count, updatedAt: new Date().toISOString() };
+      if (meta) await t.updateEntity(newMeta, "Replace", { etag: meta.etag || "*" });
+      else await t.createEntity(newMeta);
     } catch (e) {
-      // 412 / 409 = een ander verzoek was net sneller
-      if (e.statusCode === 412 || e.statusCode === 409) return json({ error: "Iemand anders heeft de planning net opgeslagen. Ververs de pagina.", version: currentVersion }, 409);
-      return json({ error: "Opslaan mislukt." }, 502);
+      if (e.statusCode === 412 || e.statusCode === 409) {
+        return json({ error: "Iemand anders heeft de planning net opgeslagen. Ververs de pagina.", version: currentVersion }, 409);
+      }
+      return json({ error: "Opslaan mislukt: " + String(e.message || e).slice(0, 200) }, 502);
     }
-    // "Replace" vervangt de hele rij, dus oude stukken verdwijnen vanzelf.
     return json({ version: currentVersion + 1 });
   }
 

@@ -48,7 +48,7 @@ async function archiefKiesSleutel(key){
 }
 function archiefViewerHtml(){
   const v=ARCH_VIEW;
-  const knoppen=ARCH_PERIODES.map(p=>`<button class="fchip${v.periode===p?' on':''}" data-act="archper" data-periode="${p}">${p}</button>`).join('');
+  const knoppen=ARCH_PERIODES.map(p=>{const aan=v.periode===p;return `<button class="fchip${aan?' on':''}" data-act="archper" data-periode="${p}" aria-pressed="${aan}" style="${aan?'font-weight:700;box-shadow:inset 0 0 0 2px currentColor':''}">${aan?'✓ ':''}${p}</button>`}).join('');
   let lijst='';
   if(v.laden&&!v.items)lijst='<p class="small muted">Laden…</p>';
   else if(v.sleutels&&!v.key){
@@ -62,7 +62,7 @@ function archiefViewerHtml(){
       </tbody></table></div>
       <div class="row" style="margin-top:8px"><button class="btn sm" data-act="archkey" data-key="">← Terug naar de periodes</button></div>`;
   }
-  return `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:10px">${knoppen}</div><div style="margin-top:8px">${lijst}</div>`;
+  return `<p class="small" style="margin:10px 0 4px"><b>Archief bekijken per: ${esc(v.periode)}</b></p><div class="row" style="gap:6px;flex-wrap:wrap">${knoppen}</div><div style="margin-top:8px">${lijst}</div>`;
 }
 function archiefHtml(){
   const dagen=D.settings.bewaarDagen||60;

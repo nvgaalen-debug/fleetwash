@@ -90,7 +90,7 @@ ${lines.join('\n')}`;
           const j=JOB[id];
           if(aiVast(j,P0)&&aiHuidigeWerker(j,P0)){vastN++;continue}
           const seg=s.seg.find(x=>x.k==='job'&&x.id===id),nt=seg?seg.a:null,v=nu[id];
-          if(!v||v.naam!==WRK[wid].name||v.t!==nt)rijen.push({plate:j.plate,loc:LOC[j.locationId]?LOC[j.locationId].name:'',nu:v?`${v.naam}${v.t!=null?' om '+m2t(v.t):''}`:'niet ingepland',nieuw:`${WRK[wid].name}${nt!=null?' om '+m2t(nt):''}`});
+          if(!v||v.naam!==WRK[wid].name||v.t!==nt)rijen.push({plate:j.plate,loc:aiKlantLoc(j),nu:v?`${v.naam}${v.t!=null?' om '+m2t(v.t):''}`:'niet ingepland',nieuw:`${WRK[wid].name}${nt!=null?' om '+m2t(nt):''}`});
         }
       }
     }
@@ -115,3 +115,6 @@ function aiOverzicht(rijen,samen){
     $('#aivJa').onclick=()=>klaar(true);
   });
 }
+
+/* Klantnaam en locatienaam voor in het overzicht */
+function aiKlantLoc(j){const l=LOC[j.locationId];if(!l)return'';const c=D.customers.find(x=>x.id===l.customerId);return[c?c.name:'',l.name].filter(Boolean).join(' · ')}

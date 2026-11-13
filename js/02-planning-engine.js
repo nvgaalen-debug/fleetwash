@@ -381,7 +381,7 @@ function eject(R,ws,pins,jobs){
   }
 }
 function getPlan(date){D.plans[date]=D.plans[date]||{routes:{},pinned:{}};const P=D.plans[date];P.routes=P.routes||{};P.pinned=P.pinned||{};return P}
-const hasPlan=date=>!!(D.plans[date]&&(D.plans[date].auto||D.plans[date].edited));
+const hasPlan=date=>!!(D.plans[date]&&(D.plans[date].auto||D.plans[date].edited||D.plans[date].archived));
 function cleanPlan(date){
   const P=getPlan(date),ok=new Set(jobsOn(date).map(j=>j.id)),seen=new Set();
   for(const wid of Object.keys(P.routes)){if(!WRK[wid]){delete P.routes[wid];continue}P.routes[wid]=P.routes[wid].filter(id=>ok.has(id)&&!seen.has(id)&&seen.add(id))}

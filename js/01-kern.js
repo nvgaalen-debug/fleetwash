@@ -87,6 +87,6 @@ function sample(){
 }
 function load(){try{const raw=typeof localStorage!=='undefined'&&localStorage.getItem(KEY);if(raw){const x=JSON.parse(raw);if(x&&x.version)D=x}}catch(e){}if(!D)D=sample();/* Bij openen altijd vandaag; binnen hetzelfde tabblad (herladen) blijft de gekozen datum staan */S.date=todayIso();try{const sd=sessionStorage.getItem('wasroute.date');if(sd&&/^\d{4}-\d\d-\d\d$/.test(sd))S.date=sd}catch(e){}if(D.ui&&D.ui.pview)S.pview=D.ui.pview;index();D.workers.forEach(w=>{if(!w.token)w.token=randTok()});
   if(D.settings.maxPreTravel===undefined)D.settings.maxPreTravel=60;if(!D.settings.travelSource)D.settings.travelSource='schatting';
-  if(D.settings.startAtFirst===undefined){D.settings.startAtFirst=true;D.settings.endAtLast=false;for(const d of Object.keys(D.plans))if(!D.plans[d].edited&&jobsOn(d).length)autoPlan(d);save()}}
+  if(D.settings.startAtFirst===undefined){D.settings.startAtFirst=true;D.settings.endAtLast=false;for(const d of Object.keys(D.plans))if(!D.plans[d].edited&&!D.plans[d].archived&&jobsOn(d).length)autoPlan(d);save()}}
 function save(){D.ui={date:S.date,pview:S.pview||'dag'};try{sessionStorage.setItem('wasroute.date',S.date)}catch(e){}LEGS.clear();index();try{localStorage.setItem(KEY,JSON.stringify(D))}catch(e){}schedulePush()}
 

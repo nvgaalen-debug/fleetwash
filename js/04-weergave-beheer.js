@@ -1,6 +1,6 @@
 /* ---------- weergave ---------- */
 let toastT;
-function toast(msg){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
+function toast(msg,ms){const t=$('#toast');t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,ms||3200)}
 /* ---------- menu: indeling instelbaar via Beheer > Menu indelen ---------- */
 const MENU_ITEMS={
   'planning':['Planning','Dagplanning, kaart en meldingen'],

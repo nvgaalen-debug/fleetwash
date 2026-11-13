@@ -431,6 +431,14 @@ function moveJobs(ids,wid,before){
   }
   P.edited=Date.now();save();render();
   toast(wid?`Verplaatst naar ${WRK[wid].name} en vastgezet. Tijden en route zijn herberekend.`:'Uit de planning gehaald.');
+  if(wid){
+    const s=simulate(WRK[wid],P.routes[wid]||[]),late=s.lateJobs||[];
+    if(late.length){
+      const parts=late.slice(0,3).map(id=>{const j=JOB[id]||{},seg=s.seg.find(x=>x.k==='job'&&x.id===id),tm=seg?m2t(seg.a):'?';
+        const win=(j.from||j.to)?` (tijdvak klant ${j.from||'?'}-${j.to||'?'})`:'';return `${j.plate||id} om ${tm}${win}`});
+      toast(`Let op: ${WRK[wid].name} komt niet binnen het tijdvak bij ${parts.join('; ')}. De reistijd tussen de klussen is hierbij meegenomen; verplaats of kies een ander moment.`,9000);
+    }
+  }
 }
 function bestWorkerFor(ids){
   const date=S.date,P=getPlan(date),ws=D.workers.filter(w=>avail(w,date));let best=null;

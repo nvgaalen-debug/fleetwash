@@ -731,6 +731,7 @@ function viewSettings(){
   <div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Standaardduur</th><th>Vereiste vaardigheid</th><th></th></tr></thead><tbody>${tr}</tbody></table></div></section>`,
   data:`<section class="panel sec"><h2>Gegevens</h2>
   <p class="help">Gegevens worden in deze browser bewaard. Kopieer een back-up om ze elders te gebruiken of terug te zetten.</p>
+  <p class="small muted">Versie van deze app: ${BUILD}</p>
   <div class="row"><button class="btn" data-act="export">${I.copy} Back-up kopiëren</button><button class="btn" data-act="restore">${I.imp} Back-up terugzetten</button><button class="btn danger" data-act="reset">Voorbeelddata herstellen</button></div>
 </section>`};
   if(S.setPage==='menu')return viewMenu();

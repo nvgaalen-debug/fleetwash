@@ -390,7 +390,7 @@ function cleanPlan(date){
   return P;
 }
 function autoPlan(date){
-  const P=cleanPlan(date),jobs=jobsOn(date),ws=D.workers.filter(w=>avail(w,date)),pins=P.pinned;
+  const P=cleanPlan(date),pins=P.pinned,skip=P.skip||{},jobs=jobsOn(date).filter(j=>!(skip[j.id]&&!pins[j.id])),ws=D.workers.filter(w=>avail(w,date));
   /* Bezoeken die al bij een medewerker staan, blijven daar; vastgezette bezoeken worden hieronder op hun medewerker gezet */
   const R={},bij=new Set(jobs.map(j=>j.id));ws.forEach(w=>R[w.id]=(P.routes[w.id]||[]).filter(id=>bij.has(id)&&!pins[id]));
   const byWin=(a,b)=>(t2m(a.from)??0)-(t2m(b.from)??0);

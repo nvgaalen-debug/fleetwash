@@ -20,7 +20,7 @@ function onClick(e){
     case'gotoweek':S.date=el.dataset.date;S.pview='week';save();render();break;
     case'aiday':aiVoorstel([S.date]);break;
     case'aiweek':aiVoorstel([...Array(7)].map((_,i)=>addDays(weekStart(S.date),i)));break;
-    case'auto':autoPlan(S.date);save();render();toast('Planning automatisch opnieuw gemaakt. Vastgezette bezoeken zijn gerespecteerd.');break;
+    case'auto':{const P0=getPlan(S.date);P0.skip={};}autoPlan(S.date);save();render();toast('Planning automatisch opnieuw gemaakt. Vastgezette bezoeken zijn gerespecteerd.');break;
     case'unpinall':{const P=getPlan(S.date);P.pinned={};P.edited=Date.now();save();render();toast('Alle vastzettingen opgeheven. Klik Automatisch plannen om vrij te optimaliseren.');break}
     case'selw':S.wid=el.dataset.wid;S.selLoc=null;render();break;
     case'sel':S.wid=el.dataset.wid;S.selLoc=S.selLoc===el.dataset.loc?null:el.dataset.loc;render();break;
@@ -127,7 +127,7 @@ function onClick(e){
 function onChange(e){
   const el=e.target;
   if(el.id==='xf'&&el.files&&el.files[0])return readXlsx(el.files[0]);
-  if((el.id==='xclear'||el.id==='xfuture'||el.id==='xslot'||el.id==='xtype')&&XIMP)return renderXPrev();
+  if((el.id==='xclear'||el.id==='xfuture'||el.id==='xslot'||el.id==='xgeen'||el.id==='xtype')&&XIMP)return renderXPrev();
   if(el.dataset.xname!=null&&XIMP){XIMP.names=Object.assign({},XIMP.names,{[el.dataset.xname]:el.value});return xReparse()}
   if(el.id==='xcust'&&XIMP){XIMP.custEdit=el.value;return xReparse()}
   if(el.id==='xbill'&&XIMP){XIMP.billTo=el.value;renderXPrev();if(el.value==='__new')setTimeout(()=>{const i=$('#xbillnew');if(i)i.focus()},0);return}

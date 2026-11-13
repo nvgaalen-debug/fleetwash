@@ -49,8 +49,11 @@ ${lines.join('\n')}`;
     const a=txt.indexOf('{'),b=txt.lastIndexOf('}');let obj=null;
     try{obj=JSON.parse(txt.slice(a,b+1))}catch(e){}
     if(!obj||!Array.isArray(obj.plan)){toast('De AI gaf geen bruikbaar voorstel. Probeer het opnieuw.');return}
+    const lByC={};lIds.forEach(id=>lByC[lC[id]]=id);
+    /* Codes in de reden van de AI vervangen door namen */
+    const aiVertaal=t=>t.replace(/\bW\d{2}\b/g,c=>wByC[c]?wByC[c].name:c).replace(/\bL\d{2}\b/g,c=>lByC[c]?aiKlantLoc({locationId:lByC[c]}):c).replace(/\bJ\d{2,}\b/g,c=>jByC[c]?jByC[c].plate:c);
     const koz={};
-    for(const p of obj.plan){const j=jByC[p.job],w=wByC[p.werker];if(!j||!w||!/^\d{1,2}:\d{2}$/.test(p.start||''))continue;if(!(j.id in koz))koz[j.id]={wid:w.id,start:t2m(p.start),reden:String(p.reden||'').slice(0,120)}}
+    for(const p of obj.plan){const j=jByC[p.job],w=wByC[p.werker];if(!j||!w||!/^\d{1,2}:\d{2}$/.test(p.start||''))continue;if(!(j.id in koz))koz[j.id]={wid:w.id,start:t2m(p.start),reden:aiVertaal(String(p.reden||'')).slice(0,160)}}
 
     const nieuw={},fout=[];let verplaatst=0;
     for(const d of dates){
@@ -79,6 +82,11 @@ ${lines.join('\n')}`;
     }
     if(fout.length){toast(`AI-voorstel past niet binnen de regels: ${fout.slice(0,2).join('; ')}. Kies een andere dag of pas het zelf aan.`,9000);return}
 
+    /* Alleen een voorstel dat de totale reistijd verlaagt, wordt getoond */
+    const tr=(R,d)=>D.workers.reduce((a,w)=>{const ids=(R&&R[w.id])||[];return ids.length?a+simulate(WRK[w.id],ids,d).trav:a},0);
+    let voor=0,na=0;
+    for(const d of dates){voor+=tr(getPlan(d).routes,d);na+=tr(nieuw[d],d)}
+    if(na>=voor-1){toast(`Het AI-voorstel verbetert de reistijd niet (${Math.round(voor)} min nu, ${Math.round(na)} min voorstel). Er is niets veranderd.`,9000);return}
     /* Overzicht van wat er verandert, vóórdat er iets wordt opgeslagen */
     const rijen=[];let vastN=0;
     for(const d of dates){
@@ -96,7 +104,7 @@ ${lines.join('\n')}`;
       }
     }
     if(!rijen.length){toast('Het AI-voorstel verandert niets.');return}
-    const samen=`${dates.length===1?'Deze dag':dates.length+' dagen'}: ${rijen.length} bezoek(en) veranderen van medewerker of tijd. ${vastN} vaste bezoek(en) blijven staan.`;
+    const samen=`${dates.length===1?'Deze dag':dates.length+' dagen'}: ${rijen.length} bezoek(en) veranderen van medewerker of tijd. Totale reistijd ${Math.round(voor)} min nu, ${Math.round(na)} min na het voorstel. ${vastN} vaste bezoek(en) blijven staan.`;
     const ok=await aiOverzicht(rijen,samen);
     if(!ok)return;
     dates.forEach(d=>{const P=getPlan(d);P.routes=nieuw[d];P.auto=Date.now();P.edited=0});

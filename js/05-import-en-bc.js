@@ -175,6 +175,7 @@ function openXlsxImport(){
   <div class="ximp-opts">
     <label class="chk"><input type="checkbox" id="xfuture" checked> Alleen datums vanaf vandaag</label>
     <label class="chk"><input type="checkbox" id="xslot" checked> Duur = lengte van het tijdvak</label>
+    <label class="chk"><input type="checkbox" id="xgeen" checked> Bezoeken zonder tijdvak direct inplannen</label>
     <label class="chk"><input type="checkbox" id="xclear"${isSample()?' checked':''}> Voorbeeldgegevens eerst verwijderen</label>
   </div>
   <div id="xprev"></div>
@@ -332,7 +333,8 @@ function doXImport(){
   const type=$('#xtype').value,slack=+$('#xslack').value||0,slotDur=$('#xslot').checked;
   if(XIMP.billTo==='__new'&&!xBillName(XIMP)){toast('Vul de naam van de leasemaatschappij in, of kies een bestaande klant bij Factureren aan.');const i=$('#xbillnew');if(i)i.focus();return}
   if($('#xclear').checked)removeSample();
-  let n=0,dup=0,newC=0,newL=0;const dates=new Set(),newLocs=[],slotIds=[];
+  let n=0,dup=0,newC=0,newL=0;const dates=new Set(),newLocs=[],slotIds=[],skipIds=[];
+  const geenPlan=$('#xgeen')&&!$('#xgeen').checked;
   let billCu=null;
   if(XIMP.billTo==='__new'){const nm=xBillName(XIMP);billCu=D.customers.find(c=>clean(c.name).toLowerCase()===nm.toLowerCase());if(!billCu){billCu={id:uid('c'),name:nm,contact:'',phone:'',email:'',login:''};D.customers.push(billCu);newC++}}
   else if(XIMP.billTo)billCu=D.customers.find(c=>c.id===XIMP.billTo)||null;
@@ -354,10 +356,13 @@ function doXImport(){
     const isSlot=len>0&&!it.win,nShare=share[locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to]||1;
     if(isSlot&&nShare>1&&log[it.li])log[it.li].reason=`Let op: ${nShare} auto's tegelijk in dit tijdslot`;
     if(isSlot)slotIds.push({id:jid,date:it.date});
+    if(geenPlan&&!from&&!to)skipIds.push({id:jid,date:it.date});
     D.jobs.push({id:jid,plate:it.plate,vehicle:it.veh,locationId:lo.id,date:it.date,from,to,type,duration:isSlot?len:'',priority:2,notes:it.note});n++;dates.add(it.date);
   }
   index();closeForm();XIMP=null;
   const ds=[...dates].sort(),today=todayIso();
+  /* Bezoeken zonder tijdvak: geïmporteerd, maar niet automatisch ingepland (blijven bij niet ingepland) */
+  for(const s of skipIds){const P=getPlan(s.date);P.skip=P.skip||{};P.skip[s.id]=true}
   /* Vaste tijdsloten (begin- en eindtijd, geen tijdvak): eerst plannen, dan bij de gekozen medewerker vastzetten */
   if(slotIds.length){for(const d of ds)if(!hasPlan(d)&&jobsOn(d).length)autoPlan(d);for(const s of slotIds){const P=getPlan(s.date);for(const wid of Object.keys(P.routes))if(P.routes[wid].includes(s.id))P.pinned[s.id]=wid}}
   if(ds.length){S.date=ds.find(d=>d>=today)||ds[0];S.tab='planning';S.selLoc=null}

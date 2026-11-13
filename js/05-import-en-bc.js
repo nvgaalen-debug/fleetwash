@@ -237,7 +237,7 @@ function xRows(X){const fut=$('#xfuture')&&$('#xfuture').checked,t=todayIso();
 function xDurFn(){const slot=$('#xslot')&&$('#xslot').checked,typ=TYP[$('#xtype')&&$('#xtype').value]||D.types[0]||{dur:30,name:''};
   const share={};xItems().forEach(it=>{if(it.from&&it.to){const k=locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to;share[k]=(share[k]||0)+1}});
   return r=>{const len=r.from&&r.to?t2m(r.to)-t2m(r.from):0;
-    if(slot&&len>0&&!r.win){const n=share[locKey({cust:String(r.cust||''),pc:r.pc||'',addr:r.addr||'',city:r.city||''})+'|'+r.date+'|'+r.from+'|'+r.to]||1;return{m:Math.max(10,Math.floor(len/n)),src:n>1?`tijdslot gedeeld door ${n}`:'tijdslot'}}
+    if(len>0&&!r.win){const n=share[locKey({cust:String(r.cust||''),pc:r.pc||'',addr:r.addr||'',city:r.city||''})+'|'+r.date+'|'+r.from+'|'+r.to]||1;return{m:len,src:n>1?`vast tijdslot, let op: ${n} auto's tegelijk`:'vast tijdslot'}}
     return{m:typ.dur,src:r.win&&slot&&len>0?`venster, dus ${typ.name}`:typ.name}}}
 function xPvBody(X){const pv=X.pv||(X.pv={f:'imp',q:''}),rows=xRows(X),q=normQ(pv.q).trim(),words=q?q.split(/\s+/):[];
   const list=rows.filter(r=>(pv.f==='all'||(pv.f==='skip'?!['imp','dup'].includes(r.st):r.st===pv.f))&&(!words.length||words.every(w=>normQ([r.plate,r.veh,r.cust,r.addr,r.pc,r.city,r.note,r.reason,r.date].join(' ')).includes(w))))
@@ -332,7 +332,7 @@ function doXImport(){
   const type=$('#xtype').value,slack=+$('#xslack').value||0,slotDur=$('#xslot').checked;
   if(XIMP.billTo==='__new'&&!xBillName(XIMP)){toast('Vul de naam van de leasemaatschappij in, of kies een bestaande klant bij Factureren aan.');const i=$('#xbillnew');if(i)i.focus();return}
   if($('#xclear').checked)removeSample();
-  let n=0,dup=0,newC=0,newL=0;const dates=new Set(),newLocs=[];
+  let n=0,dup=0,newC=0,newL=0;const dates=new Set(),newLocs=[],slotIds=[];
   let billCu=null;
   if(XIMP.billTo==='__new'){const nm=xBillName(XIMP);billCu=D.customers.find(c=>clean(c.name).toLowerCase()===nm.toLowerCase());if(!billCu){billCu={id:uid('c'),name:nm,contact:'',phone:'',email:'',login:''};D.customers.push(billCu);newC++}}
   else if(XIMP.billTo)billCu=D.customers.find(c=>c.id===XIMP.billTo)||null;
@@ -351,10 +351,15 @@ function doXImport(){
     let from=it.from,to=it.to;const len=from&&to?t2m(to)-t2m(from):0;
     if(slack){if(from)from=m2t(Math.max(0,t2m(from)-slack));if(to)to=m2t(Math.min(1439,t2m(to)+slack))}
     const jid=uid('j');if(log[it.li]){log[it.li].status='imp';log[it.li].jobId=jid}
-    D.jobs.push({id:jid,plate:it.plate,vehicle:it.veh,locationId:lo.id,date:it.date,from,to,type,duration:slotDur&&len>0&&!it.win?Math.max(10,Math.floor(len/(share[locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to]||1))):'',priority:2,notes:it.note});n++;dates.add(it.date);
+    const isSlot=len>0&&!it.win,nShare=share[locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to]||1;
+    if(isSlot&&nShare>1&&log[it.li])log[it.li].reason=`Let op: ${nShare} auto's tegelijk in dit tijdslot`;
+    if(isSlot)slotIds.push({id:jid,date:it.date});
+    D.jobs.push({id:jid,plate:it.plate,vehicle:it.veh,locationId:lo.id,date:it.date,from,to,type,duration:isSlot?len:'',priority:2,notes:it.note});n++;dates.add(it.date);
   }
   index();closeForm();XIMP=null;
   const ds=[...dates].sort(),today=todayIso();
+  /* Vaste tijdsloten (begin- en eindtijd, geen tijdvak): eerst plannen, dan bij de gekozen medewerker vastzetten */
+  if(slotIds.length){for(const d of ds)if(!hasPlan(d)&&jobsOn(d).length)autoPlan(d);for(const s of slotIds){const P=getPlan(s.date);for(const wid of Object.keys(P.routes))if(P.routes[wid].includes(s.id))P.pinned[s.id]=wid}}
   if(ds.length){S.date=ds.find(d=>d>=today)||ds[0];S.tab='planning';S.selLoc=null}
   D.importLog={file:fileName,at:Date.now(),entries:log};importLogs();const lid=uid('il');D.importLogs=D.importLogs.filter(x=>x.at!==D.importLog.at).concat({id:lid,...D.importLog}).slice(-10);S.logId=lid;delete D.importLog;
   const msg=`${n} opdrachten geïmporteerd (${newC} nieuwe klanten, ${newL} nieuwe locaties)${dup?`, ${dup} dubbele overgeslagen`:''}`;

@@ -270,9 +270,10 @@ function simulate(w,ids,date){
     const pf=(D.plans[dt]&&D.plans[dt].prefs||{})[id];let ws=t2m(j.from);if(pf!=null&&(ws==null||pf>ws))ws=pf;const we=t2m(j.to);
     if(ws!=null&&t<ws){seg.push({k:'wait',a:t,b:ws});wait+=ws-t;cur.wait+=ws-t;if(!pauseDone&&ws-t>=pm&&ws>pAt)pauseDone=true;t=ws}
     else if(!pauseDone&&t>=pAt&&cur.jobs.length&&pauseFits(i,t,pos))pause();
-    const d=jobDur(j),s=t,e=t+d,isLate=we!=null&&e>we+.5;
+    /* Alleen een tijd (zonder "tot"): exacte starttijd, te laat als de medewerker na die tijd start */
+    const d=jobDur(j),s=t,e=t+d,exact=ws!=null&&we==null,lateStart=exact&&s>ws+.5,isLate=lateStart||(we!=null&&e>we+.5);
     seg.push({k:'job',a:s,b:e,id,late:isLate});serv+=d;t=e;
-    if(isLate){late+=e-we;lateJobs.push(id);cur.late=true}
+    if(isLate){late+=lateStart?s-ws:e-we;lateJobs.push(id);cur.late=true}
     cur.jobs.push(id);if(cur.start==null)cur.start=s;cur.end=e;
   }
   if(stops.length){
@@ -390,15 +391,17 @@ function cleanPlan(date){
 }
 function autoPlan(date){
   const P=cleanPlan(date),jobs=jobsOn(date),ws=D.workers.filter(w=>avail(w,date)),pins=P.pinned;
-  const R={};ws.forEach(w=>R[w.id]=[]);
+  /* Bezoeken die al bij een medewerker staan, blijven daar; vastgezette bezoeken worden hieronder op hun medewerker gezet */
+  const R={},bij=new Set(jobs.map(j=>j.id));ws.forEach(w=>R[w.id]=(P.routes[w.id]||[]).filter(id=>bij.has(id)&&!pins[id]));
   const byWin=(a,b)=>(t2m(a.from)??0)-(t2m(b.from)??0);
   const pj=jobs.filter(j=>pins[j.id]&&R[pins[j.id]]).sort(byWin);
   for(const j of pj){const wid=pins[j.id];const b=bestPos(WRK[wid],R[wid],[j.id],true)||bestPos(WRK[wid],R[wid],[j.id],false);R[wid]=b.arr}
   insertLoop(jobs.filter(j=>!(pins[j.id]&&R[pins[j.id]])).map(j=>j.id),R,ws);
-  improve(R,ws,pins,false);
+  /* Optimaliseren alleen binnen de route van elke medewerker; bezoeken niet over medewerkers heen verplaatsen */
+  improve(R,ws,pins,true);
   const inR=()=>new Set(Object.values(R).flat());
   let left=jobs.map(j=>j.id).filter(id=>!inR().has(id));
-  if(left.length){insertLoop(left,R,ws);improve(R,ws,pins,false);eject(R,ws,pins,jobs);improve(R,ws,pins,false)}
+  if(left.length){insertLoop(left,R,ws);improve(R,ws,pins,true)}
   P.routes=R;P.auto=Date.now();P.edited=0;
   return P;
 }

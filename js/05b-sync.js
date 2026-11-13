@@ -78,7 +78,7 @@ async function pushState(){
     }else if(e&&e.code==='pw'){
       // het wachtwoordvenster is al getoond
     }else{
-      toast('Opslaan op de server mislukt. Je wijziging staat wel lokaal.');
+      toast('Opslaan op de server mislukt: '+(e&&e.message?e.message:'onbekende fout')+'. Je wijziging staat wel lokaal.');
     }
   }finally{
     PUSHING=false;

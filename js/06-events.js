@@ -79,9 +79,8 @@ function onClick(e){
     case'combopick':comboPick(el.dataset.k,el.dataset.v);break;
     case'chat':openChat(el.dataset.id);break;
     case'chatquick':chatSend(el.dataset.q);break;
-    case'archiefnu':archiveerGereed(el.dataset.periode);break;
-    case'archper':archiefKiesPeriode(el.dataset.periode);break;
-    case'archkey':archiefKiesSleutel(el.dataset.key);break;
+    case'archiefnu':archiveerGereed();break;
+    case'archtoon':archiefToon();break;
     case'archsave':archiefTermijnOpslaan();break;
     case'archopruim':archiefOpruimen();break;
     case'chatapply':chatApply(+el.dataset.m,+el.dataset.i);break;

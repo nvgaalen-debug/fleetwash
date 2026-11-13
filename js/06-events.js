@@ -174,6 +174,7 @@ function migrateBillTo(){
 }
 function init(){
   try{load();migrateBillTo()}catch(err){if(!D)D=sample();try{index()}catch(e){}setTimeout(()=>showFatal('gegevens laden',err),0)}
+  initSync();
   try{if(window.claude&&typeof window.claude.use==='function')window.claude.use('sample').then(s=>{SAMPLE=s||null}).catch(()=>{})}catch(e){}
   document.addEventListener('click',onClick);
   if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);if(SERVER)setInterval(()=>{if(!document.hidden&&(MV||(S.tab==='planning'&&Date.now()-MSG.at>30000)))fetchMsgs(true)},15000);document.addEventListener('change',onChange);document.addEventListener('contextmenu',onContext);addEventListener('scroll',closeCtx,{passive:true});addEventListener('resize',closeCtx);

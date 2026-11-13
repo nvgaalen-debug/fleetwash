@@ -252,7 +252,7 @@ function simulate(w,ids,date){
   const dt=date||(ids.length&&JOB[ids[0]]?JOB[ids[0]].date:null),sh=shiftOf(w,dt);
   const st=D.settings,start=t2m(sh.start)??480,end=t2m(sh.end)??1020,pAt=t2m(st.pauseAt)??720,pm=+st.pauseMin||0;
   let t=start,pos=wPt(w),km=0,trav=0,wait=0,serv=0,pauseDone=pm<=0,late=0,cur=null,depart=start,lastEnd=start;
-  if(st.startAtFirst!==false&&ids.length){const j0=JOB[ids[0]],l0=j0&&LOC[j0.locationId];if(l0){const arr=Math.max(start,t2m(j0.from)??start);depart=arr-leg(pos,lPt(l0)).min-(+st.parkMin||0);const mp=st.maxPreTravel==null||st.maxPreTravel===''?60:+st.maxPreTravel;depart=Math.max(depart,start-mp);t=depart}}
+  if(st.startAtFirst!==false&&ids.length){const j0=JOB[ids[0]],l0=j0&&LOC[j0.locationId];if(l0){const pf0=(D.plans[dt]&&D.plans[dt].prefs||{})[ids[0]];let a0=t2m(j0.from);if(pf0!=null&&(a0==null||pf0>a0))a0=pf0;const arr=Math.max(start,a0??start);depart=arr-leg(pos,lPt(l0)).min-(+st.parkMin||0);const mp=st.maxPreTravel==null||st.maxPreTravel===''?60:+st.maxPreTravel;depart=Math.max(depart,start-mp);t=depart}}
   const seg=[],stops=[],lateJobs=[],skillBad=[];
   const pause=()=>{seg.push({k:'pause',a:t,b:t+pm});t+=pm;pauseDone=true};
   /* Pauze is flexibel: alleen nemen als de volgende klussen daardoor niet buiten hun tijdvak vallen */

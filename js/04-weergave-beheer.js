@@ -369,7 +369,7 @@ function editJob(id,preset){
     onSave:v=>{if(v.from&&v.to&&t2m(v.to)<=t2m(v.from))return'"Uiterlijk gereed" moet later zijn dan "Vanaf".';
       if(id){Object.assign(j,v);replan([v.date,old]);toast('Opdracht opgeslagen, planning herberekend.');return}
       const nj={id:uid('j'),...v};D.jobs.push(nj);index();
-      if(pl&&WRK[pl.wid]){if(!hasPlan(v.date)&&jobsOn(v.date).length>1)autoPlan(v.date);const nm=placeNewJob(nj,pl);replan([v.date]);const st=jobPlanInfo(nj);toast(`Afspraak ${nj.plate} ingepland bij ${nm}${st.start!=null?' om '+m2t(st.start):''} en vastgezet${st.st==='late'?'. Let op: valt buiten het tijdvak of de werktijd':''}.`);return}
+      if(pl&&WRK[pl.wid]){if(t2m(v.from)!=null)pl.at=t2m(v.from);if(!hasPlan(v.date)&&jobsOn(v.date).length>1)autoPlan(v.date);const nm=placeNewJob(nj,pl);replan([v.date]);const st=jobPlanInfo(nj);toast(`Afspraak ${nj.plate} ingepland bij ${nm}${st.start!=null?' om '+m2t(st.start):''} en vastgezet${st.st==='late'?'. Let op: valt buiten het tijdvak of de werktijd':''}.`);return}
       replan([v.date]);toast('Opdracht toegevoegd en ingepland.')},
     onDelete:id?()=>{D.jobs=D.jobs.filter(x=>x.id!==id);replan([old]);toast('Opdracht verwijderd.')}:null});
 }
@@ -407,6 +407,7 @@ function onContext(e){
   const first=w.name.split(' ')[0];
   openCtx(e.clientX,e.clientY,
     (t!=null?ctxBtn('ctxnew',`${I.plus} Nieuwe afspraak om ${m2t(t)}`,`data-wid="${wid}" data-t="${t}"`,`bij ${esc(first)}, vastgezet`):'')+
+    ctxBtn('ctxnew',`${I.plus} Nieuwe afspraak op een ander tijdstip`,`data-wid="${wid}" data-t=""`,`bij ${esc(first)}, zelf de tijd invullen`)+
     ctxBtn('ctxnew',`${I.plus} Nieuwe afspraak voor ${esc(first)}`,`data-wid="${wid}"`,'op de beste plek in de rit')+
     ctxBtn('newjob',`${I.plus} Nieuwe afspraak, automatisch plannen`,'','de app kiest de medewerker')+
     `<div class="ctx-sep"></div>`+

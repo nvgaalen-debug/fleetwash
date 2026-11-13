@@ -28,13 +28,14 @@ async function aiVoorstel(dates){
     jobs.forEach(j=>{const P=getPlan(j.date),cur=aiHuidigeWerker(j,P),v=aiVast(j,P)&&cur!=null;const s=aiStart(j,P);
       lines.push(`${jC[j.id]} dag=${j.date} loc=${lC[j.locationId]} duur=${jobDur(j)} van=${j.from||'-'} tot=${j.to||'-'} vaardigheid=${jobSkill(j)||'geen'} vast=${v?'ja':'nee'}${v?' werker='+wC[cur]+' start='+(s!=null?m2t(s):'-'):''}`)});
     const prompt=`Je bent planner voor reinigingsbezoeken aan auto's. Geef ALLEEN JSON terug, zonder tekst eromheen, in dit formaat:
-{"plan":[{"job":"J01","werker":"W02","start":"08:30"}]}
+{"plan":[{"job":"J01","werker":"W02","start":"08:30","reden":"korte zin, max 10 woorden, Nederlands"}]}
 Regels:
 - Neem alleen bezoeken met vast=nee op in het antwoord. Bezoeken met vast=ja blijven staan zoals ze zijn.
 - Elk bezoek met vast=nee krijgt precies één werker en één starttijd. De starttijd ligt binnen de werktijd van die werker op die dag, en binnen van/tot als die zijn ingevuld.
 - Een werker doet op één moment één bezoek. Tussen twee bezoeken moet genoeg tijd zitten voor reistijd en duur. Reistijd van de standplaats (Wxx) naar een locatie staat als Wxx>Lxx; tussen locaties als Lxx>Lxx.
 - Een werker krijgt alleen een bezoek als hij de vaardigheid heeft (geen = iedereen).
 - Verdeel het werk zo dat de totale reistijd klein blijft.
+- Geef bij elk bezoek een korte reden (max 10 woorden), bijvoorbeeld: kortere rit vanaf standplaats, medewerker zit toch in de buurt, past in lege tijd.
 - Antwoord alleen met de JSON.
 
 ${lines.join('\n')}`;
@@ -49,7 +50,7 @@ ${lines.join('\n')}`;
     try{obj=JSON.parse(txt.slice(a,b+1))}catch(e){}
     if(!obj||!Array.isArray(obj.plan)){toast('De AI gaf geen bruikbaar voorstel. Probeer het opnieuw.');return}
     const koz={};
-    for(const p of obj.plan){const j=jByC[p.job],w=wByC[p.werker];if(!j||!w||!/^\d{1,2}:\d{2}$/.test(p.start||''))continue;if(!(j.id in koz))koz[j.id]={wid:w.id,start:t2m(p.start)}}
+    for(const p of obj.plan){const j=jByC[p.job],w=wByC[p.werker];if(!j||!w||!/^\d{1,2}:\d{2}$/.test(p.start||''))continue;if(!(j.id in koz))koz[j.id]={wid:w.id,start:t2m(p.start),reden:String(p.reden||'').slice(0,120)}}
 
     const nieuw={},fout=[];let verplaatst=0;
     for(const d of dates){
@@ -90,7 +91,7 @@ ${lines.join('\n')}`;
           const j=JOB[id];
           if(aiVast(j,P0)&&aiHuidigeWerker(j,P0)){vastN++;continue}
           const seg=s.seg.find(x=>x.k==='job'&&x.id===id),nt=seg?seg.a:null,v=nu[id];
-          if(!v||v.naam!==WRK[wid].name||v.t!==nt)rijen.push({plate:j.plate,loc:aiKlantLoc(j),nu:v?`${v.naam}${v.t!=null?' om '+m2t(v.t):''}`:'niet ingepland',nieuw:`${WRK[wid].name}${nt!=null?' om '+m2t(nt):''}`});
+          if(!v||v.naam!==WRK[wid].name||v.t!==nt)rijen.push({plate:j.plate,loc:aiKlantLoc(j),nu:v?`${v.naam}${v.t!=null?' om '+m2t(v.t):''}`:'niet ingepland',nieuw:`${WRK[wid].name}${nt!=null?' om '+m2t(nt):''}`,reden:(koz[id]&&koz[id].reden)||'Betere volgorde binnen de rit'});
         }
       }
     }
@@ -108,7 +109,7 @@ ${lines.join('\n')}`;
 function aiOverzicht(rijen,samen){
   return new Promise(res=>{
     const m=$('#modal');
-    m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="aivT" style="max-width:860px"><h3 id="aivT">AI-voorstel: wat verandert er</h3><p class="note">${esc(samen)} Vaste tijdsloten en vastgezette bezoeken worden niet gewijzigd.</p><div class="tbl-wrap" style="max-height:55vh;overflow:auto"><table><thead><tr><th>Kenteken</th><th>Klant en locatie</th><th>Nu</th><th>Voorstel</th></tr></thead><tbody>${rijen.map(r=>`<tr><td class="mono">${esc(r.plate)}</td><td>${esc(r.loc)}</td><td>${esc(r.nu)}</td><td><b>${esc(r.nieuw)}</b></td></tr>`).join('')}</tbody></table></div><div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" id="aivNee">Annuleren</button><button type="button" class="btn primary" id="aivJa">Doorvoeren</button></div></div>`;
+    m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="aivT" style="max-width:860px"><h3 id="aivT">AI-voorstel: wat verandert er</h3><p class="note">${esc(samen)} Vaste tijdsloten en vastgezette bezoeken worden niet gewijzigd.</p><div class="tbl-wrap" style="max-height:55vh;overflow:auto"><table><thead><tr><th>Kenteken</th><th>Klant en locatie</th><th>Nu</th><th>Voorstel</th><th>Reden</th></tr></thead><tbody>${rijen.map(r=>`<tr><td class="mono">${esc(r.plate)}</td><td>${esc(r.loc)}</td><td>${esc(r.nu)}</td><td><b>${esc(r.nieuw)}</b></td><td>${esc(r.reden)}</td></tr>`).join('')}</tbody></table></div><div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" id="aivNee">Annuleren</button><button type="button" class="btn primary" id="aivJa">Doorvoeren</button></div></div>`;
     m.hidden=false;
     const klaar=v=>{m.hidden=true;m.innerHTML='';res(v)};
     $('#aivNee').onclick=()=>klaar(false);

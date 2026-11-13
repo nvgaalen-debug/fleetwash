@@ -705,7 +705,7 @@ function liveOne(e,memo){
     const j=JOB[e.jobId];if(!j)return{...e,st:'gone',reason:'Opdracht is na de import verwijderd'};
     const P=D.plans[j.date];let wid=null;if(P&&P.routes)for(const k in P.routes)if(P.routes[k].includes(j.id))wid=k;
     if(wid&&WRK[wid]){const key=wid+'|'+j.date;const s=memo[key]||(memo[key]=simulate(WRK[wid],P.routes[wid],j.date));const g=s.seg.find(x=>x.k==='job'&&x.id===j.id);
-      return{...e,st:'planned',date:j.date,reason:`${WRK[wid].name}, ${g?m2t(g.a)+'–'+m2t(g.b):''}${g&&g.late?' (buiten tijdvak)':''}`}}
+      return{...e,st:'planned',date:j.date,reason:`${WRK[wid].name}, ${g?m2t(g.a)+'–'+m2t(g.b):''}${g&&g.late?(g.ls?' (later dan de vaste tijd)':' (buiten tijdvak)'):''}`}}
     return{...e,st:'unplanned',date:j.date,reason:hasPlan(j.date)?whyUnplanned(j,j.date):'Nog niet gepland: open deze dag in Planning'};
   }
 }

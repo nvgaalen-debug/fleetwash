@@ -272,7 +272,7 @@ function simulate(w,ids,date){
     else if(!pauseDone&&t>=pAt&&cur.jobs.length&&pauseFits(i,t,pos))pause();
     /* Alleen een tijd (zonder "tot"): exacte starttijd, te laat als de medewerker na die tijd start */
     const d=jobDur(j),s=t,e=t+d,exact=ws!=null&&we==null,lateStart=exact&&s>ws+.5,isLate=lateStart||(we!=null&&e>we+.5);
-    seg.push({k:'job',a:s,b:e,id,late:isLate});serv+=d;t=e;
+    seg.push({k:'job',a:s,b:e,id,late:isLate,ls:lateStart});serv+=d;t=e;
     if(isLate){late+=lateStart?s-ws:e-we;lateJobs.push(id);cur.late=true}
     cur.jobs.push(id);if(cur.start==null)cur.start=s;cur.end=e;
   }

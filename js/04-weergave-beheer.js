@@ -571,7 +571,7 @@ function jobPlanNote(j){
   const P=D.plans[j.date],l=LOC[j.locationId]||{},cu=CUS[l.customerId]||{};let wid=null;
   if(P&&P.routes)for(const k in P.routes)if(P.routes[k].includes(j.id))wid=k;
   let t=`${cu.name||''}, ${[l.address,l.city].filter(Boolean).join(', ')}. `;
-  if(wid&&WRK[wid]){const s=simulate(WRK[wid],P.routes[wid],j.date),g=s.seg.find(x=>x.k==='job'&&x.id===j.id);t+=`Gepland bij ${WRK[wid].name} op ${fdate(j.date,{weekday:'short',day:'numeric',month:'short'})}${g?`, ${m2t(g.a)}–${m2t(g.b)}${g.late?' (buiten tijdvak)':''}`:''}.`}
+  if(wid&&WRK[wid]){const s=simulate(WRK[wid],P.routes[wid],j.date),g=s.seg.find(x=>x.k==='job'&&x.id===j.id);t+=`Gepland bij ${WRK[wid].name} op ${fdate(j.date,{weekday:'short',day:'numeric',month:'short'})}${g?`, ${m2t(g.a)}–${m2t(g.b)}${g.late?(g.ls?' (later dan de vaste tijd)':' (buiten tijdvak)'):''}`:''}.`}
   else t+='Nog niet ingepland.';
   if(P&&P.edited)t+=' Deze dag is handmatig aangepast: na opslaan worden de tijden herberekend en blijft de rest van de planning staan.';
   return t;
@@ -581,7 +581,7 @@ function openVisit(wid,lid){
   const s=simulate(w,P.routes[wid]||[],date),idx=s.stops.findIndex(x=>x.loc.id===lid),p=s.stops[idx];if(!p)return;
   const rows=p.jobs.map(id=>{const j=JOB[id],g=s.seg.find(x=>x.k==='job'&&x.id===id);
     return`<li class="vjob"><div class="row">${plateBtn(j)}<b>${esc((TYP[j.type]||{}).name||j.type)}</b><span class="muted">${esc(j.vehicle||'')}</span><span class="sp"></span>${stChip(id,date)}${+j.priority===3?'<span class="chip warn">Hoge prio</span>':''}</div>
-      <div class="small muted">Gepland ${g?m2t(g.a)+'–'+m2t(g.b):''} (${jobDur(j)} min) · tijdvak klant ${j.from||j.to?esc((j.from||'—')+'–'+(j.to||'—')):'hele dag'}${g&&g.late?' · <b style="color:var(--bad)">buiten tijdvak</b>':''}</div>
+      <div class="small muted">Gepland ${g?m2t(g.a)+'–'+m2t(g.b):''} (${jobDur(j)} min) · tijdvak klant ${j.from||j.to?esc((j.from||'—')+'–'+(j.to||'—')):'hele dag'}${g&&g.late?' · <b style="color:var(--bad)">'+(g.ls?'later dan de vaste tijd':'buiten tijdvak')+'</b>':''}</div>
       ${j.notes?`<div class="small">${esc(j.notes)}</div>`:''}
       <div class="row"><button class="btn sm primary" data-act="chat" data-id="${id}">${I.auto} Herplan met AI</button><button class="btn sm" data-act="editjob" data-id="${id}">${I.edit} Opdracht wijzigen</button>${g&&g.late?`<button class="btn sm" data-act="propose" data-ids="${id}">${I.auto} Slim voorstel</button>`:''}</div></li>`}).join('');
   FORM=null;

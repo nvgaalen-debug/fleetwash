@@ -78,11 +78,40 @@ ${lines.join('\n')}`;
     }
     if(fout.length){toast(`AI-voorstel past niet binnen de regels: ${fout.slice(0,2).join('; ')}. Kies een andere dag of pas het zelf aan.`,9000);return}
 
-    const aantal=Object.keys(koz).filter(id=>jobs.some(j=>j.id===id)).length;
-    const ok=confirm(`AI-voorstel voor ${dates.length===1?'deze dag':'deze '+dates.length+' dagen'} (${aantal} bezoeken ingepland):\n\n- ${verplaatst} bezoek(en) naar een andere medewerker\n- De rest in een andere volgorde en tijd\n- Vaste tijdsloten en vastgezette bezoeken blijven staan\n\nOK = voorstel doorvoeren\nAnnuleren = niets veranderen`);
+    /* Overzicht van wat er verandert, vóórdat er iets wordt opgeslagen */
+    const rijen=[];let vastN=0;
+    for(const d of dates){
+      const P0=getPlan(d),nu={};
+      jobsOn(d).forEach(j=>{const wj=jobWhere(j.id);nu[j.id]=wj&&wj.wid?{naam:WRK[wj.wid].name,t:wj.start}:null});
+      for(const wid of Object.keys(nieuw[d])){
+        const ids=nieuw[d][wid];if(!ids.length)continue;
+        const s=simulate(WRK[wid],ids,d);
+        for(const id of ids){
+          const j=JOB[id];
+          if(aiVast(j,P0)&&aiHuidigeWerker(j,P0)){vastN++;continue}
+          const seg=s.seg.find(x=>x.k==='job'&&x.id===id),nt=seg?seg.a:null,v=nu[id];
+          if(!v||v.naam!==WRK[wid].name||v.t!==nt)rijen.push({plate:j.plate,loc:LOC[j.locationId]?LOC[j.locationId].name:'',nu:v?`${v.naam}${v.t!=null?' om '+m2t(v.t):''}`:'niet ingepland',nieuw:`${WRK[wid].name}${nt!=null?' om '+m2t(nt):''}`});
+        }
+      }
+    }
+    if(!rijen.length){toast('Het AI-voorstel verandert niets.');return}
+    const samen=`${dates.length===1?'Deze dag':dates.length+' dagen'}: ${rijen.length} bezoek(en) veranderen van medewerker of tijd. ${vastN} vaste bezoek(en) blijven staan.`;
+    const ok=await aiOverzicht(rijen,samen);
     if(!ok)return;
     dates.forEach(d=>{const P=getPlan(d);P.routes=nieuw[d];P.auto=Date.now();P.edited=0});
     save();render();
     toast(`AI-voorstel doorgevoerd voor ${dates.length} dag(en).`);
   }finally{AIV_BUSY=false}
+}
+
+/* Overzichtsvenster: tabel met wat er per bezoek verandert. Geeft true bij Doorvoeren, false bij Annuleren. */
+function aiOverzicht(rijen,samen){
+  return new Promise(res=>{
+    const m=$('#modal');
+    m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="aivT" style="max-width:860px"><h3 id="aivT">AI-voorstel: wat verandert er</h3><p class="note">${esc(samen)} Vaste tijdsloten en vastgezette bezoeken worden niet gewijzigd.</p><div class="tbl-wrap" style="max-height:55vh;overflow:auto"><table><thead><tr><th>Kenteken</th><th>Klant en locatie</th><th>Nu</th><th>Voorstel</th></tr></thead><tbody>${rijen.map(r=>`<tr><td class="mono">${esc(r.plate)}</td><td>${esc(r.loc)}</td><td>${esc(r.nu)}</td><td><b>${esc(r.nieuw)}</b></td></tr>`).join('')}</tbody></table></div><div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" id="aivNee">Annuleren</button><button type="button" class="btn primary" id="aivJa">Doorvoeren</button></div></div>`;
+    m.hidden=false;
+    const klaar=v=>{m.hidden=true;m.innerHTML='';res(v)};
+    $('#aivNee').onclick=()=>klaar(false);
+    $('#aivJa').onclick=()=>klaar(true);
+  });
 }

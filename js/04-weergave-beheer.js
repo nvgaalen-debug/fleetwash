@@ -276,7 +276,7 @@ function routePanel(st){
   li+=`<li><span></span><div class="rt-end" data-drop="end:${w.id}">Sleep hierheen om achteraan de rit toe te voegen</div></li>`;
   const util=s.n?Math.round(s.serv/Math.max(1,s.end-s.start)*100):0;
   return`<section class="panel">${chips}
-  <div class="rt-head"><div class="row"><h2>Rit ${esc(w.name)}</h2><span class="sp"></span>${sickBtns(w,S.date)}<button class="btn sm" data-act="ovr" data-wid="${w.id}">${I.edit} Werktijd deze dag</button><button class="btn sm" data-act="seqopt" data-wid="${w.id}">${I.route} Volgorde optimaliseren</button></div>
+  <div class="rt-head"><div class="row"><h2>Rit ${esc(w.name)}</h2><span class="sp"></span>${sickBtns(w,S.date)}<button class="btn sm" data-act="ovr" data-wid="${w.id}">${I.edit} Werktijd deze dag</button><button class="btn sm" data-act="pauze" data-wid="${w.id}">${I.edit} Pauze deze dag</button><button class="btn sm" data-act="seqopt" data-wid="${w.id}">${I.route} Volgorde optimaliseren</button></div>
   <div class="sub">Standplaats ${esc(w.postcode)} ${esc(w.city)} · werktijd ${esc(shiftOf(w,date).start)}–${esc(shiftOf(w,date).end)}${ovr(w,date)?` <span class="chip warn">Afwijkend vandaag${ovr(w,date).note?': '+esc(ovr(w,date).note):''} · normaal ${esc(w.start)}–${esc(w.end)}</span>`:''}${(w.skills||[]).length?' · '+esc(w.skills.join(', ')):''}${why?` · <b style="color:var(--bad)">${esc(why)}</b>`:''}</div>
   <dl class="stats"><div><dt>Vertrek</dt><dd>${m2t(s.depart)}</dd></div><div><dt>Terug</dt><dd>${m2t(s.finish)}</dd></div><div><dt>Voertuigen</dt><dd>${s.n}</dd></div><div><dt>Rijtijd</dt><dd>${fdur(s.trav)}</dd></div><div><dt>Afstand</dt><dd>${fkm(s.km)}</dd></div><div><dt>Benutting</dt><dd>${util}%</dd></div></dl></div>
   <ol class="rt">${li}</ol></section>`;
@@ -720,6 +720,15 @@ function editW(id){
     onDelete:id?()=>{D.workers=D.workers.filter(x=>x.id!==id);replan(Object.keys(D.plans));toast('Medewerker verwijderd.')}:null});
 }
 
+/* Pauze per medewerker en per dag: duur, startvenster en optioneel een vast startmoment (vastgezet, wordt bij automatisch plannen niet gewijzigd) */
+function editPauze(wid,date){
+  const w=WRK[wid];if(!w)return;const P=getPlan(date);P.pauze=P.pauze||{};const cur=P.pauze[wid];const st=D.settings;
+  openForm({title:`Pauze ${w.name}, ${fdate(date,{weekday:'short',day:'numeric',month:'short'})}`,note:'Bij automatisch plannen kiest de app het startmoment binnen het venster. Een vast startmoment blijft staan. "Uiterlijk starten" betekent: de pauze begint uiterlijk op dat tijdstip.',
+    fields:[{k:'min',label:'Pauzeduur (min, 0 = geen pauze)',type:'number',req:1},{k:'from',label:'Venster vanaf',type:'time'},{k:'tot',label:'Uiterlijk starten',type:'time'},{k:'vast',label:'Vast startmoment (optioneel)',type:'time',wide:1}],
+    values:cur||{min:st.pauseMin??30,from:st.pauseAt??'',tot:st.pauseTot??'',vast:''},
+    onSave:v=>{if(v.min===''||v.min<0)return'Vul een pauzeduur in (0 of meer).';if(v.from&&v.tot&&t2m(v.tot)<t2m(v.from))return'"Uiterlijk starten" moet na "Venster vanaf" liggen.';P.pauze[wid]={min:v.min,from:v.from||null,tot:v.tot||null,vast:v.vast||null};save();replan([date]);toast(v.vast?`Pauze vastgezet om ${v.vast}. De planning is eromheen herberekend.`:'Pauze voor deze dag opgeslagen. De planning is herberekend.')},
+    onDelete:cur?()=>{delete P.pauze[wid];save();replan([date]);toast('Pauze voor deze dag verwijderd; de algemene pauzeregel geldt weer.')}:null});
+}
 function editOvr(wid,date){
   const w=WRK[wid];if(!w)return;const cur=(w.overrides||{})[date];
   openForm({title:`Werktijd ${w.name}, ${fdate(date,{weekday:'short',day:'numeric',month:'short'})}`,note:`Normaal ${w.start}–${w.end}. Een afwijking geldt alleen voor deze dag en wordt in de planning gemarkeerd.`,

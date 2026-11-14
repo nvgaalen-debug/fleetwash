@@ -260,16 +260,25 @@ function absDelete(a){
 /* Pauze: met een 'Pauze uiterlijk' moet de pauze er zijn. Lukt dat niet op een passend moment, dan wordt hij op het eerste moment na 'Pauze vanaf' geforceerd. */
 function simulate(w,ids,date){
   const r=simulateBasis(w,ids,date,false);
-  if(D.settings.pauseTot&&(+D.settings.pauseMin||0)>0&&r.stops.length&&!r.seg.some(x=>x.k==='pause'))return simulateBasis(w,ids,date,true);
+  const dt=date||(ids.length&&JOB[ids[0]]?JOB[ids[0]].date:null),pz=((D.plans[dt]&&D.plans[dt].pauze)||{})[w.id]||{};
+  const tot=pz.tot!=null&&pz.tot!==''?pz.tot:D.settings.pauseTot,pm=pz.min!=null&&pz.min!==''?+pz.min:(+D.settings.pauseMin||0);
+  if(tot&&pm>0&&r.stops.length&&!r.seg.some(x=>x.k==='pause'))return simulateBasis(w,ids,date,true);
   return r;
 }
 function simulateBasis(w,ids,date,force){
   const dt=date||(ids.length&&JOB[ids[0]]?JOB[ids[0]].date:null),sh=shiftOf(w,dt);
-  const st=D.settings,start=t2m(sh.start)??480,end=t2m(sh.end)??1020,pAt=t2m(st.pauseAt)??720,pTot=t2m(st.pauseTot),pm=+st.pauseMin||0;
-  let t=start,pos=wPt(w),km=0,trav=0,wait=0,serv=0,pauseDone=pm<=0,late=0,cur=null,depart=start,lastEnd=start;
+  const st=D.settings,start=t2m(sh.start)??480,end=t2m(sh.end)??1020;
+  /* Pauze per medewerker en per dag: duur, startvenster en eventueel een vastgezet startmoment; anders de algemene instellingen */
+  const pz=((D.plans[dt]&&D.plans[dt].pauze)||{})[w.id]||{};
+  const pAt=t2m(pz.from)??t2m(st.pauseAt)??720,pTot=t2m(pz.tot)??t2m(st.pauseTot),pm=pz.min!=null&&pz.min!==''?(+pz.min||0):(+st.pauseMin||0);
+  const vast=t2m(pz.vast);
+  let t=start,pos=wPt(w),km=0,trav=0,wait=0,serv=0,pauseDone=pm<=0||vast!=null,late=0,cur=null,depart=start,lastEnd=start;
+  let vastDone=vast==null||pm<=0;
   if(st.startAtFirst!==false&&ids.length){const j0=JOB[ids[0]],l0=j0&&LOC[j0.locationId];if(l0){const pf0=(D.plans[dt]&&D.plans[dt].prefs||{})[ids[0]];let a0=t2m(j0.from);if(pf0!=null&&(a0==null||pf0>a0))a0=pf0;const arr=Math.max(start,a0??start);depart=arr-leg(pos,lPt(l0)).min-(+st.parkMin||0);const mp=st.maxPreTravel==null||st.maxPreTravel===''?60:+st.maxPreTravel;depart=Math.max(depart,start-mp);t=depart}}
   const seg=[],stops=[],lateJobs=[],skillBad=[];
   const pause=()=>{seg.push({k:'pause',a:t,b:t+pm});t+=pm;pauseDone=true};
+  /* Vastgezette pauze: een rit, wachttijd of klus die over het vaste startmoment heen zou lopen, begint pas na de pauze */
+  const gate=d=>{if(vastDone)return;if(t>=vast+pm){vastDone=true;return}if(t+d<=vast)return;if(t<vast){seg.push({k:'wait',a:t,b:vast});wait+=vast-t;if(cur)cur.wait+=vast-t;t=vast}if(t<vast+pm){seg.push({k:'pause',a:t,b:vast+pm});t=vast+pm}vastDone=true};
   /* Pauze is flexibel: alleen nemen als de volgende klussen daardoor niet buiten hun tijdvak vallen */
   const pauseFits=(i,t0,p0)=>{let tt=t0+pm,pp=p0;for(let k=i;k<Math.min(ids.length,i+5);k++){const jj=JOB[ids[k]],ll=jj&&LOC[jj.locationId];if(!ll)continue;const q=lPt(ll);if(q.key!==pp.key){tt+=leg(pp,q).min+(+st.parkMin||0);pp=q}const a=t2m(jj.from),b=t2m(jj.to);if(a!=null&&tt<=a)return true;tt+=jobDur(jj);if(b!=null&&tt>b+.5)return false}return true};
   for(let i=0;i<ids.length;i++){const id=ids[i];
@@ -279,10 +288,12 @@ function simulateBasis(w,ids,date,force){
     if(p.key!==pos.key){
       if(!pauseDone&&stops.length&&t>=pAt&&(force||pauseFits(i,t,pos)))pause();
       const g=leg(pos,p),mins=g.min+(+st.parkMin||0);
+      gate(mins);
       seg.push({k:'drive',a:t,b:t+mins,km:g.km});t+=mins;km+=g.km;trav+=mins;pos=p;
       cur={loc:l,arrive:t,travel:mins,km:g.km,jobs:[],start:null,end:null,wait:0,late:false};stops.push(cur);
     }
     const pf=(D.plans[dt]&&D.plans[dt].prefs||{})[id];let ws=t2m(j.from);if(pf!=null&&(ws==null||pf>ws))ws=pf;const we=t2m(j.to);
+    if(ws!=null&&t<ws)gate(ws-t);
     if(ws!=null&&t<ws){
       /* Wachten op een tijd: de pauze valt in die wachttijd (wordt getekend), mits die binnen het pauzevenster past */
       const pStart=Math.max(t,pAt);
@@ -293,12 +304,14 @@ function simulateBasis(w,ids,date,force){
       seg.push({k:'wait',a:t,b:ws});wait+=ws-t;cur.wait+=ws-t;t=ws}
     else if(!pauseDone&&t>=pAt&&cur.jobs.length&&(force||pauseFits(i,t,pos)))pause();
     /* Alleen een tijd (zonder "tot"): exacte starttijd, te laat als de medewerker na die tijd start */
+    gate(jobDur(j));
     const d=jobDur(j),s=t,e=t+d,exact=ws!=null&&we==null,lateStart=exact&&s>ws+.5,isLate=lateStart||(we!=null&&e>we+.5);
     seg.push({k:'job',a:s,b:e,id,late:isLate,ls:lateStart,vt:(pf!=null&&ws===pf)?pf:null});serv+=d;t=e;
     if(isLate){late+=lateStart?s-ws:e-we;lateJobs.push(id);cur.late=true}
     cur.jobs.push(id);if(cur.start==null)cur.start=s;cur.end=e;
   }
   if(stops.length){
+    if(!vastDone){if(t<vast){seg.push({k:'wait',a:t,b:vast});wait+=vast-t;t=vast}if(t<vast+pm){seg.push({k:'pause',a:t,b:vast+pm});t=vast+pm}vastDone=true}
     if(!pauseDone&&t-start>(+st.pauseMinDay||330)&&(pTot==null||t<=pTot))pause();
     lastEnd=t;
     const g=leg(pos,wPt(w));seg.push({k:'return',a:t,b:t+g.min,km:g.km});t+=g.min;km+=g.km;trav+=g.min;

@@ -458,6 +458,40 @@ function cleanPlan(date){
   for(const id of Object.keys(P.pinned))if(!ok.has(id)||!WRK[P.pinned[id]])delete P.pinned[id];
   return P;
 }
+/* Afdwingen: elk bezoek (één Visit-ID) bij precies één medewerker en aaneengesloten in de route. Bestaande routes met een gesplitst bezoek worden hersteld. */
+function enforceVisits(date,R,pins,blocked){
+  const vm=visitMapDay(date);VC[date]=vm;
+  const groups={};jobsOn(date).forEach(j=>(groups[vm[j.id]]=groups[vm[j.id]]||[]).push(j.id));
+  for(const v of Object.keys(groups)){
+    const ids=visitIds(groups[v][0]).filter(x=>vm[x]===v);
+    const holders={};Object.keys(R).forEach(wid=>{const n=ids.filter(x=>R[wid].includes(x)).length;if(n)holders[wid]=n});
+    const pinW=[...new Set(ids.map(x=>pins[x]).filter(Boolean))];
+    const wids=Object.keys(holders);
+    const contig=wids.length===1&&blocksOf(R[wids[0]]).filter(b=>b.loc===v).length===1;
+    if(wids.length===1&&holders[wids[0]]===ids.length&&contig&&(!pinW.length||pinW[0]===wids[0]))continue;
+    if(pinW.length>1){ids.forEach(x=>blocked.add(x));continue}
+    const target=pinW[0]||wids.sort((a,b)=>holders[b]-holders[a])[0];
+    Object.keys(R).forEach(wid=>{R[wid]=R[wid].filter(x=>!ids.includes(x))});
+    if(!target||!WRK[target]){ids.forEach(x=>blocked.add(x));continue}
+    const before=violOf(simulate(WRK[target],R[target]||[])),b=bestPos(WRK[target],R[target]||[],ids,false);
+    if(b&&violOf(b.s)<=before+.5)R[target]=b.arr;
+    else{const keep=ids.filter(x=>pins[x]===target);if(keep.length){const bp=bestPos(WRK[target],R[target]||[],keep,false);if(bp)R[target]=bp.arr}ids.filter(x=>!keep.includes(x)).forEach(x=>blocked.add(x))}
+  }
+}
+/* Invariant: één logisch bezoek = één Visit-ID = één medewerker */
+function visitInvariant(date){
+  const P=D.plans[date]||{routes:{}};const out=[];const where={};
+  Object.entries(P.routes||{}).forEach(([wid,r])=>r.forEach(id=>where[id]=wid));
+  const vm=visitMapDay(date);VC[date]=vm;const byV={};jobsOn(date).forEach(j=>(byV[vm[j.id]]=byV[vm[j.id]]||[]).push(j.id));
+  for(const [v,ids] of Object.entries(byV)){const ws=[...new Set(ids.map(x=>where[x]).filter(Boolean))];if(ws.length>1)out.push(v+': over '+ws.length+' medewerkers')}
+  return out;
+}
+/* Diagnose per afspraak: kenteken | klant | tijd | visitId | blockId | medewerker */
+function visitDiag(date){
+  const P=D.plans[date]||{routes:{}};const where={};Object.entries(P.routes||{}).forEach(([wid,r])=>r.forEach(id=>where[id]=wid));
+  const vm=visitMapDay(date);VC[date]=vm;
+  return jobsOn(date).slice().sort((a,b)=>((t2m(a.from)??0)-(t2m(b.from)??0))).map(j=>{const l=LOC[j.locationId]||{},c=CUS[l.customerId]||{},w=where[j.id];return{kenteken:j.plate||j.id,klant:c.name||l.customerId||'',locatie:l.name||j.locationId,tijd:j.from||'',visitId:vm[j.id],blockId:w?vm[j.id]+'@'+w:'(niet gepland)',medewerker:w?(WRK[w]||{}).name:'-'}});
+}
 function autoPlan(date){
   visitReset();let blocked=new Set();
   const P=cleanPlan(date),pins=P.pinned,skip=P.skip||{},jobs=jobsOn(date).filter(j=>!(skip[j.id]&&!pins[j.id]));
@@ -478,7 +512,11 @@ function autoPlan(date){
   improve(R,ws,pins,true);
   let left=todo();
   if(left.length){insertLoop(left,R,ws);improve(R,ws,pins,true)}
+  enforceVisits(date,R,pins,blocked);
   P.routes=R;P.auto=Date.now();P.edited=manW.size?Date.now():0;
+  const bad=visitInvariant(date);if(bad.length)console.warn('Visit-invariant geschonden',bad);
+  if(typeof window!=='undefined'&&window.VISITDIAG)console.table(visitDiag(date));
+  visitReset();
   return P;
 }
 function whyUnplanned(j,date){

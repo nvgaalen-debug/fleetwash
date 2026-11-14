@@ -369,6 +369,9 @@ function visitIds(id){const j=JOB[id];if(!j)return [id];const v=visitOf(id);retu
 function blocksOf(r){const b=[],idx={};for(const id of r){const v=visitOf(id);if(idx[v]===undefined){idx[v]=b.length;b.push({loc:v,ids:[id],dur:0})}b[idx[v]].ids.push(id);b[idx[v]].dur+=JOB[id]?jobDur(JOB[id]):0}return b}
 /* Ongedeelde eenheden uit een lijst auto's: per bezoek alle auto's die nog in de lijst staan */
 function unitsOf(ids){const want=new Set(ids),done=new Set(),out=[];for(const id of ids){if(done.has(id))continue;const u=visitIds(id).filter(x=>want.has(x)&&!done.has(x));if(!u.length)u.push(id);u.forEach(x=>done.add(x));out.push(u)}return out}
+/* Sterke voorkeur (geen harde regel): een aansluitend bezoek op dezelfde locatie gaat naar dezelfde medewerker. Haalbaarheid (werktijd, tijdvenster, vastzettingen, pauze) blijft leidend. */
+const ADJ_BONUS=60;
+function adjacentSameLoc(arr,u){const p=arr.indexOf(u[0]),last=arr.indexOf(u[u.length-1]);if(p<0||last<0)return false;const lid=JOB[u[0]]&&JOB[u[0]].locationId;if(!lid)return false;const pr=arr[p-1],nx=arr[last+1];return !!((pr&&JOB[pr]&&JOB[pr].locationId===lid)||(nx&&JOB[nx]&&JOB[nx].locationId===lid))}
 function insertLoop(rest,R,ws){
   const base={};const upd=wid=>base[wid]=costOf(simulate(WRK[wid],R[wid]));ws.forEach(w=>upd(w.id));
   let units=unitsOf(rest);
@@ -377,7 +380,7 @@ function insertLoop(rest,R,ws){
     for(const u of units){
       const pr=Math.max(...u.map(id=>+(JOB[id]&&JOB[id].priority)||2)),opts=[];
       /* Het hele bezoek moet binnen één medewerker passen; anders blijft het bezoek liever even onbezet */
-      for(const w of ws){const b=bestPos(w,R[w.id],u,true);if(b)opts.push({w:w.id,arr:b.arr,d:b.c-base[w.id]})}
+      for(const w of ws){const b=bestPos(w,R[w.id],u,true);if(b)opts.push({w:w.id,arr:b.arr,d:b.c-base[w.id]-(adjacentSameLoc(b.arr,u)?ADJ_BONUS:0)})}
       if(!opts.length)continue;
       opts.sort((a,b)=>a.d-b.d);
       const regret=opts.length>1?opts[1].d-opts[0].d:300;

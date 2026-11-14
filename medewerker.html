@@ -286,7 +286,7 @@ const REASONS=['Auto niet aanwezig','Geen toegang tot de locatie','Schade of nie
 /* Foto bij oplevering: de telefoon-camera, verkleind tot JPEG en opgeslagen bij de afspraak */
 function fotoBtn(j){
   const has=(S.foto||{})[j.id];
-  return `<div class="row2"><button class="linkbtn" data-act="foto" data-id="${esc(j.id)}">${has?'Foto vervangen':'Foto maken'}</button>${has?'<small>📷 foto opgeslagen</small>':''}</div>`;
+  return `<div class="acts"><button class="big alt" style="grid-column:1/-1" data-act="foto" data-id="${esc(j.id)}">📷 ${has?'Foto vervangen':'Foto maken'}</button></div>${has?'<p class="small" style="margin:6px 0 0">Foto opgeslagen</p>':''}`;
 }
 function fotoVerkleind(file,maxPx=1280,kwaliteit=.8){
   return new Promise((ok,nee)=>{
@@ -306,9 +306,9 @@ function takePhoto(id){
       S.foto=S.foto||{};
       if(DEMO){S.foto[id]=true;render();toast('Foto opgeslagen (demo).');return}
       const r=await fetch('/api/foto',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({t:TOK,date:S.date,jobId:id,image:data})});
-      if(!r.ok){const d=await r.json().catch(()=>({}));toast(d.error||'Foto niet opgeslagen.');return}
+      if(!r.ok){const d=await r.json().catch(()=>({}));toast(`Foto niet opgeslagen: ${d.error||'serverfout'} (code ${r.status})`,9000);return}
       S.foto[id]=true;render();toast('Foto opgeslagen.');
-    }catch(e){toast('Foto niet opgeslagen. Controleer je verbinding en probeer opnieuw.')}
+    }catch(e){toast(`Foto niet opgeslagen: ${e&&e.message?e.message:'geen verbinding'}`,9000)}
   };
   inp.click();
 }

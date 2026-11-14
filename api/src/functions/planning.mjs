@@ -140,6 +140,37 @@ async function handler(req) {
       return json({ name: who.name, date, route: route || null, dates, status });
     }
 
+    // ---- foto bij oplevering (proof of delivery) ----
+    // POST: medewerker stuurt { t, date, jobId, image: "data:image/jpeg;base64,..." } voor een eigen afspraak
+    // GET:  planner haalt de foto op: ?date=&jobId=  (APP_PASSWORD)
+    if (path.endsWith("/foto")) {
+      if (req.method === "POST") {
+        const b = await req.json();
+        const who = await worker(store, b.t);
+        if (!who) return json({ error: "Deze link is niet (meer) geldig." }, 401);
+        if (!isDate(b.date) || !isId(b.jobId)) return json({ error: "Ongeldige foto." }, 400);
+        const route = await store.get(`route/${who.wid}/${b.date}`, { type: "json" });
+        const mine = (route?.visits || []).some((v) => (v.jobs || []).some((j) => j.id === b.jobId));
+        if (!mine) return json({ error: "Deze afspraak staat niet (meer) in jouw planning." }, 403);
+        const m = /^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/.exec(String(b.image || ""));
+        if (!m) return json({ error: "Alleen JPEG-foto's." }, 400);
+        const buf = Buffer.from(m[1], "base64");
+        if (buf.length > 1_500_000) return json({ error: "Foto is te groot." }, 413);
+        await store.setRaw(`pod/${b.date}/${b.jobId}.jpg`, buf, "image/jpeg");
+        return json({ ok: true });
+      }
+      if (req.method === "GET") {
+        if (!plannerOk(req)) return json({ error: "Wachtwoord klopt niet." }, 401);
+        const date = url.searchParams.get("date");
+        const jobId = url.searchParams.get("jobId");
+        if (!isDate(date) || !isId(jobId)) return json({ error: "Ongeldige aanvraag." }, 400);
+        const f = await store.getRaw(`pod/${date}/${jobId}.jpg`);
+        if (!f) return json({ error: "Geen foto." }, 404);
+        return { status: 200, headers: { "content-type": "image/jpeg", "cache-control": "no-store" }, body: f.buf };
+      }
+      return json({ error: "Alleen GET of POST." }, 405);
+    }
+
     // ---- medewerker: gereed of probleem melden ----
     if (path.endsWith("/melding")) {
       if (req.method !== "POST") return json({ error: "Alleen POST is toegestaan." }, 405);
@@ -237,6 +268,6 @@ async function handler(req) {
   }
 }
 
-for (const r of ["publiceer", "status", "mijn-planning", "melding", "berichten"]) {
+for (const r of ["publiceer", "status", "mijn-planning", "melding", "berichten", "foto"]) {
   app.http(`planning-${r}`, { route: r, methods: ["GET", "POST"], authLevel: "anonymous", handler });
 }

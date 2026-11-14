@@ -283,6 +283,36 @@ function dayHeader(){
 }
 const mapsUrl=v=>'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([v.address,[v.postcode,v.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')||`${v.lat},${v.lng}`);
 const REASONS=['Auto niet aanwezig','Geen toegang tot de locatie','Schade of niet goed te reinigen','Anders'];
+/* Foto bij oplevering: de telefoon-camera, verkleind tot JPEG en opgeslagen bij de afspraak */
+function fotoBtn(j){
+  const has=(S.foto||{})[j.id];
+  return `<div class="row2"><button class="linkbtn" data-act="foto" data-id="${esc(j.id)}">${has?'Foto vervangen':'Foto maken'}</button>${has?'<small>📷 foto opgeslagen</small>':''}</div>`;
+}
+function fotoVerkleind(file,maxPx=1280,kwaliteit=.8){
+  return new Promise((ok,nee)=>{
+    const url=URL.createObjectURL(file),img=new Image();
+    img.onload=()=>{try{const s=Math.min(1,maxPx/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);c.getContext('2d').drawImage(img,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',kwaliteit))}catch(e){nee(e)}finally{URL.revokeObjectURL(url)}};
+    img.onerror=()=>{URL.revokeObjectURL(url);nee(new Error('geen afbeelding'))};
+    img.src=url;
+  });
+}
+function takePhoto(id){
+  const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.capture='environment';
+  inp.onchange=async()=>{
+    const f=inp.files&&inp.files[0];if(!f)return;
+    try{
+      toast('Foto wordt verwerkt…');
+      const data=await fotoVerkleind(f);
+      S.foto=S.foto||{};
+      if(DEMO){S.foto[id]=true;render();toast('Foto opgeslagen (demo).');return}
+      const r=await fetch('/api/foto',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({t:TOK,date:S.date,jobId:id,image:data})});
+      if(!r.ok){const d=await r.json().catch(()=>({}));toast(d.error||'Foto niet opgeslagen.');return}
+      S.foto[id]=true;render();toast('Foto opgeslagen.');
+    }catch(e){toast('Foto niet opgeslagen. Controleer je verbinding en probeer opnieuw.')}
+  };
+  inp.click();
+}
+
 function carHtml(j,st){
   const s=st[j.id];
   let act;
@@ -294,9 +324,9 @@ function carHtml(j,st){
       <textarea id="note" placeholder="Toelichting (optioneel)"></textarea>
       <div class="acts"><button class="big bad" data-act="sendissue" data-id="${esc(j.id)}">${IC.warn} Probleem melden</button><button class="big alt" data-act="cancel">Annuleren</button></div>`;
   }else if(!s){
-    act=`<div class="acts three"><button class="big ok" data-act="done" data-id="${esc(j.id)}">${IC.check} Gereed</button><button class="big alt" data-act="note" data-id="${esc(j.id)}">${IC.note} Opmerking</button><button class="big alt" data-act="issue" data-id="${esc(j.id)}">${IC.warn} Probleem</button></div>`;
+    act=`<div class="acts three"><button class="big ok" data-act="done" data-id="${esc(j.id)}">${IC.check} Gereed</button><button class="big alt" data-act="note" data-id="${esc(j.id)}">${IC.note} Opmerking</button><button class="big alt" data-act="issue" data-id="${esc(j.id)}">${IC.warn} Probleem</button></div>${fotoBtn(j)}`;
   }else if(s.st==='done'){
-    act=`<div class="state ok">${IC.check} Gereed om ${esc(hhmm(s.at))}${s.pending?' <small>wordt verstuurd…</small>':''}</div>${s.note?`<p class="note"><b>Jouw opmerking:</b> ${esc(s.note)}</p>`:''}<div class="row2"><button class="linkbtn" data-act="note" data-id="${esc(j.id)}">${s.note?'Opmerking wijzigen':'Opmerking toevoegen'}</button><button class="linkbtn" data-act="undo" data-id="${esc(j.id)}">Ongedaan maken</button></div>`;
+    act=`<div class="state ok">${IC.check} Gereed om ${esc(hhmm(s.at))}${s.pending?' <small>wordt verstuurd…</small>':''}</div>${s.note?`<p class="note"><b>Jouw opmerking:</b> ${esc(s.note)}</p>`:''}<div class="row2"><button class="linkbtn" data-act="note" data-id="${esc(j.id)}">${s.note?'Opmerking wijzigen':'Opmerking toevoegen'}</button><button class="linkbtn" data-act="undo" data-id="${esc(j.id)}">Ongedaan maken</button></div>${fotoBtn(j)}`;
   }else{
     act=`<div class="state bad">${IC.warn} ${esc(s.reason||'Probleem gemeld')}${s.pending?' <small>wordt verstuurd…</small>':''}</div>${s.note?`<p class="note">${esc(s.note)}</p>`:''}<button class="linkbtn" data-act="undo" data-id="${esc(j.id)}">Ongedaan maken</button>`;
   }
@@ -350,6 +380,7 @@ document.addEventListener('click',e=>{
     case'day':S.date=addDays(S.date,+el.dataset.d);S.form=null;load();break;
     case'goto':S.date=el.dataset.date;S.form=null;load();break;
     case'reload':load();loadMsgs();break;
+    case'foto':takePhoto(id);break;
     case'msgs':S.view='msgs';S.form=null;render();markRead();break;
     case'plan':{const ta=$('#rtext');if(ta)S.msgDraft=ta.value;S.view='plan';render();window.scrollTo(0,0);break}
     case'mread':markRead([id]).then(render);break;

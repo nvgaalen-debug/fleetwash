@@ -39,6 +39,23 @@ export function getStore({ name }) {
     async delete(key) {
       await (await c()).getBlockBlobClient(key).deleteIfExists();
     },
+    /* Ruwe bestanden, zoals foto's (bytes, geen JSON) */
+    async setRaw(key, buf, contentType) {
+      await (await c()).getBlockBlobClient(key).upload(buf, buf.length, {
+        blobHTTPHeaders: { blobContentType: contentType },
+      });
+    },
+    async getRaw(key) {
+      try {
+        const res = await (await c()).getBlockBlobClient(key).download();
+        const chunks = [];
+        for await (const chunk of res.readableStreamBody) chunks.push(Buffer.from(chunk));
+        return { buf: Buffer.concat(chunks), type: res.contentType || "application/octet-stream" };
+      } catch (e) {
+        if (e.statusCode === 404) return null;
+        throw e;
+      }
+    },
     async list({ prefix = "" } = {}) {
       const blobs = [];
       for await (const b of (await c()).listBlobsFlat({ prefix })) blobs.push({ key: b.name });

@@ -112,6 +112,7 @@ function onClick(e){
       const g=b.s.seg.find(x=>x.k==='job'&&x.id===ids[0]);if(AICTL)AICTL.abort();closeForm();PROP=null;S.wid=w.id;save();render();
       toast(`${w.name} werkt op ${fdate(d,{weekday:'short',day:'numeric',month:'short'})} incidenteel ${el.dataset.start}–${el.dataset.end}. Ingepland om ${g?m2t(g.a):''} en gemarkeerd.`);break}
     case'ovr':editOvr(el.dataset.wid,S.date);break;
+    case'fotoplan':showFoto(el.dataset.date,el.dataset.id);break;
     case'pauze':editPauze(el.dataset.wid,S.date);break;
     case'papply':applyProp(+el.dataset.i);break;
     case'askai':askAI();break;

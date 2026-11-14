@@ -482,6 +482,17 @@ const PWKEEP='wasroute.pwkeep';
 /* keep: true = ook op deze computer onthouden, false = alleen deze sessie, undefined = bestaande keuze volgen */
 const pwStore=(v,keep)=>{try{if(v)sessionStorage.setItem(PWKEY,v);else sessionStorage.removeItem(PWKEY)}catch(e){}
   try{if(!v||keep===false)localStorage.removeItem(PWKEEP);else if(keep===true||localStorage.getItem(PWKEEP))localStorage.setItem(PWKEEP,v)}catch(e){}};
+/* Foto bij oplevering van één afspraak bekijken (proof of delivery) */
+async function showFoto(date,id){
+  try{
+    const r=await fetch(`/api/foto?date=${encodeURIComponent(date)}&jobId=${encodeURIComponent(id)}`,{cache:'no-store',headers:{'x-app-password':getPw()}});
+    if(r.status===404){toast('Nog geen foto bij deze afspraak.');return}
+    if(!r.ok){toast(r.status===401?'Wachtwoord klopt niet.':'Foto niet opgehaald.');return}
+    const url=URL.createObjectURL(await r.blob());
+    $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" style="width:min(720px,100%)"><h3>Foto bij oplevering</h3><img src="${url}" alt="Foto bij oplevering" style="width:100%;border-radius:8px"><div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" data-act="dlgx">Sluiten</button></div></div>`;
+    $('#modal').hidden=false;
+  }catch(e){toast('Foto niet opgehaald.')}
+}
 function getPw(){if(PWMEM)return PWMEM;let v='';try{v=sessionStorage.getItem(PWKEY)||localStorage.getItem(PWKEEP)||''}catch(e){}if(!v){const el=$('#aiPw');if(el&&el.value)v=el.value}if(v)PWMEM=v;return v}
 /* Een bewaard wachtwoord dat de server afwijst, overal weggooien (ook in andere tabbladen) */
 function pwForget(bad){if(bad&&getPw()!==bad)return;PWMEM='';try{sessionStorage.removeItem(PWKEY);if(!bad||localStorage.getItem(PWKEEP)===bad)localStorage.removeItem(PWKEEP)}catch(e){}try{PWBC&&PWBC.postMessage({forget:bad||''})}catch(e){}}

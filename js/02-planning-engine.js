@@ -24,7 +24,20 @@ const avail=(w,date)=>!availWhy(w,date);
 const LEGS=new Map();
 function hav(a,b){const R=6371,t=Math.PI/180,dl=(b.lat-a.lat)*t,dg=(b.lng-a.lng)*t;const x=Math.sin(dl/2)**2+Math.cos(a.lat*t)*Math.cos(b.lat*t)*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(x))}
 const wPt=w=>({key:'W'+w.id,lat:+w.lat,lng:+w.lng});
-const lPt=l=>({key:'L'+l.id,lat:+l.lat,lng:+l.lng});
+/* Centrale regel: wanneer zijn twee locaties fysiek dezelfde plek? Eerst postcode + huisnummer, dan straat + plaats, dan coördinaten, anders het record zelf.
+   Reistijd, parkeertijd, pauze, route en medewerkerselectie gebruiken allemaal deze sleutel. */
+function physKey(l){
+  if(!l)return '';
+  const pc=String(l.postcode||'').replace(/\s/g,'').toUpperCase();
+  const hn=(String(l.address||'').match(/(\d+)\s*([a-zA-Z]{0,2})(?:\s*[-\/]\s*(\d+))?\s*$/)||[]).slice(1).filter(Boolean).join('').toLowerCase();
+  if(/^\d{4}[A-Z]{2}$/.test(pc)&&hn)return 'A'+pc+'-'+hn;
+  const st=String(l.address||'').trim().toLowerCase().replace(/\s+/g,' '),ct=String(l.city||'').trim().toLowerCase();
+  if(st&&ct)return 'S'+st+'|'+ct;
+  if(isFinite(+l.lat)&&isFinite(+l.lng)&&(+l.lat||+l.lng))return 'C'+(+l.lat).toFixed(5)+','+(+l.lng).toFixed(5);
+  return 'I'+l.id;
+}
+function samePhysicalLocation(a,b){if(!a||!b)return false;if(a===b||a.id===b.id)return true;return physKey(a)===physKey(b)}
+const lPt=l=>({key:'L'+physKey(l),lat:+l.lat,lng:+l.lng});
 function leg(a,b){
   if(a.key===b.key)return{km:0,min:0};
   const k=a.key+'|'+b.key;if(LEGS.has(k))return LEGS.get(k);
@@ -287,7 +300,13 @@ function simulateBasis(w,ids,date,force){
     const p=lPt(l);
     /* Pauze alleen tussen bezoeken, nooit tussen auto's van één bezoek */
     const nv=i===0||visitOf(ids[i-1])!==visitOf(id);
-    if(p.key!==pos.key){
+    const same=p.key===pos.key;
+    if(same&&cur&&cur.loc.id!==l.id){
+      /* Zelfde fysieke plek, ander locatierecord (bijv. parkeergarage en hoofdingang): apart blok, 0 min reizen en 0 min parkeren */
+      if(!pauseDone&&t>=pAt&&nv&&pauseFits(i,t,pos))pause();
+      cur={loc:l,arrive:t,travel:0,km:0,jobs:[],start:null,end:null,wait:0,late:false,samePlace:true};stops.push(cur);
+    }
+    if(!same){
       /* Pauze alleen als de volgende klussen daardoor niet te laat komen; anders een pauze later op de dag */
       if(!pauseDone&&stops.length&&t>=pAt&&nv&&pauseFits(i,t,pos))pause();
       const g=leg(pos,p),mins=g.min+(+st.parkMin||0);
@@ -369,18 +388,29 @@ function visitIds(id){const j=JOB[id];if(!j)return [id];const v=visitOf(id);retu
 function blocksOf(r){const b=[],idx={};for(const id of r){const v=visitOf(id);if(idx[v]===undefined){idx[v]=b.length;b.push({loc:v,ids:[id],dur:0})}b[idx[v]].ids.push(id);b[idx[v]].dur+=JOB[id]?jobDur(JOB[id]):0}return b}
 /* Ongedeelde eenheden uit een lijst auto's: per bezoek alle auto's die nog in de lijst staan */
 function unitsOf(ids){const want=new Set(ids),done=new Set(),out=[];for(const id of ids){if(done.has(id))continue;const u=visitIds(id).filter(x=>want.has(x)&&!done.has(x));if(!u.length)u.push(id);u.forEach(x=>done.add(x));out.push(u)}return out}
-/* Sterke voorkeur (geen harde regel): een aansluitend bezoek op dezelfde locatie gaat naar dezelfde medewerker. Haalbaarheid (werktijd, tijdvenster, vastzettingen, pauze) blijft leidend. */
-const ADJ_BONUS=60;
-function adjacentSameLoc(arr,u){const p=arr.indexOf(u[0]),last=arr.indexOf(u[u.length-1]);if(p<0||last<0)return false;const lid=JOB[u[0]]&&JOB[u[0]].locationId;if(!lid)return false;const pr=arr[p-1],nx=arr[last+1];return !!((pr&&JOB[pr]&&JOB[pr].locationId===lid)||(nx&&JOB[nx]&&JOB[nx].locationId===lid))}
+/* Zoek medewerkers die op dezelfde fysieke plek al een ander bezoek hebben en controleer of het volledige bezoek u bij hen past */
+function samePlaceFit(u,R,ws){
+  const l=JOB[u[0]]&&LOC[JOB[u[0]].locationId];if(!l)return{fit:false,reason:'geen locatie'};
+  let best=null;const tried=[];
+  for(const w of ws){const r=R[w.id]||[];if(!r.some(id=>JOB[id]&&!u.includes(id)&&samePhysicalLocation(LOC[JOB[id].locationId],l)))continue;
+    const b=bestPos(w,r,u,true);
+    if(b){if(!best||b.c<best.c)best={fit:true,w:w.id,arr:b.arr,c:b.c,s:b.s}}
+    else{const nb=bestPos(w,r,u,false);tried.push(w.name+': '+(nb?(nb.s.lateJobs.length?'te laat '+nb.s.lateJobs.map(id=>JOB[id].plate||id).join(', '):nb.s.over>.5?'buiten werktijd':nb.s.skillBad.length?'vaardigheid ontbreekt':'past niet'):'past niet'))}}
+  return best||{fit:false,reason:tried.length?tried.join('; '):'geen medewerker op deze plek'};
+}
 function insertLoop(rest,R,ws){
   const base={};const upd=wid=>base[wid]=costOf(simulate(WRK[wid],R[wid]));ws.forEach(w=>upd(w.id));
   let units=unitsOf(rest);
   while(units.length){
+    /* Stap 1, vóór de normale selectie: staat een medewerker al op dezelfde fysieke plek en past het volledige bezoek bij hem/haar, dan gaat het bezoek naar die medewerker */
+    let direct=null;
+    for(const u of units){const r=samePlaceFit(u,R,ws);if(r.fit&&(!direct||r.c<direct.c))direct={u,...r}}
+    if(direct){R[direct.w]=direct.arr;upd(direct.w);units=units.filter(x=>x!==direct.u);continue}
     let pick=null;
     for(const u of units){
       const pr=Math.max(...u.map(id=>+(JOB[id]&&JOB[id].priority)||2)),opts=[];
       /* Het hele bezoek moet binnen één medewerker passen; anders blijft het bezoek liever even onbezet */
-      for(const w of ws){const b=bestPos(w,R[w.id],u,true);if(b)opts.push({w:w.id,arr:b.arr,d:b.c-base[w.id]-(adjacentSameLoc(b.arr,u)?ADJ_BONUS:0)})}
+      for(const w of ws){const b=bestPos(w,R[w.id],u,true);if(b)opts.push({w:w.id,arr:b.arr,d:b.c-base[w.id]})}
       if(!opts.length)continue;
       opts.sort((a,b)=>a.d-b.d);
       const regret=opts.length>1?opts[1].d-opts[0].d:300;

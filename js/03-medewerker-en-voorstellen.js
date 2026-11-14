@@ -334,9 +334,17 @@ function runSick(wid,from,to,note,opts={}){
   for(const day of days){
     const d=day.date,P=getPlan(d);delete P.routes[wid];day.aff.forEach(id=>{if(P.pinned[id]===wid)delete P.pinned[id]});
     if(!day.aff.length)continue;
-    const ws=D.workers.filter(x=>avail(x,d)),R={};ws.forEach(x=>R[x.id]=[...(P.routes[x.id]||[])]);
-    insertLoop(day.aff,R,ws);eject(R,ws,P.pinned,day.aff.map(id=>JOB[id]));
-    Object.assign(P.routes,R);day.aff.forEach(id=>{for(const k in R)if(R[k].includes(id))P.pinned[id]=k});P.edited=Date.now();if(!P.auto)P.auto=Date.now();
+    /* Plannings-eenheid is het klantbezoek: auto's van één bezoek (zelfde locatie, tijdvak) blijven bij elkaar en gaan naar één collega die het hele bezoek kan doen.
+       Past dat nergens, dan blijft het bezoek onbemand (met reden), in plaats van de auto's over collega's te verdelen. Bestaande routes worden niet omgegooid. */
+    const ws=D.workers.filter(x=>avail(x,d)&&x.id!==wid),R={};D.workers.forEach(x=>R[x.id]=[...(P.routes[x.id]||[])]);
+    const visits={};day.aff.forEach(id=>{const j=JOB[id];if(!j)return;const k=j.locationId+'|'+(j.from||'')+'|'+(j.to||'');(visits[k]=visits[k]||[]).push(id)});
+    for(const G of Object.values(visits)){
+      G.sort((a,b)=>(+JOB[b].priority||2)-(+JOB[a].priority||2));
+      let best=null;
+      for(const A of ws){if(G.some(id=>!skillOk(A,JOB[id])))continue;const b=bestPos(A,R[A.id],G,true);if(b){const c=costOf(b.s);if(!best||c<best.c)best={w:A.id,arr:b.arr,c}}}
+      if(best){R[best.w]=best.arr;G.forEach(id=>P.pinned[id]=best.w)}
+    }
+    Object.assign(P.routes,R);P.edited=Date.now();if(!P.auto)P.auto=Date.now();
   }
   (D.sickLog||[]).forEach(x=>delete x.snap);
   const entry={id:uid('s'),wid,from,to,note,at:Date.now(),orig:Object.fromEntries(days.map(x=>[x.date,x.aff])),before:Object.fromEntries(days.map(x=>[x.date,x.before])),snap};
@@ -354,7 +362,7 @@ function openSickResult(){
       const res=Object.values(byW).map(({p,n})=>`<span class="chip ${p.late?'warn':'ok'}"><i class="dot" style="background:${wc(WRK[p.wid])}"></i>${esc(WRK[p.wid].name)}${p.date!==d?' '+esc(fdate(p.date,{weekday:'short',day:'numeric',month:'short'})):''} ${p.start!=null?m2t(p.start):''}${n<ids.length?` (${n})`:''}</span>`).join(' ');
       const un=ids.filter((id,i)=>!(pl[i]&&pl[i].wid));if(un.length)unGroups.push({date:JOB[un[0]].date,ids:un,lid});
       const win=[...new Set(ids.map(id=>JOB[id]).map(j=>j.from||j.to?`${j.from||'—'}–${j.to||'—'}`:'hele dag'))].join(', ');
-      return`<tr><td><b>${esc(cu.name||'')}</b><div class="small muted">${esc(l.city||'')}</div></td><td>${ids.map(id=>plateBtn(JOB[id])).join(' ')}</td><td class="small mono">${esc(win)}</td><td>${res}${un.length?` <span class="chip bad">${un.length} niet ingepland</span> <button class="btn sm" data-act="propose" data-ids="${un.join(',')}">${I.auto} Slim voorstel</button>`:''}</td></tr>`}).join('');
+      return`<tr><td><b>${esc(cu.name||'')}</b><div class="small muted">${esc(l.city||'')}</div></td><td>${ids.map(id=>plateBtn(JOB[id])).join(' ')}</td><td class="small mono">${esc(win)}</td><td>${res}${un.length?` <span class="chip bad">⚠️ niet herpland: geen medewerker heeft ${un.length} auto${un.length>1?"'s":''} (${un.reduce((s,id)=>s+(JOB[id]?jobDur(JOB[id]):0),0)} min) aaneengesloten ruimte</span> <button class="btn sm" data-act="propose" data-ids="${un.join(',')}">${I.auto} Slim voorstel</button>`:''}</td></tr>`}).join('');
     const load=Object.keys(P.routes).filter(x=>WRK[x]&&x!==K.wid).map(x=>{const b=day.before[x],a=simulate(WRK[x],P.routes[x],d);const extra=(a.serv+a.trav)-(b||0);return extra>.5?`${esc(WRK[x].name)} +${fdur(extra)} (terug ${m2t(a.finish)})`:''}).filter(Boolean).join(' · ');
     return`<h4 class="ph">${esc(fdate(d,{weekday:'long',day:'numeric',month:'long'}))}</h4><div class="tbl-wrap"><table><thead><tr><th>Klant</th><th>Auto's</th><th>Tijdvak</th><th>Nieuwe planning</th></tr></thead><tbody>${rows}</tbody></table></div>${load?`<p class="small muted" style="margin:6px 0 0">Extra werk voor collega's: ${load}</p>`:''}`}).join('');
   K.unGroups=unGroups;const mode=aiMode(),kb=!K.type||K.type==='ziek'?'Ziekmelding':'Afwezigheid';

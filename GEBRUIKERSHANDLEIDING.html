@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wasroute Planner: gebruikershandleiding</title>
+<style>
+  :root { --ink:#1d2a33; --muted:#5b6b75; --line:#dfe6ea; --accent:#0e6b84; --accent-soft:#e6f3f6; --warn:#fff4e0; --warn-line:#e7b64d; --bg:#f7f9fa; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; color:var(--ink); background:var(--bg); line-height:1.6; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 40px 24px 80px; background:#fff; min-height:100vh; }
+  header { border-bottom: 3px solid var(--accent); padding-bottom: 18px; margin-bottom: 28px; }
+  header .kicker { font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  h1 { font-size: 32px; margin: 4px 0 8px; line-height: 1.2; }
+  header p { color: var(--muted); margin: 0; }
+  nav.toc { background: var(--accent-soft); border-radius: 10px; padding: 18px 22px; margin-bottom: 36px; }
+  nav.toc h2 { font-size: 15px; margin: 0 0 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--accent); }
+  nav.toc ol { margin: 0; padding-left: 20px; columns: 2; column-gap: 32px; }
+  nav.toc li { margin: 3px 0; break-inside: avoid; }
+  nav.toc a { color: var(--ink); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+  section { margin-bottom: 40px; }
+  h2 { font-size: 23px; margin: 0 0 14px; padding-top: 6px; border-top: 1px solid var(--line); }
+  h2 .num { color: var(--accent); margin-right: 8px; }
+  h3 { font-size: 17px; margin: 22px 0 8px; }
+  p { margin: 0 0 12px; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin: 4px 0; }
+  strong { font-weight: 600; }
+  code { background: #eef2f4; padding: 1px 6px; border-radius: 4px; font-size: .92em; }
+  .note { background: var(--warn); border-left: 4px solid var(--warn-line); padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+  .note strong:first-child { display:block; margin-bottom: 4px; }
+  .tip { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 12px 16px; border-radius: 6px; margin: 16px 0; }
+  .btn { display:inline-block; font-size: 13px; font-weight: 600; padding: 2px 9px; border:1px solid #b9c7ce; border-radius: 6px; background:#fff; color:var(--ink); white-space: nowrap; }
+  .legend { display:grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 14px 0; }
+  .legend div { display:flex; align-items:center; gap:10px; background:#fafcfd; border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size: 15px; }
+  .sw { width: 34px; height: 16px; border-radius: 4px; flex: none; }
+  .sw.job { background:#3d5563; }
+  .sw.drive { background: repeating-linear-gradient(45deg, #9fb3bd 0 4px, #e8eef1 4px 8px); }
+  .sw.wait { background:#fff; border:1px dashed #7e939d; }
+  .sw.pause { background:#e3e8eb; }
+  .faq { border:1px solid var(--line); border-radius: 8px; padding: 14px 18px; margin: 12px 0; }
+  .faq h3 { margin: 0 0 6px; font-size: 16px; }
+  .faq p { margin: 0; }
+  footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+  @media (max-width: 640px) { nav.toc ol { columns: 1; } .legend { grid-template-columns: 1fr; } h1 { font-size: 26px; } }
+  @media print {
+    body { background:#fff; }
+    .wrap { padding: 0; max-width: none; }
+    nav.toc { break-after: page; }
+    section { break-inside: auto; }
+    h2 { break-after: avoid; }
+    a { color: inherit; text-decoration: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <div class="kicker">Handleiding</div>
+  <h1>Wasroute Planner: gebruikershandleiding</h1>
+  <p>Hoe je de planning dagelijks gebruikt. Installatie, Netlify en koppelingen staan in <code>LEESMIJ.md</code>.</p>
+</header>
+
+<nav class="toc">
+  <h2>Inhoud</h2>
+  <ol>
+    <li><a href="#opslag">Opslag</a></li>
+    <li><a href="#dagplanning">De dagplanning</a></li>
+    <li><a href="#automatisch">Automatisch plannen</a></li>
+    <li><a href="#vastzetten">Vastzetten en handmatige wijzigingen</a></li>
+    <li><a href="#nieuw">Een nieuwe afspraak toevoegen</a></li>
+    <li><a href="#pauzes">Pauzes</a></li>
+    <li><a href="#werktijd">Werktijd en volgorde op één dag</a></li>
+    <li><a href="#feestdagen">Feestdagen</a></li>
+    <li><a href="#import">Importeren uit Excel</a></li>
+    <li><a href="#berichten">Berichten</a></li>
+    <li><a href="#archief">Archief</a></li>
+    <li><a href="#faq">Veelgestelde vragen</a></li>
+  </ol>
+</nav>
+
+<section id="opslag">
+  <h2><span class="num">1</span>Opslag</h2>
+  <ul>
+    <li>Alle gegevens staan op de server. Er wordt niets meer lokaal opgeslagen, dus je ziet op elk apparaat dezelfde planning.</li>
+    <li>Elke wijziging (handmatig, import of AI) gaat direct naar de server.</li>
+    <li>Werkt iemand anders tegelijk aan dezelfde planning en is die eerder opgeslagen, dan laadt de app de serverversie opnieuw in en verschijnt de melding <em>"Iemand anders heeft de planning net opgeslagen"</em>. Controleer daarna je wijziging en voer hem opnieuw in als dat nodig is.</li>
+    <li>Verschijnt <em>"Opslaan op de server mislukt"</em>, dan is de wijziging niet bewaard. Probeer het opnieuw.</li>
+  </ul>
+</section>
+
+<section id="dagplanning">
+  <h2><span class="num">2</span>De dagplanning</h2>
+  <p>Op de pagina <strong>Planning</strong> zie je per dag een rij per medewerker, met de bezetting, reistijd en het aantal bezoeken. De blokken betekenen:</p>
+  <div class="legend">
+    <div><span class="sw job"></span>Reinigen</div>
+    <div><span class="sw drive"></span>Rijden</div>
+    <div><span class="sw wait"></span>Wachten op tijdvenster</div>
+    <div><span class="sw pause"></span>Pauze (P)</div>
+  </div>
+  <p>Een te laat bezoek of een overschreden werktijd krijgt een rode markering. Klik op de naam van een medewerker om het <strong>ritpaneel</strong> te openen, met de volgorde van de bezoeken, de tijden en de knoppen voor die medewerker.</p>
+  <p>Een bezoek verplaatsen kan door het blok naar een andere medewerker te slepen. Daarna wordt de planning van die medewerker opnieuw berekend.</p>
+</section>
+
+<section id="automatisch">
+  <h2><span class="num">3</span>Automatisch plannen</h2>
+  <ul>
+    <li>Klik op <span class="btn">Automatisch plannen</span> om de dag opnieuw te verdelen. Vastgezette afspraken blijven staan.</li>
+    <li>Medewerkers met een handmatige wijziging (zie hieronder) houden hun route. De andere medewerkers worden opnieuw ingepland, en niet-ingeplande afspraken komen bij hen terecht.</li>
+    <li>Lukt een afspraak niet, dan staat in de opdrachtenlijst de reden. Die melding kan ook betekenen dat de medewerker die dag niet genoeg tijd heeft.</li>
+  </ul>
+</section>
+
+<section id="vastzetten">
+  <h2><span class="num">4</span>Vastzetten en handmatige wijzigingen</h2>
+  <ul>
+    <li>Een afspraak die je op een <strong>gekozen tijd</strong> of in een <strong>gekozen rit</strong> zet, wordt vastgezet. Bij automatisch plannen blijft die afspraak dan op die plek en tijd.</li>
+    <li>Een afspraak die je op de <strong>beste plek</strong> in de rit zet, wordt <strong>niet</strong> vastgezet. De planner kan die later nog verplaatsen.</li>
+    <li>Een medewerker waarbij je zelf iets hebt aangepast (slepen, de volgorde optimaliseren, een afspraak vastzetten), krijgt een handmatige markering. Bij herplannen blijft die medewerker dan staan.</li>
+    <li><span class="btn">Vastzetting opheffen</span> in de dialoog van een opdracht heft alleen de vastzetting van die afspraak op. De planning wordt daarna opnieuw berekend.</li>
+    <li><span class="btn">Vastzetten opheffen</span> in de balk boven de dagplanning heft <strong>alle</strong> vastzettingen en handmatige markeringen van die dag op. De planning verandert pas als je daarna op <span class="btn">Automatisch plannen</span> klikt.</li>
+    <li>De dag krijgt de markering <strong>Handmatig aangepast</strong> zolang er vastzettingen of handmatige wijzigingen op die dag staan.</li>
+  </ul>
+</section>
+
+<section id="nieuw">
+  <h2><span class="num">5</span>Een nieuwe afspraak toevoegen</h2>
+  <p>Klik op <span class="btn">Nieuwe afspraak</span> en kies een van de drie opties:</p>
+  <ul>
+    <li><strong>Automatisch plannen</strong>: de app kiest de medewerker.</li>
+    <li><strong>Op de beste plek in de rit</strong>: de afspraak komt op de plek met de minste extra reistijd, bij de gekozen medewerker. Hij wordt niet vastgezet.</li>
+    <li><strong>Op een gekozen tijd</strong>: de afspraak wordt vastgezet op dat tijdstip bij de gekozen medewerker.</li>
+  </ul>
+  <p>Zoek je een klant of locatie die nog niet bestaat, gebruik dan <span class="btn">+ Nieuwe klant of locatie</span> in het zoekveld. Na opslaan keert de app terug naar je opdracht, met de ingevulde gegevens.</p>
+</section>
+
+<section id="pauzes">
+  <h2><span class="num">6</span>Pauzes</h2>
+  <p>Er zijn twee manieren om pauzes te regelen.</p>
+
+  <h3>Algemene pauzeregel</h3>
+  <p>Te vinden onder <strong>Beheer &gt; Planning en reistijd</strong>. Die geldt voor alle medewerkers.</p>
+  <ul>
+    <li><strong>Pauze (min)</strong>: de duur. 0 betekent geen pauze.</li>
+    <li><strong>Pauze vanaf</strong>: de pauze begint niet eerder dan dit tijdstip.</li>
+    <li><strong>Pauze uiterlijk</strong>: de pauze begint uiterlijk op dit tijdstip, ook als een vaste afspraak daardoor later wordt. Bij 13:30 en 30 minuten loopt de pauze dus tot 14:00. Leeg betekent geen grens.</li>
+  </ul>
+  <p>Een pauze wordt bij voorkeur in een wachttijd of tussen twee bezoeken gezet. Er wordt niet in een rit gepauzeerd.</p>
+
+  <h3>Pauze per medewerker en per dag</h3>
+  <p>In het ritpaneel, met de knop <span class="btn">Pauze deze dag</span>:</p>
+  <ul>
+    <li>Je stelt de duur, het venster (vanaf en uiterlijk) en eventueel een <strong>vast startmoment</strong> in. Die instellingen gelden alleen voor die medewerker op die dag.</li>
+    <li>Een vast startmoment blijft staan bij automatisch plannen. Bezoeken, reistijd en wachttijd worden eromheen gepland.</li>
+    <li>Met <span class="btn">Pauze deze dag</span> kun je een pauze ook verwijderen. Daarna geldt weer de algemene regel.</li>
+  </ul>
+  <div class="tip">Je hoeft dit per dag niet in te stellen. De algemene regel geldt zolang je niets per medewerker opgeeft.</div>
+</section>
+
+<section id="werktijd">
+  <h2><span class="num">7</span>Werktijd en volgorde op één dag</h2>
+  <ul>
+    <li><span class="btn">Werktijd deze dag</span> (ritpaneel): wijkt de werktijd van een medewerker op die dag af, dan stel je dat hier in. De afwijking wordt gemarkeerd.</li>
+    <li><span class="btn">Volgorde optimaliseren</span> (ritpaneel): zet de bezoeken van die medewerker in de kortste volgorde. De vastgezette afspraken blijven op hun plek.</li>
+  </ul>
+</section>
+
+<section id="feestdagen">
+  <h2><span class="num">8</span>Feestdagen</h2>
+  <p>Onder <strong>Beheer &gt; Planning en reistijd</strong> vink je de feestdagen aan waarop niemand werkt. Op die dagen wordt niets ingepland.</p>
+</section>
+
+<section id="import">
+  <h2><span class="num">9</span>Importeren uit Excel</h2>
+  <ul>
+    <li>Importeer een bestand en de app plant de nieuwe afspraken in. Daarna volgt de automatische planning (zie punt 3).</li>
+    <li>Staat er een tijd in de Excel, dan wordt die tijd als vaste tijd gezien.</li>
+    <li>Na een import loopt de app automatisch door: exacte posities via PDOK, dan echte rijtijden (als OpenRouteService aanstaat), en dan de planning.</li>
+  </ul>
+</section>
+
+<section id="berichten">
+  <h2><span class="num">10</span>Berichten</h2>
+  <ul>
+    <li>Stuur een bericht via <strong>Planning &gt; Berichten</strong>, of in een bezoek via <span class="btn">Bericht aan …</span>. Je kiest één medewerker of meerdere, en kunt een bericht als urgent markeren.</li>
+    <li>Je ziet per bericht wanneer het is gelezen. Antwoorden van medewerkers verschijnen met een rode teller bij Planning en Berichten.</li>
+  </ul>
+</section>
+
+<section id="archief">
+  <h2><span class="num">11</span>Archief</h2>
+  <p>Dagen die je niet meer nodig hebt, zet je in het <strong>archief</strong>. Gearchiveerde dagen tellen niet meer mee in de planning.</p>
+</section>
+
+<section id="faq">
+  <h2><span class="num">12</span>Veelgestelde vragen</h2>
+
+  <div class="faq">
+    <h3>Een afspraak wordt niet ingepland, terwijl medewerkers een lege agenda hebben.</h3>
+    <p>Controleer of de dag de markering <em>Handmatig aangepast</em> heeft. Klik op <span class="btn">Automatisch plannen</span>. Blijft de afspraak onbemand, dan is er mogelijk geen medewerker die hem binnen de werktijd kan doen. Lees de reden in de opdrachtenlijst.</p>
+  </div>
+
+  <div class="faq">
+    <h3>De pauze komt niet in het venster.</h3>
+    <p>Er is in dat venster geen wachttijd of pauzemoment tussen twee bezoeken. Een pauze midden in een rit wordt niet gepland. Verschuif een bezoek of zet een vast startmoment bij die medewerker.</p>
+  </div>
+
+  <div class="faq">
+    <h3>Mijn wijziging is verdwenen.</h3>
+    <p>Waarschijnlijk heeft iemand anders tegelijk opgeslagen. Controleer de planning en voer je wijziging opnieuw in.</p>
+  </div>
+</section>
+
+<div class="note"><strong>Let op</strong>De tekst is op basis van de vernieuwde planner geschreven en nog niet in de browser nagelopen. Controleer vooral de delen over pauzes en over <em>Vastzetten opheffen</em>.</div>
+
+<footer>Wasroute Planner · gebruikershandleiding</footer>
+
+</div>
+</body>
+</html>

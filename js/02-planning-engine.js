@@ -286,7 +286,8 @@ function simulateBasis(w,ids,date,force){
     if(!skillOk(w,j))skillBad.push(id);
     const p=lPt(l);
     if(p.key!==pos.key){
-      if(!pauseDone&&stops.length&&t>=pAt&&(force||pauseFits(i,t,pos)))pause();
+      /* Pauze alleen als de volgende klussen (ook van hetzelfde bezoek) daardoor niet te laat komen; anders geen wisselende medewerker maar een pauze later op de dag */
+      if(!pauseDone&&stops.length&&t>=pAt&&pauseFits(i,t,pos))pause();
       const g=leg(pos,p),mins=g.min+(+st.parkMin||0);
       gate(mins);
       seg.push({k:'drive',a:t,b:t+mins,km:g.km});t+=mins;km+=g.km;trav+=mins;pos=p;

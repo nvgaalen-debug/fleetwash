@@ -73,7 +73,9 @@ async function archiefOpruimen(){
   if(!res)return;                       // archiveren mislukt: niets verwijderd
   for(const d of kandidaten){const P=D.plans[d];P.routes={};P.pinned={};P.archived=true;delete P.auto;delete P.edited}
   const zonderMelding=items.filter(x=>x.melding.st!=='done').length;
-  ARCH_LAST=`Opgeruimd: ${kandidaten.length} dagen gearchiveerd (${items.length} bezoeken, ${zonderMelding} zonder gereed-melding), om ${hm(Date.now())}.`;
+  /* Foto's van de gearchiveerde dagen worden ook van de server gewist */
+  const fotos=SERVER?await wisFotos(kandidaten):0;
+  ARCH_LAST=`Opgeruimd: ${kandidaten.length} dagen gearchiveerd (${items.length} bezoeken, ${zonderMelding} zonder gereed-melding, ${fotos} foto's verwijderd), om ${hm(Date.now())}.`;
   save();render();
   toast(`${kandidaten.length} planningsdagen gearchiveerd en opgeruimd (${items.length} bezoeken, ${zonderMelding} zonder gereed-melding).`,7000);
 }

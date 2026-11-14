@@ -482,16 +482,33 @@ const PWKEEP='wasroute.pwkeep';
 /* keep: true = ook op deze computer onthouden, false = alleen deze sessie, undefined = bestaande keuze volgen */
 const pwStore=(v,keep)=>{try{if(v)sessionStorage.setItem(PWKEY,v);else sessionStorage.removeItem(PWKEY)}catch(e){}
   try{if(!v||keep===false)localStorage.removeItem(PWKEEP);else if(keep===true||localStorage.getItem(PWKEEP))localStorage.setItem(PWKEEP,v)}catch(e){}};
+/* Alle foto's van een dag van de server wissen (bij archiveren); geeft het aantal verwijderde foto's terug */
+async function wisFotos(dates){
+  let n=0;
+  for(const d of dates){
+    try{
+      const r=await fetch('/api/foto',{method:'POST',headers:{'content-type':'application/json','x-app-password':getPw()},body:JSON.stringify({action:'wis',date:d})});
+      if(r.ok){const j=await r.json();n+=j.verwijderd||0}
+    }catch(e){}
+  }
+  return n;
+}
 /* Foto bij oplevering van één afspraak bekijken (proof of delivery) */
 async function showFoto(date,id){
+  const hdr={'x-app-password':getPw()};
   try{
-    const r=await fetch(`/api/foto?date=${encodeURIComponent(date)}&jobId=${encodeURIComponent(id)}`,{cache:'no-store',headers:{'x-app-password':getPw()}});
-    if(r.status===404){toast('Nog geen foto bij deze afspraak.');return}
-    if(!r.ok){toast(r.status===401?'Wachtwoord klopt niet.':'Foto niet opgehaald.');return}
-    const url=URL.createObjectURL(await r.blob());
-    $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" style="width:min(720px,100%)"><h3>Foto bij oplevering</h3><img src="${url}" alt="Foto bij oplevering" style="width:100%;border-radius:8px"><div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" data-act="dlgx">Sluiten</button></div></div>`;
+    const lr=await fetch(`/api/foto?date=${encodeURIComponent(date)}&jobId=${encodeURIComponent(id)}&lijst=1`,{cache:'no-store',headers:hdr});
+    if(!lr.ok){toast(lr.status===401?'Wachtwoord klopt niet.':'Foto\'s niet opgehaald.');return}
+    const namen=(await lr.json()).fotos||[];
+    if(!namen.length){toast('Nog geen foto bij deze afspraak.');return}
+    const imgs=[];
+    for(const n of namen){
+      const r=await fetch(`/api/foto?date=${encodeURIComponent(date)}&jobId=${encodeURIComponent(id)}&n=${encodeURIComponent(n)}`,{cache:'no-store',headers:hdr});
+      if(r.ok)imgs.push(`<img src="${URL.createObjectURL(await r.blob())}" alt="Foto ${imgs.length+1} bij oplevering" style="width:100%;border-radius:8px;margin-bottom:10px">`);
+    }
+    $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" style="width:min(720px,100%)"><h3>Foto's bij oplevering (${imgs.length})</h3><div style="max-height:70vh;overflow:auto">${imgs.join('')}</div><div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" data-act="dlgx">Sluiten</button></div></div>`;
     $('#modal').hidden=false;
-  }catch(e){toast('Foto niet opgehaald.')}
+  }catch(e){toast('Foto\'s niet opgehaald.')}
 }
 function getPw(){if(PWMEM)return PWMEM;let v='';try{v=sessionStorage.getItem(PWKEY)||localStorage.getItem(PWKEEP)||''}catch(e){}if(!v){const el=$('#aiPw');if(el&&el.value)v=el.value}if(v)PWMEM=v;return v}
 /* Een bewaard wachtwoord dat de server afwijst, overal weggooien (ook in andere tabbladen) */

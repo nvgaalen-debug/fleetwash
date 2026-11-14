@@ -146,6 +146,17 @@ async function handler(req) {
     if (path.endsWith("/foto")) {
       if (req.method === "POST") {
         const b = await req.json();
+        // planner: alle foto's van een dag wissen (bij archiveren)
+        if (b.action === "wis") {
+          if (!plannerOk(req)) return json({ error: "Wachtwoord klopt niet." }, 401);
+          if (!isDate(b.date)) return json({ error: "Ongeldige datum." }, 400);
+          let n = 0;
+          for (const f of (await store.list({ prefix: `pod/${b.date}/` })).blobs || []) {
+            await store.delete(f.key);
+            n++;
+          }
+          return json({ ok: true, verwijderd: n });
+        }
         const who = await worker(store, b.t);
         if (!who) return json({ error: "Deze link is niet (meer) geldig." }, 401);
         if (!isDate(b.date) || !isId(b.jobId)) return json({ error: "Ongeldige foto." }, 400);
@@ -156,7 +167,9 @@ async function handler(req) {
         if (!m) return json({ error: "Alleen JPEG-foto's." }, 400);
         const buf = Buffer.from(m[1], "base64");
         if (buf.length > 1_500_000) return json({ error: "Foto is te groot." }, 413);
-        await store.setRaw(`pod/${b.date}/${b.jobId}.jpg`, buf, "image/jpeg");
+        const bestaand = (await store.list({ prefix: `pod/${b.date}/${b.jobId}/` })).blobs || [];
+        if (bestaand.length >= 8) return json({ error: "Maximaal 8 foto's per afspraak." }, 409);
+        await store.setRaw(`pod/${b.date}/${b.jobId}/${Date.now()}.jpg`, buf, "image/jpeg");
         return json({ ok: true });
       }
       if (req.method === "GET") {
@@ -164,7 +177,18 @@ async function handler(req) {
         const date = url.searchParams.get("date");
         const jobId = url.searchParams.get("jobId");
         if (!isDate(date) || !isId(jobId)) return json({ error: "Ongeldige aanvraag." }, 400);
-        const f = await store.getRaw(`pod/${date}/${jobId}.jpg`);
+        // lijst van foto's bij een afspraak (nieuwste laatst); oudere losse foto's tellen ook mee
+        if (url.searchParams.get("lijst") === "1") {
+          const blobs = (await store.list({ prefix: `pod/${date}/${jobId}/` })).blobs || [];
+          const namen = blobs.map((x) => x.key.split("/").pop()).sort();
+          if (await store.getRaw(`pod/${date}/${jobId}.jpg`)) namen.unshift("oud.jpg");
+          return json({ fotos: namen });
+        }
+        // één foto ophalen: ?n=<naam uit de lijst>
+        const n = url.searchParams.get("n") || "";
+        if (!/^(oud|\d{10,16})\.jpg$/.test(n)) return json({ error: "Ongeldige foto." }, 400);
+        const key = n === "oud.jpg" ? `pod/${date}/${jobId}.jpg` : `pod/${date}/${jobId}/${n}`;
+        const f = await store.getRaw(key);
         if (!f) return json({ error: "Geen foto." }, 404);
         return { status: 200, headers: { "content-type": "image/jpeg", "cache-control": "no-store" }, body: f.buf };
       }

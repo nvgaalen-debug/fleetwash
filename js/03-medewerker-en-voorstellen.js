@@ -337,8 +337,8 @@ function runSick(wid,from,to,note,opts={}){
     /* Plannings-eenheid is het klantbezoek: auto's van één bezoek (zelfde locatie, tijdvak) blijven bij elkaar en gaan naar één collega die het hele bezoek kan doen.
        Past dat nergens, dan blijft het bezoek onbemand (met reden), in plaats van de auto's over collega's te verdelen. Bestaande routes worden niet omgegooid. */
     const ws=D.workers.filter(x=>avail(x,d)&&x.id!==wid),R={};D.workers.forEach(x=>R[x.id]=[...(P.routes[x.id]||[])]);
-    const visits={};day.aff.forEach(id=>{const j=JOB[id];if(!j)return;const k=j.locationId+'|'+(j.from||'')+'|'+(j.to||'');(visits[k]=visits[k]||[]).push(id)});
-    for(const G of Object.values(visits)){
+    /* Bezoeken volgen de oorspronkelijke route: opeenvolgende auto's op dezelfde locatie vormen één bezoek (ook als elke auto een eigen tijdvak had) */
+    for(const G of blocksOf(day.aff).map(b=>b.ids)){
       G.sort((a,b)=>(+JOB[b].priority||2)-(+JOB[a].priority||2));
       let best=null;
       for(const A of ws){if(G.some(id=>!skillOk(A,JOB[id])))continue;const b=bestPos(A,R[A.id],G,true);if(b){const c=costOf(b.s);if(!best||c<best.c)best={w:A.id,arr:b.arr,c}}}

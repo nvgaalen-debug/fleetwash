@@ -302,9 +302,9 @@ function simulateBasis(w,ids,date,force){
         pause();
       }
       seg.push({k:'wait',a:t,b:ws});wait+=ws-t;cur.wait+=ws-t;t=ws}
-    else if(!pauseDone&&t>=pAt&&cur.jobs.length&&(force||pauseFits(i,t,pos)))pause();
+    /* Geen pauze tussen auto's van hetzelfde bezoek: de pauze valt alleen bij een nieuwe locatie (rit) of in een wachttijd */
     /* Alleen een tijd (zonder "tot"): exacte starttijd, te laat als de medewerker na die tijd start */
-    gate(jobDur(j));
+    if(!cur||!cur.jobs.length)gate(jobDur(j));
     const d=jobDur(j),s=t,e=t+d,exact=ws!=null&&we==null,lateStart=exact&&s>ws+.5,isLate=lateStart||(we!=null&&e>we+.5);
     seg.push({k:'job',a:s,b:e,id,late:isLate,ls:lateStart,vt:(pf!=null&&ws===pf)?pf:null});serv+=d;t=e;
     if(isLate){late+=lateStart?s-ws:e-we;lateJobs.push(id);cur.late=true}

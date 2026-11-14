@@ -259,7 +259,7 @@ function absDelete(a){
 /* ---------- dagsimulatie ---------- */
 function simulate(w,ids,date){
   const dt=date||(ids.length&&JOB[ids[0]]?JOB[ids[0]].date:null),sh=shiftOf(w,dt);
-  const st=D.settings,start=t2m(sh.start)??480,end=t2m(sh.end)??1020,pAt=t2m(st.pauseAt)??720,pm=+st.pauseMin||0;
+  const st=D.settings,start=t2m(sh.start)??480,end=t2m(sh.end)??1020,pAt=t2m(st.pauseAt)??720,pTot=t2m(st.pauseTot),pm=+st.pauseMin||0;
   let t=start,pos=wPt(w),km=0,trav=0,wait=0,serv=0,pauseDone=pm<=0,late=0,cur=null,depart=start,lastEnd=start;
   if(st.startAtFirst!==false&&ids.length){const j0=JOB[ids[0]],l0=j0&&LOC[j0.locationId];if(l0){const pf0=(D.plans[dt]&&D.plans[dt].prefs||{})[ids[0]];let a0=t2m(j0.from);if(pf0!=null&&(a0==null||pf0>a0))a0=pf0;const arr=Math.max(start,a0??start);depart=arr-leg(pos,lPt(l0)).min-(+st.parkMin||0);const mp=st.maxPreTravel==null||st.maxPreTravel===''?60:+st.maxPreTravel;depart=Math.max(depart,start-mp);t=depart}}
   const seg=[],stops=[],lateJobs=[],skillBad=[];
@@ -271,14 +271,14 @@ function simulate(w,ids,date){
     if(!skillOk(w,j))skillBad.push(id);
     const p=lPt(l);
     if(p.key!==pos.key){
-      if(!pauseDone&&stops.length&&t>=pAt&&pauseFits(i,t,pos))pause();
+      if(!pauseDone&&stops.length&&t>=pAt&&((pTot!=null&&t>=pTot)||pauseFits(i,t,pos)))pause();
       const g=leg(pos,p),mins=g.min+(+st.parkMin||0);
       seg.push({k:'drive',a:t,b:t+mins,km:g.km});t+=mins;km+=g.km;trav+=mins;pos=p;
       cur={loc:l,arrive:t,travel:mins,km:g.km,jobs:[],start:null,end:null,wait:0,late:false};stops.push(cur);
     }
     const pf=(D.plans[dt]&&D.plans[dt].prefs||{})[id];let ws=t2m(j.from);if(pf!=null&&(ws==null||pf>ws))ws=pf;const we=t2m(j.to);
     if(ws!=null&&t<ws){seg.push({k:'wait',a:t,b:ws});wait+=ws-t;cur.wait+=ws-t;if(!pauseDone&&ws-t>=pm&&ws>pAt)pauseDone=true;t=ws}
-    else if(!pauseDone&&t>=pAt&&cur.jobs.length&&pauseFits(i,t,pos))pause();
+    else if(!pauseDone&&t>=pAt&&cur.jobs.length&&((pTot!=null&&t>=pTot)||pauseFits(i,t,pos)))pause();
     /* Alleen een tijd (zonder "tot"): exacte starttijd, te laat als de medewerker na die tijd start */
     const d=jobDur(j),s=t,e=t+d,exact=ws!=null&&we==null,lateStart=exact&&s>ws+.5,isLate=lateStart||(we!=null&&e>we+.5);
     seg.push({k:'job',a:s,b:e,id,late:isLate,ls:lateStart,vt:(pf!=null&&ws===pf)?pf:null});serv+=d;t=e;
@@ -286,7 +286,7 @@ function simulate(w,ids,date){
     cur.jobs.push(id);if(cur.start==null)cur.start=s;cur.end=e;
   }
   if(stops.length){
-    if(!pauseDone&&t-start>(+st.pauseMinDay||330))pause();
+    if(!pauseDone&&t-start>(+st.pauseMinDay||330)&&(pTot==null||t<=pTot))pause();
     lastEnd=t;
     const g=leg(pos,wPt(w));seg.push({k:'return',a:t,b:t+g.min,km:g.km});t+=g.min;km+=g.km;trav+=g.min;
   }

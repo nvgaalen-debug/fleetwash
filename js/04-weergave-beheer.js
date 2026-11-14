@@ -362,11 +362,16 @@ function jobFields(){
     {k:'duration',label:'Afwijkende duur (min)',type:'number',ph:'standaard per type'},{k:'priority',label:'Prioriteit',type:'select',options:[[1,'Laag'],[2,'Normaal'],[3,'Hoog']]},
     {k:'notes',label:'Opmerking',wide:1}];
 }
-function editJob(id,preset){
-  if(!D.locations.length){toast('Voeg eerst een klant met locatie toe.');S.tab='klanten';render();return}
-  const pl=preset&&preset._place,j=id?JOB[id]:{plate:'',vehicle:'',locationId:(preset&&preset.locationId)||D.locations[0].id,date:S.date,type:D.types[0]?.id,from:(preset&&preset.from)||'',to:'',duration:'',priority:2,notes:''};
+let JOB_TERUG=null;   // opent het opdrachtformulier opnieuw, met bewaarde invoer
+function editJob(id,preset,concept){
+  if(!D.locations.length&&!concept){toast('Voeg eerst een klant met locatie toe.');S.tab='klanten';render();return}
+  const pl=preset&&preset._place,j=id?JOB[id]:{plate:'',vehicle:'',locationId:(preset&&preset.locationId)||(D.locations[0]&&D.locations[0].id)||'',date:S.date,type:D.types[0]?.id,from:(preset&&preset.from)||'',to:'',duration:'',priority:2,notes:''};
+  JOB_TERUG=c=>editJob(id,preset,c);
   const old=id?j.date:null;
-  openForm({title:id?'Opdracht '+j.plate:pl&&WRK[pl.wid]?'Nieuwe afspraak voor '+WRK[pl.wid].name:'Nieuwe opdracht',note:id?jobPlanNote(j):pl&&WRK[pl.wid]?`Wordt ingepland bij ${WRK[pl.wid].name}${pl.at!=null?' rond '+m2t(pl.at):' op de beste plek in de rit'} en vastgezet. Pas het tijdvak aan als de klant een andere tijd wil.`:'',fields:jobFields(),values:j,
+  /* Vastzetting zichtbaar maken en kunnen opheffen */
+  const pinP=id?D.plans[j.date]:null,pinW=pinP&&pinP.pinned&&pinP.pinned[id]&&WRK[pinP.pinned[id]];
+  const pinTxt=pinW?` Vastgezet bij ${pinW.name}. Heffen op maakt de tijd vrij voor automatisch plannen en het AI-voorstel.`:'';
+  openForm({title:id?'Opdracht '+j.plate:pl&&WRK[pl.wid]?'Nieuwe afspraak voor '+WRK[pl.wid].name:'Nieuwe opdracht',extra:pinW?`<button type="button" class="btn" data-act="unpinjob" data-id="${id}">Vastzetting opheffen</button>`:'',note:id?jobPlanNote(j)+pinTxt:pl&&WRK[pl.wid]?`Wordt ingepland bij ${WRK[pl.wid].name}${pl.at!=null?' rond '+m2t(pl.at):' op de beste plek in de rit'} en vastgezet. Pas het tijdvak aan als de klant een andere tijd wil.`:'',fields:jobFields(),values:concept?Object.assign({},j,concept):j,
     onSave:v=>{if(v.from&&v.to&&t2m(v.to)<=t2m(v.from))return'"Uiterlijk gereed" moet later zijn dan "Vanaf".';
       if(id){Object.assign(j,v);replan([v.date,old]);toast('Opdracht opgeslagen, planning herberekend.');return}
       const nj={id:uid('j'),...v};D.jobs.push(nj);index();
@@ -659,11 +664,24 @@ function editCus(id){
       const hasAddr=v.address||v.postcode||v.city;let loc=null;
       if(hasAddr){loc={name:v.locName||'Hoofdlocatie',address:v.address,postcode:v.postcode,city:v.city,info:v.info,lat:'',lng:''};const ge=fixGeo(loc,null);if(ge)return ge}
       const nid=uid('c');D.customers.push({id:nid,...cust});
-      let newLoc=null;if(loc){newLoc={id:uid('l'),customerId:nid,...loc};D.locations.push(newLoc)}setTimeout(()=>pdokAfterSave(newLoc),50);
+      let newLoc=null;if(loc){newLoc={id:uid('l'),customerId:nid,...loc};D.locations.push(newLoc)}setTimeout(()=>pdokAfterSave(newLoc),50);NEW_LOC_ID=newLoc?newLoc.id:null;
       save();render();toast(loc?`Klant en locatie opgeslagen${loc.geo!=='manual'?' (positie geschat uit '+(loc.geo==='plaats'?'de plaats':'de postcode')+')':''}.`:'Klant opgeslagen. Voeg nog een locatie toe om opdrachten te kunnen plannen.');
     },
     onDelete:id?()=>{const lids=new Set(nl.map(l=>l.id));const ds=D.jobs.filter(j=>lids.has(j.locationId)).map(j=>j.date);D.customers=D.customers.filter(x=>x.id!==id);D.locations=D.locations.filter(l=>!lids.has(l.id));D.jobs=D.jobs.filter(j=>!lids.has(j.locationId));replan(ds);toast('Klant verwijderd.')}:null,
     delNote:id&&(nl.length||nj)?`Dit verwijdert ook ${nl.length} locatie(s) en ${nj} opdracht(en).`:''});
+}
+/* Vanuit het opdrachtformulier een nieuwe klant of locatie maken; daarna keert de invoer terug */
+function nieuweKlantVanOpdracht(k){
+  const back=JOB_TERUG;if(!back)return;
+  const concept=formDraft(jobFields());
+  NEW_CUS_BACK=locId=>back(Object.assign({},concept,locId?{locationId:locId}:{}));
+  editCus(null);
+}
+/* Vastzetting van één opdracht opheffen: tijd en voorkeur vervallen, de dag wordt opnieuw berekend */
+function unpinJob(id){
+  const j=JOB[id];if(!j)return;const P=D.plans[j.date];if(!P)return;
+  if(P.pinned)delete P.pinned[id];if(P.prefs)delete P.prefs[id];P.edited=Date.now();
+  closeForm();replan([j.date]);toast('Vastzetting opgeheven. Deze afspraak kan nu door automatisch plannen of de AI worden verplaatst.',7000);
 }
 function editLoc(id,custId){
   if(!D.customers.length){toast('Voeg eerst een klant toe.');return}

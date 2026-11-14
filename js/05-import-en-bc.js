@@ -8,8 +8,9 @@ function comboHtml(f,v){
 function comboShow(k,q){
   const list=$('#f_'+k+'_list');if(!list)return;const opts=COMBO[k]||[];const words=normTxt(q).split(' ').filter(Boolean);
   const hits=opts.filter(o=>words.every(w=>o.hay.includes(w))).slice(0,40);
-  list.innerHTML=hits.length?hits.map((o,i)=>`<button type="button" role="option" data-act="combopick" data-k="${k}" data-v="${esc(o.v)}"${i===0?' class="first"':''}><b>${esc(o.title)}</b><small>${esc(o.sub)}</small></button>`).join('')+(opts.length>hits.length&&hits.length===40?'<p class="small muted" style="margin:6px 10px">Typ verder om meer te filteren…</p>':'')
-    :'<p class="small muted" style="margin:8px 10px">Geen klant of locatie gevonden. Maak een nieuwe klant aan via Klanten &amp; locaties.</p>';
+  const nieuw=`<button type="button" class="combo-new" data-act="combonew" data-k="${k}">+ Nieuwe klant of locatie</button>`;
+  list.innerHTML=(hits.length?hits.map((o,i)=>`<button type="button" role="option" data-act="combopick" data-k="${k}" data-v="${esc(o.v)}"${i===0?' class="first"':''}><b>${esc(o.title)}</b><small>${esc(o.sub)}</small></button>`).join('')+(opts.length>hits.length&&hits.length===40?'<p class="small muted" style="margin:6px 10px">Typ verder om meer te filteren…</p>':'')
+    :'<p class="small muted" style="margin:8px 10px">Geen klant of locatie gevonden.</p>')+nieuw;
   list.hidden=false;const inp=$('#f_'+k+'_q');if(inp)inp.setAttribute('aria-expanded','true');
 }
 function comboHide(k){const l=$('#f_'+k+'_list');if(l)l.hidden=true;const inp=$('#f_'+k+'_q');if(inp)inp.setAttribute('aria-expanded','false')}
@@ -39,7 +40,7 @@ function fieldHtml(f,v){
 }
 function openForm(o){
   FORM=o;MV=null;const m=$('#modal');
-  m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT"><form id="dlgF" novalidate><h3 id="dlgT">${esc(o.title)}</h3>${o.note?`<p class="note">${esc(o.note)}</p>`:''}<div class="fgrid">${o.fields.map(f=>fieldHtml(f,o.values[f.k])).join('')}</div><p class="hint" id="dlgErr" style="color:var(--bad)" hidden></p><div class="dlg-foot">${o.onDelete?'<button type="button" class="btn danger" data-act="dlgdel">Verwijderen</button>':''}<span class="sp"></span><button type="button" class="btn" data-act="dlgx">Annuleren</button><button type="submit" class="btn primary">${esc(o.okLabel||'Opslaan')}</button></div></form></div>`;
+  m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlgT"><form id="dlgF" novalidate><h3 id="dlgT">${esc(o.title)}</h3>${o.note?`<p class="note">${esc(o.note)}</p>`:''}<div class="fgrid">${o.fields.map(f=>fieldHtml(f,o.values[f.k])).join('')}</div><p class="hint" id="dlgErr" style="color:var(--bad)" hidden></p><div class="dlg-foot">${o.onDelete?'<button type="button" class="btn danger" data-act="dlgdel">Verwijderen</button>':''}${o.extra||''}<span class="sp"></span><button type="button" class="btn" data-act="dlgx">Annuleren</button><button type="submit" class="btn primary">${esc(o.okLabel||'Opslaan')}</button></div></form></div>`;
   m.hidden=false;const first=m.querySelector('input,select,textarea');if(first)first.focus();
   $('#dlgF').addEventListener('submit',e=>{e.preventDefault();
     for(const f of o.fields){if(f.req){const el=$('#f_'+f.k);if(el&&!String(el.value).trim()){return showErr(f.type==='combo'?`Kies een ${f.label.toLowerCase()} uit de lijst.`:`Vul "${f.label}" in.`)}}}
@@ -48,7 +49,11 @@ function openForm(o){
     const err=o.onSave(v);if(err)return showErr(err);closeForm();});
 }
 function showErr(t){const e=$('#dlgErr');e.textContent=t;e.hidden=false}
-function closeForm(){$('#modal').hidden=true;$('#modal').innerHTML='';FORM=null;MV=null}
+let NEW_CUS_BACK=null, NEW_LOC_ID=null;   // terugkeer naar het opdrachtformulier na 'nieuwe klant of locatie'
+function closeForm(){$('#modal').hidden=true;$('#modal').innerHTML='';FORM=null;MV=null;
+  if(NEW_CUS_BACK){const cb=NEW_CUS_BACK,id=NEW_LOC_ID;NEW_CUS_BACK=null;NEW_LOC_ID=null;setTimeout(()=>cb(id),0)}}
+/* Waarden van het open formulier, zoals bij opslaan */
+function formDraft(fields){const v={};for(const f of fields){if(f.type==='heading'||f.type==='checks')continue;const el=$('#f_'+f.k);if(el)v[f.k]=el.value}return v}
 
 /* ---------- import / export ---------- */
 function openImport(){

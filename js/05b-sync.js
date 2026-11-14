@@ -24,6 +24,17 @@ function startMet(data,version){
   SYNC.sv=version;SYNC_READY=true;
   load(data);migrateBillTo();index();
   render();
+  orsDagelijks();
+}
+
+// Eén keer per dag (bij het openen van de app) de ontbrekende rijtijden ophalen bij OpenRouteService.
+// Alleen als de bron op OpenRouteService staat; anders wordt er niets opgevraagd.
+async function orsDagelijks(){
+  if(!SERVER||!SYNC_READY||!useORS())return;
+  const vandaag=todayIso();
+  if(D.orsDag===vandaag)return;
+  await fetchORS(null,{quiet:true});
+  D.orsDag=vandaag;save();   // ook bij een fout: dan pas morgen opnieuw, geen herhaling binnen de dag
 }
 
 // Serverversie overnemen tijdens gebruik: datum en weergave blijven zoals ze waren

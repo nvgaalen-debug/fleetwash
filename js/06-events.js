@@ -31,7 +31,7 @@ function onClick(e){
     case'mv':{const P=getPlan(S.date),wid=el.dataset.wid,ids=el.dataset.ids.split(','),r=P.routes[wid];const bl=blocksOf(r);const i=bl.findIndex(b=>b.ids[0]===ids[0]);const j=i+(+el.dataset.dir);if(i<0||j<0||j>=bl.length)return;[bl[i],bl[j]]=[bl[j],bl[i]];P.routes[wid]=bl.flatMap(b=>b.ids);ids.forEach(id=>P.pinned[id]=wid);P.edited=Date.now();save();render();toast('Volgorde aangepast, tijden herberekend.');break}
     case'pin':{const P=getPlan(S.date),wid=el.dataset.wid,ids=el.dataset.ids.split(',');const all=ids.every(id=>P.pinned[id]===wid);ids.forEach(id=>{if(all)delete P.pinned[id];else P.pinned[id]=wid});save();render();toast(all?'Losgemaakt: de planner mag dit bezoek weer verplaatsen.':'Vastgezet bij '+WRK[wid].name+'.');break}
     case'jobscope':S.jobScope=el.dataset.k;render();break;
-    case'newjob':editJob(null);break;case'editjob':editJob(el.dataset.id);break;
+    case'newjob':editJob(null);break;case'combonew':nieuweKlantVanOpdracht(el.dataset.k);break;case'unpinjob':unpinJob(el.dataset.id);break;case'editjob':editJob(el.dataset.id);break;
     case'import':openXlsxImport();break;
     case'csvimport':openImport();break;
     case'xdo':doXImport();break;

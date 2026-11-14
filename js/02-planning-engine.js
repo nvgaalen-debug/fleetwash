@@ -466,7 +466,7 @@ function moveJobsAt(ids,wid,minutes){
   const st=simulate(WRK[wid],r);
   let idx=r.length;for(let i=0;i<r.length;i++){const g=st.seg.find(x=>x.k==='job'&&x.id===r[i]);if(g&&g.a>minutes){idx=i;break}}
   r.splice(idx,0,...ids);
-  P.prefs=P.prefs||{};ids.forEach(id=>{P.prefs[id]=minutes;P.pinned[id]=wid});
+  P.prefs=P.prefs||{};ids.forEach((id,k)=>{if(k===0)P.prefs[id]=minutes;else delete P.prefs[id];P.pinned[id]=wid});
   P.edited=Date.now();save();render();
   toast(`Gezet op ${m2t(minutes)} bij ${WRK[wid].name}. Tijden en route zijn herberekend.`);
   lateWarn(wid);

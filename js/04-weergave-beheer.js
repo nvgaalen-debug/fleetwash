@@ -371,11 +371,11 @@ function editJob(id,preset,concept){
   /* Vastzetting zichtbaar maken en kunnen opheffen */
   const pinP=id?D.plans[j.date]:null,pinW=pinP&&pinP.pinned&&pinP.pinned[id]&&WRK[pinP.pinned[id]];
   const pinTxt=pinW?` Vastgezet bij ${pinW.name}. Heffen op maakt de tijd vrij voor automatisch plannen en het AI-voorstel.`:'';
-  openForm({title:id?'Opdracht '+j.plate:pl&&WRK[pl.wid]?'Nieuwe afspraak voor '+WRK[pl.wid].name:'Nieuwe opdracht',extra:pinW?`<button type="button" class="btn" data-act="unpinjob" data-id="${id}">Vastzetting opheffen</button>`:'',note:id?jobPlanNote(j)+pinTxt:pl&&WRK[pl.wid]?`Wordt ingepland bij ${WRK[pl.wid].name}${pl.at!=null?' rond '+m2t(pl.at):' op de beste plek in de rit'} en vastgezet. Pas het tijdvak aan als de klant een andere tijd wil.`:'',fields:jobFields(),values:concept?Object.assign({},j,concept):j,
+  openForm({title:id?'Opdracht '+j.plate:pl&&WRK[pl.wid]?'Nieuwe afspraak voor '+WRK[pl.wid].name:'Nieuwe opdracht',extra:pinW?`<button type="button" class="btn" data-act="unpinjob" data-id="${id}">Vastzetting opheffen</button>`:'',note:id?jobPlanNote(j)+pinTxt:pl&&WRK[pl.wid]?`Wordt ingepland bij ${WRK[pl.wid].name}${pl.at!=null?' rond '+m2t(pl.at):' op de beste plek in de rit'}${pl.at!=null?' en vastgezet':''}. Pas het tijdvak aan als de klant een andere tijd wil.`:'',fields:jobFields(),values:concept?Object.assign({},j,concept):j,
     onSave:v=>{if(v.from&&v.to&&t2m(v.to)<=t2m(v.from))return'"Uiterlijk gereed" moet later zijn dan "Vanaf".';
       if(id){Object.assign(j,v);replan([v.date,old]);toast('Opdracht opgeslagen, planning herberekend.');return}
       const nj={id:uid('j'),...v};D.jobs.push(nj);index();
-      if(pl&&WRK[pl.wid]){if(t2m(v.from)!=null)pl.at=t2m(v.from);if(!hasPlan(v.date)&&jobsOn(v.date).length>1)autoPlan(v.date);const nm=placeNewJob(nj,pl);replan([v.date]);const st=jobPlanInfo(nj);toast(`Afspraak ${nj.plate} ingepland bij ${nm}${st.start!=null?' om '+m2t(st.start):''} en vastgezet${st.st==='late'?'. Let op: valt buiten het tijdvak of de werktijd':''}.`);return}
+      if(pl&&WRK[pl.wid]){if(t2m(v.from)!=null)pl.at=t2m(v.from);if(!hasPlan(v.date)&&jobsOn(v.date).length>1)autoPlan(v.date);const nm=placeNewJob(nj,pl);replan([v.date]);const st=jobPlanInfo(nj);toast(`Afspraak ${nj.plate} ingepland bij ${nm}${st.start!=null?' om '+m2t(st.start):''}${pl.at!=null?' en vastgezet':''}${st.st==='late'?'. Let op: valt buiten het tijdvak of de werktijd':''}.`);return}
       replan([v.date]);toast('Opdracht toegevoegd en ingepland.')},
     onDelete:id?()=>{D.jobs=D.jobs.filter(x=>x.id!==id);replan([old]);toast('Opdracht verwijderd.')}:null});
 }
@@ -434,7 +434,9 @@ function placeNewJob(j,pre){
   const r=P.routes[pre.wid]=P.routes[pre.wid]||[];
   if(pre.at!=null){const sim=simulate(w,r,j.date);const nxt=r.find(id=>{const g=sim.seg.find(x=>x.k==='job'&&x.id===id);return g&&g.a>=pre.at-1});const i=nxt?r.indexOf(nxt):r.length;r.splice(i,0,j.id)}
   else{const b=bestPos(w,r,[j.id],true)||bestPos(w,r,[j.id],false);P.routes[pre.wid]=b?b.arr:r.concat(j.id)}
-  P.pinned[j.id]=pre.wid;P.edited=Date.now();if(!P.auto)P.auto=Date.now();
+  /* Alleen bij een gekozen tijdstip vastzetten; 'op de beste plek' blijft vrij voor automatisch plannen en de AI */
+  if(pre.at!=null)P.pinned[j.id]=pre.wid;else delete P.pinned[j.id];
+  P.edited=Date.now();if(!P.auto)P.auto=Date.now();
   return w.name;
 }
 
@@ -579,7 +581,7 @@ function jobPlanNote(j){
   let t=`${cu.name||''}, ${[l.address,l.city].filter(Boolean).join(', ')}. `;
   if(wid&&WRK[wid]){const s=simulate(WRK[wid],P.routes[wid],j.date),g=s.seg.find(x=>x.k==='job'&&x.id===j.id);t+=`Gepland bij ${WRK[wid].name} op ${fdate(j.date,{weekday:'short',day:'numeric',month:'short'})}${g?`, ${m2t(g.a)}–${m2t(g.b)}${g.late?(g.ls?' (later dan de vaste tijd)':' (buiten tijdvak)'):''}`:''}.`}
   else t+='Nog niet ingepland.';
-  if(P&&P.edited)t+=' Deze dag is handmatig aangepast: na opslaan worden de tijden herberekend en blijft de rest van de planning staan.';
+
   return t;
 }
 function openVisit(wid,lid){

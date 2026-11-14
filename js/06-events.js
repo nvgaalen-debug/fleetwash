@@ -88,6 +88,7 @@ function onClick(e){
     case'archtoon':archiefToon();break;
     case'archsave':archiefTermijnOpslaan();break;
     case'archopruim':archiefOpruimen();break;
+    case'fotoswis':archiefFotosWissen();break;
     case'chatapply':chatApply(+el.dataset.m,+el.dataset.i);break;
     case'orsfetch':fetchORS(el.dataset.date?[el.dataset.date]:null);break;
     case'pdok':pdokImprove();break;

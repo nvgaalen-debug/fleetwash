@@ -120,6 +120,13 @@ function archiefHtml(){
     <button class="btn" data-act="archopruim">Oude planningen opruimen</button>
   </div>
   <p class="small muted">Opruimen archiveert eerst alle bezoeken van dagen ouder dan de termijn (ook met probleem of zonder melding) en haalt die dagen daarna uit de live planner. Opdrachten blijven bestaan.</p>
+  <h3 style="margin:14px 0 6px">Foto's opschonen</h3>
+  <div class="row" style="gap:8px;flex-wrap:wrap;align-items:flex-end">
+    <label class="fld"><span>Van</span><input id="fotoVan" type="date"></label>
+    <label class="fld"><span>Tot en met</span><input id="fotoTot" type="date"></label>
+    <button class="btn" data-act="fotoswis">Foto's verwijderen</button>
+  </div>
+  <p class="small muted">Verwijdert alleen de foto's van de gekozen datums van de server. De planning en de meldingen blijven staan.</p>
   <h3 style="margin:14px 0 6px">Archief bekijken</h3>
   ${archiefViewerHtml()}`;
 }

@@ -146,12 +146,16 @@ async function handler(req) {
     if (path.endsWith("/foto")) {
       if (req.method === "POST") {
         const b = await req.json();
-        // planner: alle foto's van een dag wissen (bij archiveren)
+        // planner: foto's wissen binnen een datumbereik (van t/m tot; bij archiveren één dag)
         if (b.action === "wis") {
           if (!plannerOk(req)) return json({ error: "Wachtwoord klopt niet." }, 401);
-          if (!isDate(b.date)) return json({ error: "Ongeldige datum." }, 400);
+          const van = b.van || b.date;
+          const tot = b.tot || b.date;
+          if (!isDate(van) || !isDate(tot) || van > tot) return json({ error: "Ongeldig datumbereik." }, 400);
           let n = 0;
-          for (const f of (await store.list({ prefix: `pod/${b.date}/` })).blobs || []) {
+          for (const f of (await store.list({ prefix: "pod/" })).blobs || []) {
+            const dag = f.key.split("/")[1] || "";
+            if (dag < van || dag > tot) continue;
             await store.delete(f.key);
             n++;
           }

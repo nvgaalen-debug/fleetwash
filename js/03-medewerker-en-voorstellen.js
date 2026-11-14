@@ -493,6 +493,18 @@ async function wisFotos(dates){
   }
   return n;
 }
+/* Foto's wissen binnen een datumbereik (van t/m tot), op verzoek van de planner */
+async function archiefFotosWissen(){
+  const van=($('#fotoVan')||{}).value,tot=($('#fotoTot')||{}).value;
+  if(!van||!tot){toast('Kies een begin- en einddatum.');return}
+  if(van>tot){toast('"Van" moet voor of op "Tot en met" liggen.');return}
+  if(!confirm(`Alle foto's van ${van} t/m ${tot} verwijderen? Dit kan niet ongedaan worden gemaakt.`))return;
+  try{
+    const r=await fetch('/api/foto',{method:'POST',headers:{'content-type':'application/json','x-app-password':getPw()},body:JSON.stringify({action:'wis',van,tot})});
+    if(!r.ok){toast(r.status===401?'Wachtwoord klopt niet.':'Foto\'s niet verwijderd.');return}
+    const j=await r.json();toast(`${j.verwijderd} foto's verwijderd.`,6000);
+  }catch(e){toast('Foto\'s niet verwijderd.')}
+}
 /* Foto bij oplevering van één afspraak bekijken (proof of delivery) */
 async function showFoto(date,id){
   const hdr={'x-app-password':getPw()};

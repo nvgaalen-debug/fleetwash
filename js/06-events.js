@@ -22,12 +22,12 @@ function onClick(e){
     case'mailklant':mailKlantKies(S.date);break;
     case'aiday':aiVoorstel([S.date]);break;
     case'aiweek':aiVoorstel([...Array(7)].map((_,i)=>addDays(weekStart(S.date),i)));break;
-    case'auto':{const P0=getPlan(S.date);P0.skip={};}autoPlan(S.date);save();render();toast('Planning automatisch opnieuw gemaakt. Vastgezette bezoeken zijn gerespecteerd.');break;
-    case'unpinall':{const P=getPlan(S.date);P.pinned={};P.edited=Date.now();save();render();toast('Alle vastzettingen opgeheven. Klik Automatisch plannen om vrij te optimaliseren.');break}
+    case'auto':{const P0=getPlan(S.date);P0.skip={};P0.editW={};}autoPlan(S.date);save();render();toast('Planning automatisch opnieuw gemaakt. Vastgezette bezoeken zijn gerespecteerd.');break;
+    case'unpinall':{const P=getPlan(S.date);P.pinned={};P.editW={};P.edited=Date.now();save();render();toast('Alle vastzettingen opgeheven. Klik Automatisch plannen om vrij te optimaliseren.');break}
     case'selw':S.wid=el.dataset.wid;S.selLoc=null;render();break;
     case'sel':S.wid=el.dataset.wid;S.selLoc=S.selLoc===el.dataset.loc?null:el.dataset.loc;render();break;
     case'mapmode':S.mapMode=el.dataset.k;render();break;
-    case'seqopt':{const P=getPlan(S.date),w=WRK[el.dataset.wid];const before=simulate(w,P.routes[w.id]||[]);const R={[w.id]:[...(P.routes[w.id]||[])]};improve(R,[w],P.pinned,true);P.routes[w.id]=R[w.id];P.edited=Date.now();const after=simulate(w,R[w.id]);save();render();toast(after.trav<before.trav?`Volgorde verbeterd: ${fdur(before.trav-after.trav)} minder rijtijd.`:'De huidige volgorde is al optimaal.');break}
+    case'seqopt':{const P=getPlan(S.date),w=WRK[el.dataset.wid];const before=simulate(w,P.routes[w.id]||[]);const R={[w.id]:[...(P.routes[w.id]||[])]};improve(R,[w],P.pinned,true);P.routes[w.id]=R[w.id];P.editW=Object.assign(P.editW||{},{[w.id]:Date.now()});P.edited=Date.now();const after=simulate(w,R[w.id]);save();render();toast(after.trav<before.trav?`Volgorde verbeterd: ${fdur(before.trav-after.trav)} minder rijtijd.`:'De huidige volgorde is al optimaal.');break}
     case'mv':{const P=getPlan(S.date),wid=el.dataset.wid,ids=el.dataset.ids.split(','),r=P.routes[wid];const bl=blocksOf(r);const i=bl.findIndex(b=>b.ids[0]===ids[0]);const j=i+(+el.dataset.dir);if(i<0||j<0||j>=bl.length)return;[bl[i],bl[j]]=[bl[j],bl[i]];P.routes[wid]=bl.flatMap(b=>b.ids);ids.forEach(id=>P.pinned[id]=wid);P.edited=Date.now();save();render();toast('Volgorde aangepast, tijden herberekend.');break}
     case'pin':{const P=getPlan(S.date),wid=el.dataset.wid,ids=el.dataset.ids.split(',');const all=ids.every(id=>P.pinned[id]===wid);ids.forEach(id=>{if(all)delete P.pinned[id];else P.pinned[id]=wid});save();render();toast(all?'Losgemaakt: de planner mag dit bezoek weer verplaatsen.':'Vastgezet bij '+WRK[wid].name+'.');break}
     case'jobscope':S.jobScope=el.dataset.k;render();break;

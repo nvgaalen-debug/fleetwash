@@ -257,7 +257,13 @@ function absDelete(a){
 }
 
 /* ---------- dagsimulatie ---------- */
+/* Pauze: met een 'Pauze uiterlijk' moet de pauze er zijn. Lukt dat niet op een passend moment, dan wordt hij op het eerste moment na 'Pauze vanaf' geforceerd. */
 function simulate(w,ids,date){
+  const r=simulateBasis(w,ids,date,false);
+  if(D.settings.pauseTot&&(+D.settings.pauseMin||0)>0&&r.stops.length&&!r.seg.some(x=>x.k==='pause'))return simulateBasis(w,ids,date,true);
+  return r;
+}
+function simulateBasis(w,ids,date,force){
   const dt=date||(ids.length&&JOB[ids[0]]?JOB[ids[0]].date:null),sh=shiftOf(w,dt);
   const st=D.settings,start=t2m(sh.start)??480,end=t2m(sh.end)??1020,pAt=t2m(st.pauseAt)??720,pTot=t2m(st.pauseTot),pm=+st.pauseMin||0;
   let t=start,pos=wPt(w),km=0,trav=0,wait=0,serv=0,pauseDone=pm<=0,late=0,cur=null,depart=start,lastEnd=start;
@@ -271,14 +277,21 @@ function simulate(w,ids,date){
     if(!skillOk(w,j))skillBad.push(id);
     const p=lPt(l);
     if(p.key!==pos.key){
-      if(!pauseDone&&stops.length&&t>=pAt&&((pTot!=null&&t>=pTot)||pauseFits(i,t,pos)))pause();
+      if(!pauseDone&&stops.length&&t>=pAt&&(force||pauseFits(i,t,pos)))pause();
       const g=leg(pos,p),mins=g.min+(+st.parkMin||0);
       seg.push({k:'drive',a:t,b:t+mins,km:g.km});t+=mins;km+=g.km;trav+=mins;pos=p;
       cur={loc:l,arrive:t,travel:mins,km:g.km,jobs:[],start:null,end:null,wait:0,late:false};stops.push(cur);
     }
     const pf=(D.plans[dt]&&D.plans[dt].prefs||{})[id];let ws=t2m(j.from);if(pf!=null&&(ws==null||pf>ws))ws=pf;const we=t2m(j.to);
-    if(ws!=null&&t<ws){seg.push({k:'wait',a:t,b:ws});wait+=ws-t;cur.wait+=ws-t;if(!pauseDone&&ws-t>=pm&&ws>pAt)pauseDone=true;t=ws}
-    else if(!pauseDone&&t>=pAt&&cur.jobs.length&&((pTot!=null&&t>=pTot)||pauseFits(i,t,pos)))pause();
+    if(ws!=null&&t<ws){
+      /* Wachten op een tijd: de pauze valt in die wachttijd (wordt getekend), mits die binnen het pauzevenster past */
+      const pStart=Math.max(t,pAt);
+      if(!pauseDone&&pm>0&&pStart+pm<=ws&&(pTot==null||pStart<=pTot)){
+        if(pStart>t){seg.push({k:'wait',a:t,b:pStart});wait+=pStart-t;cur.wait+=pStart-t;t=pStart}
+        pause();
+      }
+      seg.push({k:'wait',a:t,b:ws});wait+=ws-t;cur.wait+=ws-t;t=ws}
+    else if(!pauseDone&&t>=pAt&&cur.jobs.length&&(force||pauseFits(i,t,pos)))pause();
     /* Alleen een tijd (zonder "tot"): exacte starttijd, te laat als de medewerker na die tijd start */
     const d=jobDur(j),s=t,e=t+d,exact=ws!=null&&we==null,lateStart=exact&&s>ws+.5,isLate=lateStart||(we!=null&&e>we+.5);
     seg.push({k:'job',a:s,b:e,id,late:isLate,ls:lateStart,vt:(pf!=null&&ws===pf)?pf:null});serv+=d;t=e;
@@ -399,19 +412,19 @@ function cleanPlan(date){
   return P;
 }
 function autoPlan(date){
-  const P=cleanPlan(date),pins=P.pinned,skip=P.skip||{},jobs=jobsOn(date).filter(j=>!(skip[j.id]&&!pins[j.id])),ws=D.workers.filter(w=>avail(w,date));
-  /* Bezoeken die al bij een medewerker staan, blijven daar; vastgezette bezoeken worden hieronder op hun medewerker gezet */
-  const R={},bij=new Set(jobs.map(j=>j.id));ws.forEach(w=>R[w.id]=(P.routes[w.id]||[]).filter(id=>bij.has(id)&&!pins[id]));
-  const byWin=(a,b)=>(t2m(a.from)??0)-(t2m(b.from)??0);
-  const pj=jobs.filter(j=>pins[j.id]&&R[pins[j.id]]).sort(byWin);
-  for(const j of pj){const wid=pins[j.id];const b=bestPos(WRK[wid],R[wid],[j.id],true)||bestPos(WRK[wid],R[wid],[j.id],false);R[wid]=b.arr}
-  insertLoop(jobs.filter(j=>!(pins[j.id]&&R[pins[j.id]])).map(j=>j.id),R,ws);
+  const P=cleanPlan(date),pins=P.pinned,skip=P.skip||{},jobs=jobsOn(date).filter(j=>!(skip[j.id]&&!pins[j.id]));
+  /* Medewerkers met handmatige aanpassingen (vastgezette bezoeken of P.editW) houden hun route; alleen de overigen worden opnieuw ingepland */
+  const manW=new Set([...Object.values(pins),...Object.keys(P.editW||{})]);
+  const ws=D.workers.filter(w=>avail(w,date)&&!manW.has(w.id));
+  const R={};D.workers.forEach(w=>{if(manW.has(w.id))R[w.id]=(P.routes[w.id]||[]).slice()});
+  const bij=new Set(jobs.map(j=>j.id));ws.forEach(w=>R[w.id]=(P.routes[w.id]||[]).filter(id=>bij.has(id)&&!pins[id]));
+  const inR=()=>new Set(Object.values(R).flat());
+  insertLoop(jobs.map(j=>j.id).filter(id=>!inR().has(id)),R,ws);
   /* Optimaliseren alleen binnen de route van elke medewerker; bezoeken niet over medewerkers heen verplaatsen */
   improve(R,ws,pins,true);
-  const inR=()=>new Set(Object.values(R).flat());
   let left=jobs.map(j=>j.id).filter(id=>!inR().has(id));
   if(left.length){insertLoop(left,R,ws);improve(R,ws,pins,true)}
-  P.routes=R;P.auto=Date.now();P.edited=0;
+  P.routes=R;P.auto=Date.now();P.edited=manW.size?Date.now():0;
   return P;
 }
 function whyUnplanned(j,date){

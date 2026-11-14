@@ -379,7 +379,7 @@ function editJob(id,preset,concept){
       replan([v.date]);toast('Opdracht toegevoegd en ingepland.')},
     onDelete:id?()=>{D.jobs=D.jobs.filter(x=>x.id!==id);replan([old]);toast('Opdracht verwijderd.')}:null});
 }
-function replan(dates){index();for(const d of new Set(dates.filter(Boolean))){if(D.plans[d]&&D.plans[d].edited)cleanPlan(d);else if(jobsOn(d).length||D.plans[d])autoPlan(d)}save();render()}
+function replan(dates){index();for(const d of new Set(dates.filter(Boolean))){if(jobsOn(d).length||D.plans[d])autoPlan(d)}save();render()}
 /* ---------- rechtermuisknop op het planbord ---------- */
 function closeCtx(){const c=$('#ctx');if(c)c.remove()}
 function openCtx(x,y,html,title){
@@ -436,7 +436,7 @@ function placeNewJob(j,pre){
   else{const b=bestPos(w,r,[j.id],true)||bestPos(w,r,[j.id],false);P.routes[pre.wid]=b?b.arr:r.concat(j.id)}
   /* Alleen bij een gekozen tijdstip vastzetten; 'op de beste plek' blijft vrij voor automatisch plannen en de AI */
   if(pre.at!=null)P.pinned[j.id]=pre.wid;else delete P.pinned[j.id];
-  P.edited=Date.now();if(!P.auto)P.auto=Date.now();
+  P.editW=Object.assign(P.editW||{},{[pre.wid]:Date.now()});P.edited=Date.now();if(!P.auto)P.auto=Date.now();
   return w.name;
 }
 

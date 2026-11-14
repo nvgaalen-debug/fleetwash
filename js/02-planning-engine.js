@@ -8,7 +8,16 @@ const ovr=(w,date)=>(date&&w.overrides&&w.overrides[date])||null;
 function shiftOf(w,date){const o=ovr(w,date);let start=(o&&o.start)||w.start,end=(o&&o.end)||w.end;const pa=date&&D.absences?partialAbs(w,date):null;
   if(pa){if(pa.part==='laat'&&t2m(pa.time)>t2m(start))start=pa.time;if(pa.part==='vroeg'&&t2m(pa.time)<t2m(end))end=pa.time}
   return{start,end,o:o||(pa?{start,end,note:`${(ABS[pa.type]||{}).name||'Afwezig'} (${pa.part==='laat'?'begint '+pa.time:'stopt '+pa.time})`}:null),pa}}
-function availWhy(w,date){if((w.absent||[]).includes(date))return(w.absentNote&&w.absentNote[date])||'Afwezig';if(ovr(w,date))return'';if(!(w.days||[]).includes(wday(date)))return'Werkt niet op '+fdate(date,{weekday:'long'});return''}
+/* Nederlandse feestdagen: op een ingeschakelde feestdag is niemand beschikbaar */
+const FD_KEYS=[['nieuwjaar','Nieuwjaarsdag'],['goedevrijdag','Goede Vrijdag'],['paasdag1','Eerste Paasdag'],['paasdag2','Tweede Paasdag'],['koningsdag','Koningsdag'],['bevrijding','Bevrijdingsdag'],['hemelvaart','Hemelvaartsdag'],['pinkster1','Eerste Pinksterdag'],['pinkster2','Tweede Pinksterdag'],['kerst1','Eerste Kerstdag'],['kerst2','Tweede Kerstdag']];
+const FD_STANDAARD={nieuwjaar:true,goedevrijdag:true,paasdag1:true,paasdag2:true,koningsdag:true,bevrijding:false,hemelvaart:true,pinkster1:true,pinkster2:true,kerst1:true,kerst2:true};
+const fdCfg=()=>({...FD_STANDAARD,...(D.settings.feestdagen||{})});
+function paasdatum(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1;return new Date(Date.UTC(y,mo-1,da))}
+function feestdagenJaar(y){const p=paasdatum(y),plus=n=>{const d=new Date(p);d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};const kd=new Date(Date.UTC(y,3,27));if(kd.getUTCDay()===0)kd.setUTCDate(26);
+  return{[`${y}-01-01`]:'nieuwjaar',[plus(-2)]:'goedevrijdag',[plus(0)]:'paasdag1',[plus(1)]:'paasdag2',[kd.toISOString().slice(0,10)]:'koningsdag',[`${y}-05-05`]:'bevrijding',[plus(39)]:'hemelvaart',[plus(49)]:'pinkster1',[plus(50)]:'pinkster2',[`${y}-12-25`]:'kerst1',[`${y}-12-26`]:'kerst2'}}
+const FD_CACHE={};
+function feestdagVan(date){const y=+date.slice(0,4);if(!FD_CACHE[y])FD_CACHE[y]=feestdagenJaar(y);const k=FD_CACHE[y][date];if(!k||!fdCfg()[k])return'';return FD_KEYS.find(x=>x[0]===k)[1]}
+function availWhy(w,date){if((w.absent||[]).includes(date))return(w.absentNote&&w.absentNote[date])||'Afwezig';if(ovr(w,date))return'';const fdn=feestdagVan(date);if(fdn)return'Feestdag: '+fdn;if(!(w.days||[]).includes(wday(date)))return'Werkt niet op '+fdate(date,{weekday:'long'});return''}
 const avail=(w,date)=>!availWhy(w,date);
 
 /* ---------- reistijd ---------- */
@@ -272,7 +281,7 @@ function simulate(w,ids,date){
     else if(!pauseDone&&t>=pAt&&cur.jobs.length&&pauseFits(i,t,pos))pause();
     /* Alleen een tijd (zonder "tot"): exacte starttijd, te laat als de medewerker na die tijd start */
     const d=jobDur(j),s=t,e=t+d,exact=ws!=null&&we==null,lateStart=exact&&s>ws+.5,isLate=lateStart||(we!=null&&e>we+.5);
-    seg.push({k:'job',a:s,b:e,id,late:isLate,ls:lateStart});serv+=d;t=e;
+    seg.push({k:'job',a:s,b:e,id,late:isLate,ls:lateStart,vt:(pf!=null&&ws===pf)?pf:null});serv+=d;t=e;
     if(isLate){late+=lateStart?s-ws:e-we;lateJobs.push(id);cur.late=true}
     cur.jobs.push(id);if(cur.start==null)cur.start=s;cur.end=e;
   }

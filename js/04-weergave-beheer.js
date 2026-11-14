@@ -88,6 +88,7 @@ function showFatal(where,err){
     <div class="row"><button class="btn primary" data-act="rawbackup">Back-up kopiëren</button><button class="btn" data-act="navto" data-to="planning">Naar Planning</button><button class="btn" data-act="navto" data-to="instellingen:data">Gegevens en back-up</button></div></section>`;
 }
 function render(){
+  if(SERVER&&!SYNC_READY)return;   // zolang de server-planning niet geladen is, geen (voorbeeld)gegevens tonen
   try{renderInner()}catch(err){
     try{if(!$('#tabs').innerHTML)$('#tabs').innerHTML=['planning','opdrachten','klanten','medewerkers','instellingen'].map(t=>`<button class="tab" data-act="navto" data-to="${t}">${t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')}catch(e){}
     showFatal('scherm '+S.tab,err);
@@ -581,7 +582,7 @@ function openVisit(wid,lid){
   const s=simulate(w,P.routes[wid]||[],date),idx=s.stops.findIndex(x=>x.loc.id===lid),p=s.stops[idx];if(!p)return;
   const rows=p.jobs.map(id=>{const j=JOB[id],g=s.seg.find(x=>x.k==='job'&&x.id===id);
     return`<li class="vjob"><div class="row">${plateBtn(j)}<b>${esc((TYP[j.type]||{}).name||j.type)}</b><span class="muted">${esc(j.vehicle||'')}</span><span class="sp"></span>${stChip(id,date)}${+j.priority===3?'<span class="chip warn">Hoge prio</span>':''}</div>
-      <div class="small muted">Gepland ${g?m2t(g.a)+'–'+m2t(g.b):''} (${jobDur(j)} min) · tijdvak klant ${j.from||j.to?esc((j.from||'—')+'–'+(j.to||'—')):'hele dag'}${g&&g.late?' · <b style="color:var(--bad)">'+(g.ls?'later dan de vaste tijd':'buiten tijdvak')+'</b>':''}</div>
+      <div class="small muted">Gepland ${g?m2t(g.a)+'–'+m2t(g.b):''} (${jobDur(j)} min) · tijdvak klant ${j.from||j.to?esc((j.from||'—')+'–'+(j.to||'—')):'hele dag'}${g&&g.late?' · <b style="color:var(--bad)">'+(g.ls?(g.vt!=null?'voorkeurstijd '+m2t(g.vt)+' niet haalbaar':'later dan de vaste tijd'):'buiten tijdvak')+'</b>':''}</div>
       ${j.notes?`<div class="small">${esc(j.notes)}</div>`:''}
       <div class="row"><button class="btn sm primary" data-act="chat" data-id="${id}">${I.auto} Herplan met AI</button><button class="btn sm" data-act="editjob" data-id="${id}">${I.edit} Opdracht wijzigen</button>${g&&g.late?`<button class="btn sm" data-act="propose" data-ids="${id}">${I.auto} Slim voorstel</button>`:''}</div></li>`}).join('');
   FORM=null;
@@ -721,6 +722,7 @@ function viewSettings(){
   <div class="settings">${num('maxPreTravel','Maximale aanrijtijd vóór de begintijd (min)','Rijtijd naar de eerste klant die buiten werktijd valt. Is de rit langer, dan begint de eerste klus later.')}</div>
   <div style="display:grid;gap:8px"><label class="chk"><input type="checkbox" id="set_startAtFirst" data-set="startAtFirst"${s.startAtFirst!==false?' checked':''}> Begintijd = aanwezig bij de eerste klant (aanrijden vanaf standplaats valt vóór de begintijd)</label><label class="chk"><input type="checkbox" id="set_endAtLast" data-set="endAtLast"${s.endAtLast===true?' checked':''}> Eindtijd = klaar bij de laatste klant (terugrit naar standplaats valt na de eindtijd)</label></div>
   <div class="row"><button class="btn primary" data-act="saveset">Opslaan en opnieuw plannen</button></div></section>
+  <section class="panel sec"><h2>Feestdagen</h2><p class="small">Op een aangevinkte feestdag is niemand beschikbaar: er wordt die dag niets ingepland.</p><div class="settings">${FD_KEYS.map(([k,l])=>`<label class="chk"><input type="checkbox" data-fd="${k}"${fdCfg()[k]?' checked':''}> ${l}</label>`).join('')}</div><div class="row"><button class="btn" data-act="savefd">Feestdagen opslaan</button></div></section>
   <section class="panel sec"><div class="help"><h3 style="margin-top:14px">Zo rekent de planner</h3>
   <p>Per dag simuleert de app voor elke medewerker de rit: vertrek op begintijd vanaf de standplaats, rijden, parkeren, eventueel wachten tot het tijdvenster opent, reinigen, pauze, en terug naar de standplaats. Een rit is geldig als alle voertuigen binnen hun venster klaar zijn, de medewerker voor de eindtijd terug is en de vaardigheden kloppen.</p>
   <p>Staat "Begintijd = aanwezig bij de eerste klant" aan, dan vertrekt de medewerker zo vroeg dat hij precies op zijn begintijd bij de eerste klant is. Bij begintijd 08:00 kan de eerste klus dus om 08:00 beginnen, waar de medewerker ook woont.</p>

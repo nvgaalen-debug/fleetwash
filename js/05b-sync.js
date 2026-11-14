@@ -1,88 +1,94 @@
-/* ---------- gedeelde planning op de server (Azure Table Storage via /api/state) ----------
-   Uitgangspunt: lokale wijzigingen worden nooit stil overschreven.
-   - SYNC.base is de vingerafdruk van de planning zoals die laatst gelijk was aan de server.
-   - Geen niet-opgeslagen wijzigingen lokaal: de serverversie wordt geladen.
-   - Wel niet-opgeslagen wijzigingen lokaal en ook een planning op de server: de app vraagt wat je wilt.
-   - Vóór elke overschrijving wordt een backup van de lokale gegevens bewaard (localStorage 'wasroute.backup'). */
-let SYNC=(()=>{try{return JSON.parse(localStorage.getItem('wasroute.sync'))||{sv:null,base:null}}catch(e){return {sv:null,base:null}}})();
-let PUSH_T=null, PUSHING=false, PUSH_AGAIN=false;
+/* ---------- planning op de server (enige opslag; geen lokale kopie) ----------
+   Uitgangspunt: wat op de server staat, is de planning. Er wordt niets lokaal bewaard.
+   - Elke wijziging (handmatig, automatisch, AI, import) gaat direct naar /api/state.
+   - Een wijziging geldt pas als de server die heeft bevestigd (versie opgehoogd).
+   - Bij een conflict (iemand anders sloeg eerder op) of een fout wordt de serverversie opnieuw geladen
+     en de niet-bewaarde wijziging weggegooid, met een melding. Geen stille overschrijving.
+   - Zolang de planning niet van de server is geladen, is er niets te bewerken en wordt niets opgeslagen. */
+let SYNC={sv:null};
+let SYNC_READY=false;          // true zodra de serverplanning is geladen
+let PUSH_P=null, PUSH_DIRTY=false;
 
-function saveSync(){try{localStorage.setItem('wasroute.sync',JSON.stringify(SYNC))}catch(e){}}
-
-// Vingerafdruk van de planning zonder het UI-blok (datum en weergave horen niet bij de gegevens)
-function snapText(){const {ui,...rest}=D;return JSON.stringify(rest)}
-function fp(text){let h=2166136261;for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619)}return (h>>>0).toString(16)+':'+text.length}
-const pendingLocal=()=>fp(snapText())!==SYNC.base;
-
-function backupLocal(reason){
-  try{
-    const list=JSON.parse(localStorage.getItem('wasroute.backup')||'[]');
-    list.unshift({at:new Date().toISOString(),reason,data:localStorage.getItem(KEY)});
-    localStorage.setItem('wasroute.backup',JSON.stringify(list.slice(0,3)));
-  }catch(e){}
+// Wachtscherm of foutmelding in plaats van de planning
+function setLaden(html){
+  const v=$('#view');if(!v)return;
+  v.innerHTML=`<section class="panel sec" style="margin-top:24px"><h2>Wasroute Planner</h2>${html}</section>`;
+}
+function startFout(msg){
+  SYNC_READY=false;
+  setLaden(`<p class="note" style="color:var(--bad)">${esc(msg)}</p><div class="row"><button class="btn primary" data-act="srvretry">Opnieuw proberen</button></div>`);
 }
 
-// De serverversie overnemen (vóór het overnemen wordt de lokale versie bewaard)
-function adoptServer(r){
-  backupLocal('vóór laden van de serverversie');
-  localStorage.setItem(KEY,JSON.stringify(r.data));
-  load();migrateBillTo();index();
-  SYNC.sv=r.version;SYNC.base=fp(snapText());saveSync();
+// Planning van de server in de app zetten (bij het opstarten: datum van vandaag)
+function startMet(data,version){
+  SYNC.sv=version;SYNC_READY=true;
+  load(data);migrateBillTo();index();
   render();
 }
 
-// Keuze als er lokale wijzigingen zijn én een planning op de server
-function resolve(r){
-  const laden=confirm(
-    'Er staat een planning op de server. In deze browser staan gegevens die nog niet op de server staan '+
-    '(bijvoorbeeld een Excel-import of een wijziging die niet is opgeslagen).\n\n'+
-    'OK = de serverversie laden. De gegevens van deze browser worden als backup bewaard.\n'+
-    'Annuleren = deze browser naar de server sturen. Dat overschrijft de servergegevens.');
-  if(laden){adoptServer(r);toast('Serverversie geladen. Je lokale versie staat in de backup.')}
-  else{SYNC.sv=r.version;saveSync();schedulePush()}
+// Serverversie overnemen tijdens gebruik: datum en weergave blijven zoals ze waren
+function vervangDoorServer(data,version){
+  SYNC.sv=version;D=data;
+  LEGS.clear();index();
+  D.workers.forEach(w=>{if(!w.token)w.token=randTok()});
+  render();
 }
 
 async function initSync(){
   if(!SERVER)return;
+  setLaden('<p class="note">Planning laden van de server…</p>');
   let r;
   try{r=await withPw(()=>api('/api/state'))}
-  catch(e){return}                          // geen server of geen /api: lokaal blijven werken, niets pushen
-  if(r.data===null||r.data===undefined){    // server nog leeg: lokale planning wordt de eerste versie
-    SYNC.sv=0;saveSync();schedulePush();return;
+  catch(e){startFout('De planning kan niet van de server worden geladen. '+apiErr(e));return}
+  if(r.data===null||r.data===undefined){
+    // Server nog leeg: de voorbeeldplanning wordt de eerste versie
+    SYNC.sv=0;SYNC_READY=true;load(sample());migrateBillTo();index();render();pushState();
+    return;
   }
-  if(!pendingLocal()){adoptServer(r);return} // niets lokaal te verliezen
-  resolve(r);                                // lokale wijzigingen én serverdata: eerst vragen
+  startMet(r.data,r.version);
 }
 
-function schedulePush(){
-  if(!SERVER||SYNC.sv===null)return;        // pas pushen als we de server kennen
-  clearTimeout(PUSH_T);
-  PUSH_T=setTimeout(pushState,500);
+// Opnieuw laden van de server na een conflict of fout. Wat niet bewaard is, gaat verloren.
+async function herlaad(msg){
+  let r;
+  try{r=await withPw(()=>api('/api/state'))}
+  catch(e){startFout(msg+' Opnieuw laden lukt ook niet: '+apiErr(e));return}
+  if(r.data===null||r.data===undefined){startFout(msg+' De server heeft geen planning meer.');return}
+  vervangDoorServer(r.data,r.version);
+  toast(msg,9000);
 }
 
-async function pushState(){
-  if(PUSHING){PUSH_AGAIN=true;return}
-  if(SYNC.sv===null)return;
-  PUSHING=true;
+// Alle wijzigingen naar de server. Terwijl er een opslag loopt, worden nieuwe wijzigingen één keer
+// meegestuurd (geen parallelle schrijfacties, geen verlies van volgorde).
+function pushState(){
+  if(!SERVER||!SYNC_READY)return Promise.resolve();
+  PUSH_DIRTY=true;
+  if(!PUSH_P)PUSH_P=runPush().finally(()=>{PUSH_P=null});
+  return PUSH_P;
+}
+
+async function runPush(){
+  while(PUSH_DIRTY){
+    PUSH_DIRTY=false;
+    const ok=await stuurNu();
+    if(!ok)break;
+  }
+}
+
+async function stuurNu(){
   const text=JSON.stringify(D);
-  let ok=false;
   try{
     const r=await withPw(()=>api('/api/state',{method:'PUT',body:'{"data":'+text+',"version":'+SYNC.sv+'}'}));
-    SYNC.sv=r.version;SYNC.base=fp(snapText());saveSync();ok=true;
+    SYNC.sv=r.version;
+    return true;
   }catch(e){
+    PUSH_DIRTY=false;
+    if(e&&e.code==='pw'){toast('Niet opgeslagen: het wachtwoord is nodig. Vul het in en probeer het opnieuw.',7000);return false}
     if(e&&e.code==='srv'&&e.status===409){
-      // Iemand anders heeft net opgeslagen: eerst vragen wat er moet gebeuren
-      const r=await withPw(()=>api('/api/state')).catch(()=>null);
-      if(r&&r.data)resolve(r);
-      else toast('Opslaan mislukt. Je wijziging staat lokaal.');
-    }else if(e&&e.code==='pw'){
-      // het wachtwoordvenster is al getoond
-    }else{
-      toast('Opslaan op de server mislukt: '+(e&&e.message?e.message:'onbekende fout')+'. Je wijziging staat wel lokaal.');
+      await herlaad('Iemand anders heeft de planning net opgeslagen. Je laatste wijziging is niet bewaard; de serverversie is geladen.');
+      return false;
     }
-  }finally{
-    PUSHING=false;
-    // Na een geslaagde opslag direct nog eens als er inmiddels iets is gewijzigd. Bij een fout niet automatisch opnieuw (geen eindeloze lus).
-    if(PUSH_AGAIN||(ok&&pendingLocal())){PUSH_AGAIN=false;schedulePush()}
+    await herlaad('Opslaan op de server mislukt ('+(e&&e.message?e.message:'geen verbinding')+'). Je laatste wijziging is niet bewaard.');
+    return false;
   }
 }

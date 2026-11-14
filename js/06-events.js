@@ -18,6 +18,7 @@ function onClick(e){
     case'pview':S.pview=el.dataset.v;D.ui=D.ui||{};save();render();window.scrollTo(0,0);break;
     case'gotoday':S.date=el.dataset.date;S.pview='dag';if(el.dataset.wid)S.wid=el.dataset.wid;S.selLoc=null;save();render();window.scrollTo(0,0);break;
     case'gotoweek':S.date=el.dataset.date;S.pview='week';save();render();break;
+    case'savefd':{const cfg={};document.querySelectorAll('[data-fd]').forEach(i=>cfg[i.dataset.fd]=i.checked);D.settings.feestdagen=cfg;Object.keys(D.plans).forEach(d=>{if(feestdagVan(d)&&D.plans[d].routes){D.plans[d].routes={};D.plans[d].edited=0}});save();render();toast('Feestdagen opgeslagen. Op die dagen wordt niet ingepland.')}break;
     case'mailklant':mailKlantKies(S.date);break;
     case'aiday':aiVoorstel([S.date]);break;
     case'aiweek':aiVoorstel([...Array(7)].map((_,i)=>addDays(weekStart(S.date),i)));break;
@@ -52,7 +53,8 @@ function onClick(e){
     case'bctest':bcTest();break;
     case'bcsendok':closeForm();bcSend(true);break;
     case'bccsv':bcExport('csv');break;case'bcjson':bcExport('json');break;
-    case'rawbackup':{let raw='';try{raw=localStorage.getItem(KEY)||''}catch(e){}if(!raw)raw=JSON.stringify(D);copyText(raw,'Back-up gekopieerd. Plak hem in een tekstbestand en bewaar dat.');break}
+    case'rawbackup':{copyText(JSON.stringify(D),'Back-up gekopieerd. Plak hem in een tekstbestand en bewaar dat.');break}
+    case'srvretry':initSync();break;
     case'jfclear':S.jf={...JF0,sort:jf().sort};render();break;
     case'logclr':LOGSEL=new Set();logRefresh();break;
     case'logdel':if(el.dataset.armed){const lg=curLog();D.importLogs=importLogs().filter(x=>x!==lg);S.logId=null;LOGSRC=null;save();render();toast('Log verwijderd; de opdrachten blijven staan.')}else{el.dataset.armed='1';el.textContent='Klik nogmaals om te verwijderen'}break;
@@ -180,7 +182,8 @@ function migrateBillTo(){
   D.migBillTo=1;if(n){index();save()}
 }
 function init(){
-  try{load();migrateBillTo()}catch(err){if(!D)D=sample();try{index()}catch(e){}setTimeout(()=>showFatal('gegevens laden',err),0)}
+  if(SERVER){if(!D)D=sample()}   // alleen als tijdelijke vulling: de echte planning komt van de server (initSync)
+  else{try{load();migrateBillTo()}catch(err){if(!D)D=sample();try{index()}catch(e){}setTimeout(()=>showFatal('gegevens laden',err),0)}}
   initSync();
   try{if(window.claude&&typeof window.claude.use==='function')window.claude.use('sample').then(s=>{SAMPLE=s||null}).catch(()=>{})}catch(e){}
   document.addEventListener('click',onClick);
@@ -194,6 +197,6 @@ function init(){
     if(e.key==='d'||e.key==='w'||e.key==='m'){S.pview={d:'dag',w:'week',m:'maand'}[e.key];save();render();return}}});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#ctx')){closeCtx();return}if(e.key==='Escape'){if(document.querySelector('.navg.open')){const b=document.querySelector('.navg.open > .tab');closeMenus();if(b)b.focus();return}if(!$('#modal').hidden)closeForm()}});
   $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeForm()});
-  render();
+  if(!SERVER)render();   // op de server rendert initSync zodra de planning geladen is
 }
 if(typeof document!=='undefined'&&document.getElementById('view'))init();

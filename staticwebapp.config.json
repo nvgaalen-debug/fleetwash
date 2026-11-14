@@ -17,6 +17,10 @@
       "allowedRoles": ["anonymous"]
     },
     {
+      "route": "/api/foto",
+      "allowedRoles": ["anonymous"]
+    },
+    {
       "route": "/*",
       "allowedRoles": ["authenticated"]
     }

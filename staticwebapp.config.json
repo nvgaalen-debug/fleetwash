@@ -1,28 +1,44 @@
 {
   "routes": [
     {
+      "route": "/tests/*",
+      "statusCode": 404
+    },
+    {
       "route": "/medewerker.html",
-      "allowedRoles": ["anonymous"]
+      "allowedRoles": [
+        "anonymous"
+      ]
     },
     {
       "route": "/api/mijn-planning",
-      "allowedRoles": ["anonymous"]
+      "allowedRoles": [
+        "anonymous"
+      ]
     },
     {
       "route": "/api/melding",
-      "allowedRoles": ["anonymous"]
+      "allowedRoles": [
+        "anonymous"
+      ]
     },
     {
       "route": "/api/berichten",
-      "allowedRoles": ["anonymous"]
+      "allowedRoles": [
+        "anonymous"
+      ]
     },
     {
       "route": "/api/foto",
-      "allowedRoles": ["anonymous"]
+      "allowedRoles": [
+        "anonymous"
+      ]
     },
     {
       "route": "/*",
-      "allowedRoles": ["authenticated"]
+      "allowedRoles": [
+        "authenticated"
+      ]
     }
   ],
   "responseOverrides": {
@@ -33,6 +49,11 @@
   },
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/medewerker.html", "/api/*", "/css/*", "/js/*"]
+    "exclude": [
+      "/medewerker.html",
+      "/api/*",
+      "/css/*",
+      "/js/*"
+    ]
   }
 }

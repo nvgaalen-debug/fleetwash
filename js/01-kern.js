@@ -40,7 +40,7 @@ const KEY='wasroute.v1';
 let D=null;
 const S={tab:'planning',date:'2026-10-29',wid:null,selLoc:null,mapMode:'routes',jobScope:'dag'};
 let JOB={},LOC={},CUS={},WRK={},TYP={};
-function index(){JOB={};LOC={};CUS={};WRK={};TYP={};D.jobs.forEach(x=>JOB[x.id]=x);D.locations.forEach(x=>LOC[x.id]=x);D.customers.forEach(x=>CUS[x.id]=x);D.workers.forEach(x=>WRK[x.id]=x);if(!D.absences)migrateAbsences();(D.absences||[]).forEach(a=>{if(a.type==='ziek')a.note=''});(D.sickLog||[]).forEach(x=>{if(!x.type||x.type==='ziek')x.note='Ziek'});syncAbsences();D.types.forEach(x=>TYP[x.id]=x)}
+function index(){if(typeof physReset==='function')physReset();JOB={};LOC={};CUS={};WRK={};TYP={};D.jobs.forEach(x=>JOB[x.id]=x);D.locations.forEach(x=>LOC[x.id]=x);D.customers.forEach(x=>CUS[x.id]=x);D.workers.forEach(x=>WRK[x.id]=x);if(!D.absences)migrateAbsences();(D.absences||[]).forEach(a=>{if(a.type==='ziek')a.note=''});(D.sickLog||[]).forEach(x=>{if(!x.type||x.type==='ziek')x.note='Ziek'});syncAbsences();D.types.forEach(x=>TYP[x.id]=x)}
 function rng(seed){return()=>(seed=(seed*1664525+1013904223)%4294967296)/4294967296}
 function sample(){
   const r=rng(11),CON='BDFGHJKLNPRSTVXZ',L=()=>CON[Math.floor(r()*CON.length)],N=()=>Math.floor(r()*10);

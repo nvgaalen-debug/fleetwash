@@ -26,16 +26,30 @@ function hav(a,b){const R=6371,t=Math.PI/180,dl=(b.lat-a.lat)*t,dg=(b.lng-a.lng)
 const wPt=w=>({key:'W'+w.id,lat:+w.lat,lng:+w.lng});
 /* Centrale regel: wanneer zijn twee locaties fysiek dezelfde plek? Eerst postcode + huisnummer, dan straat + plaats, dan coördinaten, anders het record zelf.
    Reistijd, parkeertijd, pauze, route en medewerkerselectie gebruiken allemaal deze sleutel. */
-function physKey(l){
-  if(!l)return '';
+function physRawKeys(l){
+  const out=[];if(!l)return out;
   const pc=String(l.postcode||'').replace(/\s/g,'').toUpperCase();
   const hn=(String(l.address||'').match(/(\d+)\s*([a-zA-Z]{0,2})(?:\s*[-\/]\s*(\d+))?\s*$/)||[]).slice(1).filter(Boolean).join('').toLowerCase();
-  if(/^\d{4}[A-Z]{2}$/.test(pc)&&hn)return 'A'+pc+'-'+hn;
+  if(/^\d{4}[A-Z]{2}$/.test(pc)&&hn)out.push('A'+pc+'-'+hn);
   const st=String(l.address||'').trim().toLowerCase().replace(/\s+/g,' '),ct=String(l.city||'').trim().toLowerCase();
-  if(st&&ct)return 'S'+st+'|'+ct;
-  if(isFinite(+l.lat)&&isFinite(+l.lng)&&(+l.lat||+l.lng))return 'C'+(+l.lat).toFixed(5)+','+(+l.lng).toFixed(5);
-  return 'I'+l.id;
+  if(st&&ct)out.push('S'+st+'|'+ct);
+  if(!out.length&&isFinite(+l.lat)&&isFinite(+l.lng)&&(+l.lat||+l.lng))out.push('C'+(+l.lat).toFixed(5)+','+(+l.lng).toFixed(5));
+  if(!out.length)out.push('I'+l.id);
+  return out;
 }
+/* Locaties die een postcode+huisnummer-sleutel óf een straat+plaats-sleutel delen, zijn dezelfde fysieke plek
+   (bijv. 'Stationsweg 46, 5803 AC Venray' en 'stationsweg 46, VENRAY'). Eén canonieke sleutel per plek. */
+let PHYS=null,PHYS_SIG=null;/* opnieuw opgebouwd bij index() (na elke wijziging van locaties) */
+function physReset(){PHYS=null;LEGS.clear()}
+function physMap(){
+  const locs=(typeof D!=='undefined'&&D.locations)||[];
+  if(PHYS&&PHYS_SIG===locs&&PHYS.__n===locs.length)return PHYS;
+  const par={},find=x=>{while(par[x]!==x){par[x]=par[par[x]];x=par[x]}return x},uni=(a,b)=>{a=find(a);b=find(b);if(a!==b){if(a<b)par[b]=a;else par[a]=b}};
+  const raw={};locs.forEach(l=>{raw[l.id]=physRawKeys(l);raw[l.id].forEach(k=>{if(!(k in par))par[k]=k});for(let i=1;i<raw[l.id].length;i++)uni(raw[l.id][0],raw[l.id][i])});
+  PHYS={};locs.forEach(l=>PHYS[l.id]=find(raw[l.id][0]));Object.defineProperty(PHYS,'__n',{value:locs.length});PHYS_SIG=locs;LEGS.clear();
+  return PHYS;
+}
+function physKey(l){if(!l)return '';const m=physMap();if(m[l.id])return m[l.id];return physRawKeys(l)[0]}
 function samePhysicalLocation(a,b){if(!a||!b)return false;if(a===b||a.id===b.id)return true;return physKey(a)===physKey(b)}
 const lPt=l=>({key:'L'+physKey(l),lat:+l.lat,lng:+l.lng});
 function leg(a,b){
@@ -286,12 +300,16 @@ function simulateBasis(w,ids,date,force){
   const pAt=t2m(pz.from)??t2m(st.pauseAt)??720,pTot=t2m(pz.tot)??t2m(st.pauseTot),pm=pz.min!=null&&pz.min!==''?(+pz.min||0):(+st.pauseMin||0);
   const vast=t2m(pz.vast);
   let t=start,pos=wPt(w),km=0,trav=0,wait=0,serv=0,pauseDone=pm<=0||vast!=null,late=0,cur=null,depart=start,lastEnd=start;
-  let vastDone=vast==null||pm<=0;
+  let vastDone=vast==null||pm<=0,vastMissed=false;
   if(st.startAtFirst!==false&&ids.length){const j0=JOB[ids[0]],l0=j0&&LOC[j0.locationId];if(l0){const pf0=(D.plans[dt]&&D.plans[dt].prefs||{})[ids[0]];let a0=t2m(j0.from);if(pf0!=null&&(a0==null||pf0>a0))a0=pf0;const arr=Math.max(start,a0??start);depart=arr-leg(pos,lPt(l0)).min-(+st.parkMin||0);const mp=st.maxPreTravel==null||st.maxPreTravel===''?60:+st.maxPreTravel;depart=Math.max(depart,start-mp);t=depart}}
   const seg=[],stops=[],lateJobs=[],skillBad=[];
   const pause=()=>{seg.push({k:'pause',a:t,b:t+pm});t+=pm;pauseDone=true};
+  /* Twee losse regels: (1) met een pauzevenster ('pauze uiterlijk') is een pauze vereist zodra er gewerkt wordt na 'pauze vanaf';
+     (2) zonder venster is een pauze vereist bij een werkdag langer dan 'pauzeMinDay' (standaard 5,5 uur). */
+  let jobsEnd=start;
+  const pauseRequired=te=>pm>0&&(pTot!=null?te>pAt:te-start>(+st.pauseMinDay||330));
   /* Vastgezette pauze: een rit, wachttijd of klus die over het vaste startmoment heen zou lopen, begint pas na de pauze */
-  const gate=d=>{if(vastDone)return;if(t>=vast+pm){vastDone=true;return}if(t+d<=vast)return;if(t<vast){seg.push({k:'wait',a:t,b:vast});wait+=vast-t;if(cur)cur.wait+=vast-t;t=vast}if(t<vast+pm){seg.push({k:'pause',a:t,b:vast+pm});t=vast+pm}vastDone=true};
+  const gate=d=>{if(vastDone)return;if(t>=vast+pm){vastDone=true;vastMissed=true;return}if(t+d<=vast)return;if(t<vast){seg.push({k:'wait',a:t,b:vast});wait+=vast-t;if(cur)cur.wait+=vast-t;t=vast}if(t<vast+pm){seg.push({k:'pause',a:t,b:vast+pm});t=vast+pm}vastDone=true};
   /* Pauze is flexibel: alleen nemen als de volgende klussen daardoor niet buiten hun tijdvak vallen */
   const pauseFits=(i,t0,p0)=>{let tt=t0+pm,pp=p0;for(let k=i;k<Math.min(ids.length,i+5);k++){const jj=JOB[ids[k]],ll=jj&&LOC[jj.locationId];if(!ll)continue;const q=lPt(ll);if(q.key!==pp.key){tt+=leg(pp,q).min+(+st.parkMin||0);pp=q}const a=t2m(jj.from),b=t2m(jj.to);if(a!=null&&tt<=a)return true;tt+=jobDur(jj);if(b!=null&&tt>b+.5)return false}return true};
   for(let i=0;i<ids.length;i++){const id=ids[i];
@@ -326,18 +344,23 @@ function simulateBasis(w,ids,date,force){
       seg.push({k:'wait',a:t,b:ws});wait+=ws-t;cur.wait+=ws-t;t=ws}
     /* Geen pauze tussen auto's van hetzelfde bezoek: de pauze valt alleen bij een nieuwe locatie (rit) of in een wachttijd */
     /* Alleen een tijd (zonder "tot"): exacte starttijd, te laat als de medewerker na die tijd start */
-    if(!cur||!cur.jobs.length)gate(jobDur(j));
+    /* Vaste pauze: het hele bezoek moet ervóór of erná passen, nooit erdoorheen */
+    if(!cur||!cur.jobs.length){let vd=0;const v0=visitOf(id);for(let k=i;k<ids.length&&visitOf(ids[k])===v0&&JOB[ids[k]]&&JOB[ids[k]].locationId===j.locationId;k++)vd+=jobDur(JOB[ids[k]]);gate(vd)}
     const d=jobDur(j),s=t,e=t+d,exact=ws!=null&&we==null,lateStart=exact&&s>ws+.5,isLate=lateStart||(we!=null&&e>we+.5);
     seg.push({k:'job',a:s,b:e,id,late:isLate,ls:lateStart,vt:(pf!=null&&ws===pf)?pf:null});serv+=d;t=e;
     if(isLate){late+=lateStart?s-ws:e-we;lateJobs.push(id);cur.late=true}
     cur.jobs.push(id);if(cur.start==null)cur.start=s;cur.end=e;
   }
   if(stops.length){
-    if(!vastDone){if(t<vast){seg.push({k:'wait',a:t,b:vast});wait+=vast-t;t=vast}if(t<vast+pm){seg.push({k:'pause',a:t,b:vast+pm});t=vast+pm}vastDone=true}
-    /* Pauze aan het eind van de dag alleen als de medewerker daardoor niet buiten werktijd komt. Een bezoek gaat altijd voor de pauze; past de pauze nergens, dan "Pauze niet gepland". */
-    if(!pauseDone&&t-start>(+st.pauseMinDay||330)&&(pTot==null||t<=pTot)){
-      const back=st.endAtLast===true?t+pm:t+pm+leg(pos,wPt(w)).min;
-      if(back<=end+.5)pause();
+    if(!vastDone){if(t>vast+.5)vastMissed=true;if(t<vast){seg.push({k:'wait',a:t,b:vast});wait+=vast-t;t=vast}if(t<vast+pm){seg.push({k:'pause',a:t,b:vast+pm});t=vast+pm}vastDone=true}
+    /* Vrije ruimte na het laatste bezoek telt mee als plek voor de pauze, als de pauze vereist is (pauzeRequired).
+       Met een pauzevenster: start op max(einde laatste bezoek, 'pauze vanaf') en uiterlijk op 'pauze uiterlijk'. Zonder venster: direct na het laatste bezoek.
+       Nooit buiten werktijd; een bezoek gaat altijd voor. */
+    jobsEnd=t;
+    if(!pauseDone&&pauseRequired(t)){
+      const ps=pTot!=null?Math.max(t,pAt):t;
+      const back=st.endAtLast===true?ps+pm:ps+pm+leg(pos,wPt(w)).min;
+      if((pTot==null||ps<=pTot)&&back<=end+.5){if(ps>t){seg.push({k:'wait',a:t,b:ps});wait+=ps-t;t=ps}pause()}
     }
     lastEnd=t;
     const g=leg(pos,wPt(w));seg.push({k:'return',a:t,b:t+g.min,km:g.km});t+=g.min;km+=g.km;trav+=g.min;
@@ -345,11 +368,19 @@ function simulateBasis(w,ids,date,force){
   const finish=stops.length?t:start;
   const endRef=st.endAtLast===true&&stops.length?lastEnd:finish;
   /* Pauze niet gepland: er is een pauze ingesteld, de dag is lang genoeg of er is een pauzevenster, maar de pauze paste nergens zonder een bezoek te laat of buiten werktijd te maken */
-  const pauseMissing=pm>0&&vast==null&&stops.length>0&&!seg.some(x=>x.k==='pause')&&(lastEnd-start>(+st.pauseMinDay||330)||pTot!=null);
-  return{seg,stops,km,trav,wait,serv,start,end,depart,finish,over:Math.max(0,endRef-end),late,lateJobs,skillBad,n:ids.length,pauseMissing};
+  const pauseMissing=pm>0&&vast==null&&stops.length>0&&!seg.some(x=>x.k==='pause')&&pauseRequired(jobsEnd);
+  return{seg,stops,km,trav,wait,serv,start,end,depart,finish,over:Math.max(0,endRef-end),late,lateJobs,skillBad,n:ids.length,pauseMissing,vastMissed};
 }
-const costOf=s=>s.stops.length?s.trav+D.settings.kmWeight*s.km:0;
-const violOf=s=>s.late+s.over+s.skillBad.length*1000;
+/* Kostenfunctie (punten): reistijd incl. parkeren 1/min + vermijdbare wachttijd tussen eerste en laatste bezoek 1/min
+   + overwerk 10/min + niet-geplande verplichte pauze 300 + km × 'Weging kilometers' (Beheer). Niet meegeteld: tijd vóór het eerste
+   of na het laatste bezoek en de pauze zelf. */
+const W_OVER=10,W_PAUSE=300,W_MOVE=10;
+function waitBetween(s){const js=s.seg.filter(x=>x.k==='job');if(js.length<2)return 0;const a=js[0].a,b=js[js.length-1].a;let t=0;for(const x of s.seg)if(x.k==='wait'&&x.a>=a-.01&&x.b<=b+.01)t+=x.b-x.a;return t}
+const npOf=s=>s.stops.length?s.trav+waitBetween(s):0;
+let COST_MODE='full';/* 'travel' alleen voor een alternatieve startverdeling in autoPlan */
+const costOf=s=>!s.stops.length?0:COST_MODE==='travel'?s.trav+(+D.settings.kmWeight||0)*s.km:s.trav+waitBetween(s)+W_OVER*s.over+(s.pauseMissing?W_PAUSE:0)+(+D.settings.kmWeight||0)*s.km;
+/* Harde overtredingen: te laat, overwerk, ontbrekende vaardigheid, gemiste vaste pauze */
+const violOf=s=>s.late+s.over+s.skillBad.length*1000+(s.vastMissed?1000:0);
 const feas=s=>violOf(s)<.5;
 const penal=s=>costOf(s)+violOf(s)*8;
 
@@ -391,7 +422,7 @@ function visitMapDay(date){
 function visitOf(id){const j=JOB[id];if(!j)return 'J'+id;if(!VC[j.date])VC[j.date]=visitMapDay(j.date);return VC[j.date][id]||'J'+id}
 function visitReset(){VC={}}
 function visitIds(id){const j=JOB[id];if(!j)return [id];const v=visitOf(id);return jobsOn(j.date).filter(x=>visitOf(x.id)===v).sort((a,b)=>((t2m(a.from)??0)-(t2m(b.from)??0))).map(x=>x.id)}
-function blocksOf(r){const b=[],idx={};for(const id of r){const v=visitOf(id);if(idx[v]===undefined){idx[v]=b.length;b.push({loc:v,ids:[id],dur:0})}b[idx[v]].ids.push(id);b[idx[v]].dur+=JOB[id]?jobDur(JOB[id]):0}return b}
+function blocksOf(r){const b=[],idx={};for(const id of r){const v=visitOf(id);if(idx[v]===undefined){idx[v]=b.length;b.push({loc:v,ids:[],dur:0})}b[idx[v]].ids.push(id);b[idx[v]].dur+=JOB[id]?jobDur(JOB[id]):0}return b}
 /* Ongedeelde eenheden uit een lijst auto's: per bezoek alle auto's die nog in de lijst staan */
 function unitsOf(ids){const want=new Set(ids),done=new Set(),out=[];for(const id of ids){if(done.has(id))continue;const u=visitIds(id).filter(x=>want.has(x)&&!done.has(x));if(!u.length)u.push(id);u.forEach(x=>done.add(x));out.push(u)}return out}
 /* Zoek medewerkers die op dezelfde fysieke plek al een ander bezoek hebben en controleer of het volledige bezoek u bij hen past */
@@ -428,44 +459,81 @@ function insertLoop(rest,R,ws){
   }
 }
 function better(vN,cN,vO,cO){return vN<vO-.5||(vN<=vO+.01&&cN<cO-.5)}
-function improve(R,ws,pins,within){
-  const C={};const ev=wid=>{const s=simulate(WRK[wid],R[wid]);return{c:costOf(s),v:violOf(s)}};
+/* Lokale verbetering. Binnen een route: volgorde van bezoeken. Tussen medewerkers (within=false): hele bezoeken verplaatsen of ruilen,
+   met stabiliteitsbescherming: nooit vastgezette bezoeken; harde KPI's (te laat, overwerk, vaardigheid, niet-geplande pauzes) mogen niet
+   verslechteren; de ruil moet minstens 10 min niet-productieve tijd of 5% van de totale routescore opleveren; 10 punten per bezoek dat
+   van zijn oorspronkelijke medewerker (orig) wordt weggehaald. */
+const IMP_MIN_NP=10,IMP_MIN_PCT=.05,PLAN_BUDGET_MS=500;/* rekentijd per kandidaat voor de ruilstap */
+function improve(R,ws,pins,within,orig,deadline){
+  orig=orig||{};const late=()=>deadline&&Date.now()>deadline;
+  const C={};const ev=wid=>{const s=simulate(WRK[wid],R[wid]);return{c:costOf(s),v:violOf(s),np:npOf(s),pm:s.pauseMissing?1:0}};
   ws.forEach(w=>C[w.id]=ev(w.id));
+  const total=()=>ws.reduce((t,w)=>t+C[w.id].c,0);
+  const pen=(ids,from,to)=>{const id=ids[0];return orig[id]===from?W_MOVE:orig[id]===to?-W_MOVE:0};
+  const mk=(A,arr)=>{const s=simulate(A,arr);return{c:costOf(s),v:violOf(s),np:npOf(s),pm:s.pauseMissing?1:0}};
+  const crossOk=(oA,oB,nA,nB,p)=>{
+    const vo=oA.v+oB.v,vn=nA.v+nB.v;
+    if(vn<vo-.5)return true;
+    if(vn>vo+.01||nA.pm+nB.pm>oA.pm+oB.pm)return false;
+    const so=oA.c+oB.c,sn=nA.c+nB.c+p;if(sn>=so-.5)return false;
+    return (oA.np+oB.np)-(nA.np+nB.np)>=IMP_MIN_NP||(so-sn)>=IMP_MIN_PCT*total();
+  };
+  /* Samengestelde zet: 1-2 bezoeken van A ruilen tegen 0-2 bezoeken van B (dekt 'twee samen verplaatsen' en 'één tegen twee ruilen').
+     Alleen geprobeerd als de enkelvoudige zetten niets meer opleveren. */
+  const ins=(W,r,blks)=>{let a=r;for(const b of blks){const x=bestPos(W,a,b.ids,false);if(!x)return null;a=x.arr}return a};
+  const subsets=(arr,min,max)=>{const out=[];if(min<=0)out.push([]);for(let i=0;i<arr.length;i++){if(max>=1&&min<=1)out.push([arr[i]]);if(max>=2)for(let k=i+1;k<arr.length;k++)out.push([arr[i],arr[k]])}return out};
+  const compound=()=>{
+    for(const A of ws)for(const B of ws){if(A.id===B.id)continue;if(late())return false;
+      const ba=blocksOf(R[A.id]).filter(b=>!b.ids.some(id=>pins[id]||!skillOk(B,JOB[id])));
+      const bb=blocksOf(R[B.id]).filter(b=>!b.ids.some(id=>pins[id]||!skillOk(A,JOB[id])));
+      for(const SA of subsets(ba,1,2))for(const SB of subsets(bb,0,2)){
+        if(SA.length===1&&SB.length<=1)continue;if(SB.length>SA.length)continue;
+        const outA=new Set(SA.flatMap(b=>b.ids)),outB=new Set(SB.flatMap(b=>b.ids));
+        const nAarr=ins(A,R[A.id].filter(id=>!outA.has(id)),SB);if(!nAarr)continue;
+        const nBarr=ins(B,R[B.id].filter(id=>!outB.has(id)),SA);if(!nBarr)continue;
+        const eA=mk(A,nAarr),eB=mk(B,nBarr);
+        const p=SA.reduce((t,b)=>t+pen(b.ids,A.id,B.id),0)+SB.reduce((t,b)=>t+pen(b.ids,B.id,A.id),0);
+        if(crossOk(C[A.id],C[B.id],eA,eB,p)){R[A.id]=nAarr;R[B.id]=nBarr;C[A.id]=eA;C[B.id]=eB;return true}
+      }}
+    return false;
+  };
   let it=0,changed=true;
-  while(changed&&it<60){changed=false;it++;
+  while(changed&&it<80&&!late()){changed=false;it++;
     outer:for(const A of ws){
       const ra=R[A.id],blocks=blocksOf(ra);
       for(const blk of blocks){
-        const rem=ra.filter(id=>!blk.ids.includes(id));const rs=simulate(A,rem),rc=costOf(rs),rv=violOf(rs);
-        const pinned=blk.ids.some(id=>pins[id]===A.id);
+        const rem=ra.filter(id=>!blk.ids.includes(id));
+        const pinned=blk.ids.some(id=>pins[id]);
         const targets=(within||pinned)?[A]:ws;
+        let nRem=null;
         for(const B of targets){
           if(B.id!==A.id&&blk.ids.some(id=>!skillOk(B,JOB[id])))continue;
           const rb=B.id===A.id?rem:R[B.id];
           for(let p=0;p<=rb.length;p++){
-            const arr=rb.slice(0,p).concat(blk.ids,rb.slice(p));const s=simulate(B,arr),c=costOf(s),v=violOf(s);
-            let ok;
-            if(B.id===A.id)ok=better(v,c,C[A.id].v,C[A.id].c);
-            else ok=better(rv+v,rc+c,C[A.id].v+C[B.id].v,C[A.id].c+C[B.id].c);
-            if(ok){if(B.id===A.id)R[A.id]=arr;else{R[A.id]=rem;R[B.id]=arr;C[B.id]=ev(B.id)}C[A.id]=ev(A.id);changed=true;break outer}
+            const arr=rb.slice(0,p).concat(blk.ids,rb.slice(p));
+            if(B.id===A.id){const n=mk(A,arr);if(better(n.v,n.c,C[A.id].v,C[A.id].c)){R[A.id]=arr;C[A.id]=n;changed=true;break outer}continue}
+            if(!nRem)nRem=mk(A,rem);
+            const nB=mk(B,arr);
+            if(crossOk(C[A.id],C[B.id],nRem,nB,pen(blk.ids,A.id,B.id))){R[A.id]=rem;R[B.id]=arr;C[A.id]=nRem;C[B.id]=nB;changed=true;break outer}
           }
         }
       }
       if(!within)for(const B of ws){if(B.id<=A.id)continue;
-        for(const a of blocksOf(R[A.id])){if(a.ids.some(id=>pins[id]===A.id||!skillOk(B,JOB[id])))continue;
-          for(const b of blocksOf(R[B.id])){if(b.ids.some(id=>pins[id]===B.id||!skillOk(A,JOB[id])))continue;
+        for(const a of blocksOf(R[A.id])){if(a.ids.some(id=>pins[id]||!skillOk(B,JOB[id])))continue;
+          for(const b of blocksOf(R[B.id])){if(b.ids.some(id=>pins[id]||!skillOk(A,JOB[id])))continue;
             const nA=bestPos(A,R[A.id].filter(id=>!a.ids.includes(id)),b.ids,false),nB=bestPos(B,R[B.id].filter(id=>!b.ids.includes(id)),a.ids,false);
-            const vN=violOf(nA.s)+violOf(nB.s),cN=costOf(nA.s)+costOf(nB.s);
-            if(better(vN,cN,C[A.id].v+C[B.id].v,C[A.id].c+C[B.id].c)){R[A.id]=nA.arr;R[B.id]=nB.arr;C[A.id]=ev(A.id);C[B.id]=ev(B.id);changed=true;break outer}
+            const eA=mk(A,nA.arr),eB=mk(B,nB.arr);
+            if(crossOk(C[A.id],C[B.id],eA,eB,pen(a.ids,A.id,B.id)+pen(b.ids,B.id,A.id))){R[A.id]=nA.arr;R[B.id]=nB.arr;C[A.id]=eA;C[B.id]=eB;changed=true;break outer}
           }
         }
       }
       const bl=blocksOf(R[A.id]);
       for(let i=0;i<bl.length-1;i++)for(let k=i+1;k<bl.length;k++){
         const nb=bl.slice(0,i).concat(bl.slice(i,k+1).reverse(),bl.slice(k+1));const arr=nb.flatMap(b=>b.ids);
-        const s=simulate(A,arr);if(better(violOf(s),costOf(s),C[A.id].v,C[A.id].c)){R[A.id]=arr;C[A.id]=ev(A.id);changed=true;break outer}
+        const n=mk(A,arr);if(better(n.v,n.c,C[A.id].v,C[A.id].c)){R[A.id]=arr;C[A.id]=n;changed=true;break outer}
       }
     }
+    if(!changed&&!within&&compound())changed=true;
   }
 }
 /* Meer voertuigen kwijt kunnen: haal een stop uit een rit, zet een ongeplande groep erin en plaats de stop elders terug */
@@ -540,17 +608,36 @@ function autoPlan(date){
   const R={};D.workers.forEach(w=>{if(manW.has(w.id))R[w.id]=(P.routes[w.id]||[]).slice()});
   const bij=new Set(jobs.map(j=>j.id));ws.forEach(w=>R[w.id]=(P.routes[w.id]||[]).filter(id=>bij.has(id)&&!pins[id]));
   const inR=()=>new Set(Object.values(R).flat());
+  /* Oorspronkelijke medewerker per afspraak (vorige planning), voor de stabiliteitspenalty */
+  const orig={};Object.entries(P.routes||{}).forEach(([wid,r])=>r.forEach(id=>orig[id]=wid));
   /* Een bezoek met een vastgezette auto blijft bij die medewerker: de overige auto's van dat bezoek gaan erbij */
   /* Uitzondering: past het volledige bezoek niet zonder nieuwe te late auto's bij A, dan blijft het bezoek onbezet met een melding. Nooit stilletjes splitsen. */
   Object.entries(pins).forEach(([id,wid])=>{if(!R[wid]||!WRK[wid]||!JOB[id])return;const miss=visitIds(id).filter(x=>bij.has(x)&&!inR().has(x)&&!pins[x]);if(!miss.length)return;
     const before=violOf(simulate(WRK[wid],R[wid])),b=bestPos(WRK[wid],R[wid],miss,false);
     if(b&&violOf(b.s)<=before+.5)R[wid]=b.arr;else miss.forEach(x=>blocked.add(x))});
   const todo=()=>jobs.map(j=>j.id).filter(id=>!inR().has(id)&&!blocked.has(id));
-  insertLoop(todo(),R,ws);
-  /* Optimaliseren alleen binnen de route van elke medewerker; bezoeken niet over medewerkers heen verplaatsen */
-  improve(R,ws,pins,true);
-  let left=todo();
-  if(left.length){insertLoop(left,R,ws);improve(R,ws,pins,true)}
+  /* Drie kandidaat-verdelingen; elk krijgt de ruilstap. Gekozen wordt de beste op harde KPI's en daarna op kosten + stabiliteitspenalty.
+     Een kandidaat die afwijkt van 'bestaand verbeteren' moet dezelfde drempel halen als een ruil (≥10 min niet-productieve tijd of ≥5% kosten). */
+  const clone=X=>{const o={};Object.keys(X).forEach(k=>o[k]=X[k].slice());return o};
+  const base=clone(R),fresh=clone(R);ws.forEach(w=>fresh[w.id]=[]);
+  const todoOf=X=>{const s=new Set(Object.values(X).flat());return jobs.map(j=>j.id).filter(id=>!s.has(id)&&!blocked.has(id))};
+  const kpi=X=>{const k={cars:0,pm:0,v:0,c:0,np:0,trav:0,km:0,moved:0};ws.forEach(w=>{const r=X[w.id]||[];const s=simulate(w,r,date);k.cars+=r.length;k.pm+=s.pauseMissing?1:0;k.v+=violOf(s);k.c+=costOf(s);k.np+=npOf(s);k.trav+=s.trav;k.km+=s.km;r.forEach(id=>{if(orig[id]&&orig[id]!==w.id&&visitIds(id)[0]===id)k.moved++})});k.score=k.c+W_MOVE*k.moved;return k};
+  const attempt=(start,mode)=>{const X=clone(start);COST_MODE=mode;try{insertLoop(todoOf(X),X,ws)}finally{COST_MODE='full'}
+    const before=clone(X);const dl=Date.now()+PLAN_BUDGET_MS;improve(X,ws,pins,false,orig,dl);const left=todoOf(X);if(left.length){insertLoop(left,X,ws);improve(X,ws,pins,false,orig,dl+PLAN_BUDGET_MS/2)}return{X,before}};
+  const cands=[attempt(base,'full'),attempt(fresh,'travel'),attempt(fresh,'full')].map(a=>({...a,k:kpi(a.X)}));
+  const hardBetter=(a,b)=>a.cars!==b.cars?a.cars>b.cars:a.pm!==b.pm?a.pm<b.pm:a.v<b.v-.5?true:a.v>b.v+.5?false:null;
+  let pick=cands[0];
+  for(const c of cands.slice(1)){const h=hardBetter(c.k,pick.k);
+    if(h===true||(h===null&&c.k.score<pick.k.score-.5&&(pick.k.np-c.k.np>=IMP_MIN_NP||pick.k.score-c.k.score>=IMP_MIN_PCT*pick.k.score)))pick=c}
+  ws.forEach(w=>R[w.id]=pick.X[w.id]||[]);
+  /* Auto's binnen één bezoek in tijdvolgorde, als dat niet slechter is */
+  ws.forEach(w=>{const r=R[w.id]||[];if(r.length<2)return;const srt=blocksOf(r).flatMap(b=>b.ids.slice().sort((a,c)=>((t2m(JOB[a].from)??0)-(t2m(JOB[c].from)??0))||(a>c?1:-1)));
+    if(srt.join()===r.join())return;const s0=simulate(w,r,date),s1=simulate(w,srt,date);if(violOf(s1)<=violOf(s0)+.01&&costOf(s1)<=costOf(s0)+.01)R[w.id]=srt});
+  /* Toelichting voor de planner: verschil met de vorige planning (of, zonder vorige planning, met de eerste plaatsing) */
+  {const ref=Object.keys(orig).length?(()=>{const o={};ws.forEach(w=>o[w.id]=(P.routes[w.id]||[]).filter(id=>bij.has(id)));return o})():pick.before;
+   const m0={};ws.forEach(w=>(ref[w.id]||[]).forEach(id=>m0[id]=w.id));const mv=new Set();ws.forEach(w=>(R[w.id]||[]).forEach(id=>{if(m0[id]&&m0[id]!==w.id)mv.add(visitOf(id))}));
+   const k0=kpi(ref),k1=pick.k;
+   P.lastImprove={moved:mv.size,trav:Math.round(k0.trav-k1.trav),km:Math.round(k0.km-k1.km),np:Math.round(k0.np-k1.np),at:Date.now()};}
   enforceVisits(date,R,pins,blocked);
   P.routes=R;P.auto=Date.now();P.edited=manW.size?Date.now():0;
   const bad=visitInvariant(date);if(bad.length)console.warn('Visit-invariant geschonden',bad);

@@ -30,8 +30,8 @@ npx playwright show-report rapport  # rapport met schermopnamen bekijken
   Alleen Azure Table/Blob Storage is vervangen door opslag in het geheugen (`tests/server/fakes`).
   Er wordt dus nooit een Azure-account of echte planning aangeraakt.
 - De inlog is nagebootst (`/.auth/me`). De echte Microsoft-inlog test je in laag 3.
-- Externe bronnen (Excel-lezer van cdnjs, lettertypen, adresopzoeking PDOK) worden in de test lokaal afgevangen,
-  zodat de test niet van internet afhangt.
+- Externe bronnen worden lokaal afgevangen, zodat de test niet van internet afhangt: de Excel-lezer en lettertypen in de browser,
+  en PDOK in de testserver (antwoord in het echte PDOK-formaat met de coördinaten uit `tests/fixtures`).
 
 ## Wat er getest wordt
 
@@ -39,6 +39,8 @@ Motortests (`npm run motor`):
 - Regressieset (TEST 1–5), met en zonder "pauze uiterlijk".
 - Moeilijke set: acceptatiecriteria (10/10 bezoeken, ≤ 328 min, ≤ 286 km, ≤ 348 min niet-productief, 0 pauze niet gepland, 0 overwerk, niets gesplitst), gelijk aan het exacte optimum, stabiel bij herplannen, vastzetting, vaste pauze, rekentijd.
 - Dagroute-set: R-801/R-802 onuitvoerbaar met de standaard werktijdregel, gelijk aan het optimum, 21/21 als de terugrit niet meetelt.
+- Vijf planners, één dag (`testset_5_planners_1_dag.xlsx`): 42 van 46 beschikbare auto's = het exacte maximum met de werktijden van de voorbeeldmedewerkers; niets gesplitst; schrijfwijze en huisnummers juist.
+- Repair-pass (diepte 1): een onbezet bezoek wordt alsnog gepland door één ander bezoek naar een andere medewerker te verplaatsen.
 - Losse regels: bezoek als eenheid, `samePhysicalLocation()`, pauzeregels.
 
 Browsertests (`npm run browser`):
@@ -47,7 +49,8 @@ Browsertests (`npm run browser`):
 3. Eén auto slepen naar een andere medewerker → hele bezoek gaat mee
 4. Medewerker ziek melden → bezoeken blijven heel
 5. Vaste pauze per medewerker → planning eromheen
-6. Excel importeren via het scherm (niet-beschikbare auto's niet geïmporteerd)
+6. Excel importeren via het scherm: duur per auto (vast slot of venster), alles gepland
+6b. Excel met vijf planners importeren: postcode in de adreskolom, 42 van 46 gepland, niets gesplitst
 7. Keten: publiceren → medewerker meldt gereed met foto (telefoonscherm) → planner ziet foto → archiveren → foto's opschonen
 8. Verlopen sessie → **bekend probleem**, gemarkeerd als "verwacht te falen". Zodra het is opgelost, slaagt de test en geeft Playwright een seintje om de markering weg te halen.
 

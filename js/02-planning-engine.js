@@ -435,6 +435,49 @@ function samePlaceFit(u,R,ws){
     else{const nb=bestPos(w,r,u,false);tried.push(w.name+': '+(nb?(nb.s.lateJobs.length?'te laat '+nb.s.lateJobs.map(id=>JOB[id].plate||id).join(', '):nb.s.over>.5?'buiten werktijd':nb.s.skillBad.length?'vaardigheid ontbreekt':'past niet'):'past niet'))}}
   return best||{fit:false,reason:tried.length?tried.join('; '):'geen medewerker op deze plek'};
 }
+/* Repair-pass voor volledig onbezette bezoeken (na insertLoop), diepte 1:
+   1) directe herplaatsing: het hele bezoek bij een medewerker waar het haalbaar past;
+   2) anders één al gepland bezoek (niet vastgezet) van een kandidaat-medewerker naar een andere medewerker verplaatsen,
+      zodat het onbezette bezoek bij de kandidaat past.
+   Beide betrokken routes worden volledig doorgerekend (reistijd, parkeren, pauze, werktijd, tijdvensters, vaste pauze).
+   Een wijziging gaat alleen door als alle routes haalbaar blijven en het aantal geplande auto's toeneemt. */
+let REPAIR_LOG=[];
+function repairPass(R,ws,pins,todoIds,deadline){
+  const late=()=>deadline&&Date.now()>deadline;
+  const ok=(w,arr)=>{const s=simulate(w,arr);return feas(s)?s:null};
+  let gained=0;
+  for(const U of unitsOf(todoIds)){
+    if(late())break;
+    if(Object.values(R).some(r=>r.includes(U[0])))continue;
+    /* 1. direct */
+    let best=null;
+    for(const w of ws){if(U.some(id=>!skillOk(w,JOB[id])))continue;const b=bestPos(w,R[w.id]||[],U,true);if(b){const d=b.c-costOf(simulate(w,R[w.id]||[]));if(!best||d<best.d)best={d,ch:{[w.id]:b.arr},how:'direct bij '+w.name}}}
+    /* 2. diepte 1: één bezoek B van kandidaat A naar medewerker C */
+    if(!best)for(const A of ws){
+      if(late())break;
+      if(U.some(id=>!skillOk(A,JOB[id])))continue;
+      const rA=R[A.id]||[],cA0=costOf(simulate(A,rA));
+      for(const B of blocksOf(rA)){
+        if(B.ids.some(id=>pins[id]))continue;
+        const remA=rA.filter(id=>!B.ids.includes(id));
+        const bA=bestPos(A,remA,U,true);if(!bA)continue;
+        for(const C of ws){
+          if(C.id===A.id||B.ids.some(id=>!skillOk(C,JOB[id])))continue;
+          const rC=R[C.id]||[],bC=bestPos(C,rC,B.ids,true);if(!bC)continue;
+          if(!ok(A,bA.arr)||!ok(C,bC.arr))continue;
+          const d=(bA.c-cA0)+(bC.c-costOf(simulate(C,rC)));
+          if(!best||d<best.d)best={d,ch:{[A.id]:bA.arr,[C.id]:bC.arr},how:`${JOB[B.ids[0]].plate}… van ${A.name} naar ${C.name}, bezoek erbij bij ${A.name}`};
+        }
+      }
+    }
+    if(best){
+      const before=Object.values(R).reduce((n,r)=>n+r.length,0);
+      const trial={...R,...best.ch};const after=Object.values(trial).reduce((n,r)=>n+r.length,0);
+      if(after>before&&Object.keys(best.ch).every(wid=>ok(WRK[wid],trial[wid]))){Object.assign(R,best.ch);gained+=U.length;REPAIR_LOG.push((JOB[U[0]].plate||U[0])+': '+best.how)}
+    }
+  }
+  return gained;
+}
 function insertLoop(rest,R,ws){
   const base={};const upd=wid=>base[wid]=costOf(simulate(WRK[wid],R[wid]));ws.forEach(w=>upd(w.id));
   let units=unitsOf(rest);
@@ -600,7 +643,7 @@ function visitDiag(date){
   return jobsOn(date).slice().sort((a,b)=>((t2m(a.from)??0)-(t2m(b.from)??0))).map(j=>{const l=LOC[j.locationId]||{},c=CUS[l.customerId]||{},w=where[j.id];return{kenteken:j.plate||j.id,klant:c.name||l.customerId||'',locatie:l.name||j.locationId,tijd:j.from||'',visitId:vm[j.id],blockId:w?vm[j.id]+'@'+w:'(niet gepland)',medewerker:w?(WRK[w]||{}).name:'-'}});
 }
 function autoPlan(date){
-  visitReset();let blocked=new Set();
+  visitReset();REPAIR_LOG=[];let blocked=new Set();
   const P=cleanPlan(date),pins=P.pinned,skip=P.skip||{},jobs=jobsOn(date).filter(j=>!(skip[j.id]&&!pins[j.id]));
   /* Medewerkers met handmatige aanpassingen (vastgezette bezoeken of P.editW) houden hun route; alleen de overigen worden opnieuw ingepland */
   /* Vastzetting door de import (P.pinAuto) houdt alleen dat bezoek vast; een handmatige vastzetting houdt de hele route van die medewerker vast */
@@ -626,8 +669,9 @@ function autoPlan(date){
   const base=clone(R),fresh=clone(R);ws.forEach(w=>fresh[w.id]=(R[w.id]||[]).filter(id=>pins[id]===w.id));
   const todoOf=X=>{const s=new Set(Object.values(X).flat());return jobs.map(j=>j.id).filter(id=>!s.has(id)&&!blocked.has(id))};
   const kpi=X=>{const k={cars:0,pm:0,v:0,c:0,np:0,trav:0,km:0,moved:0};ws.forEach(w=>{const r=X[w.id]||[];const s=simulate(w,r,date);k.cars+=r.length;k.pm+=s.pauseMissing?1:0;k.v+=violOf(s);k.c+=costOf(s);k.np+=npOf(s);k.trav+=s.trav;k.km+=s.km;r.forEach(id=>{if(orig[id]&&orig[id]!==w.id&&visitIds(id)[0]===id)k.moved++})});k.score=k.c+W_MOVE*k.moved;return k};
-  const attempt=(start,mode)=>{const X=clone(start);COST_MODE=mode;try{insertLoop(todoOf(X),X,ws)}finally{COST_MODE='full'}
-    const before=clone(X);const dl=Date.now()+PLAN_BUDGET_MS;improve(X,ws,pins,false,orig,dl);const left=todoOf(X);if(left.length){insertLoop(left,X,ws);improve(X,ws,pins,false,orig,dl+PLAN_BUDGET_MS/2)}return{X,before}};
+  const attempt=(start,mode)=>{const l0=REPAIR_LOG.length;const X=clone(start);COST_MODE=mode;try{insertLoop(todoOf(X),X,ws)}finally{COST_MODE='full'}
+    const rep0=todoOf(X);if(rep0.length)repairPass(X,ws,pins,rep0,Date.now()+PLAN_BUDGET_MS);
+    const before=clone(X);const dl=Date.now()+PLAN_BUDGET_MS;improve(X,ws,pins,false,orig,dl);const left=todoOf(X);if(left.length){insertLoop(left,X,ws);const rep1=todoOf(X);if(rep1.length)repairPass(X,ws,pins,rep1,Date.now()+PLAN_BUDGET_MS);improve(X,ws,pins,false,orig,dl+PLAN_BUDGET_MS/2)}return{X,before,rep:REPAIR_LOG.slice(l0)}};
   const cands=[attempt(base,'full'),attempt(fresh,'travel'),attempt(fresh,'full')].map(a=>({...a,k:kpi(a.X)}));
   const hardBetter=(a,b)=>a.cars!==b.cars?a.cars>b.cars:a.pm!==b.pm?a.pm<b.pm:a.v<b.v-.5?true:a.v>b.v+.5?false:null;
   let pick=cands[0];
@@ -641,7 +685,7 @@ function autoPlan(date){
   {const ref=Object.keys(orig).length?(()=>{const o={};ws.forEach(w=>o[w.id]=(P.routes[w.id]||[]).filter(id=>bij.has(id)));return o})():pick.before;
    const m0={};ws.forEach(w=>(ref[w.id]||[]).forEach(id=>m0[id]=w.id));const mv=new Set();ws.forEach(w=>(R[w.id]||[]).forEach(id=>{if(m0[id]&&m0[id]!==w.id)mv.add(visitOf(id))}));
    const k0=kpi(ref),k1=pick.k;
-   P.lastImprove={moved:mv.size,trav:Math.round(k0.trav-k1.trav),km:Math.round(k0.km-k1.km),np:Math.round(k0.np-k1.np),at:Date.now()};}
+   P.lastImprove={moved:mv.size,trav:Math.round(k0.trav-k1.trav),km:Math.round(k0.km-k1.km),np:Math.round(k0.np-k1.np),repaired:(pick.rep||[]).filter(x=>Object.values(R).flat().some(id=>JOB[id]&&x.startsWith((JOB[id].plate||id)+':'))),at:Date.now()};}
   enforceVisits(date,R,pins,blocked);
   P.routes=R;P.auto=Date.now();P.edited=manW.size?Date.now():0;
   const bad=visitInvariant(date);if(bad.length)console.warn('Visit-invariant geschonden',bad);

@@ -22,7 +22,7 @@ function onClick(e){
     case'mailklant':mailKlantKies(S.date);break;
     case'aiday':aiVoorstel([S.date]);break;
     case'aiweek':aiVoorstel([...Array(7)].map((_,i)=>addDays(weekStart(S.date),i)));break;
-    case'auto':{const P0=getPlan(S.date);P0.skip={};P0.editW={};}autoPlan(S.date);save();render();{const li=getPlan(S.date).lastImprove;toast(li&&li.moved?`Planning verbeterd: ${li.moved} ${li.moved===1?'bezoek':'bezoeken'} verplaatst, ${li.trav} minuten minder reistijd en ${li.km} km minder. Vastgezette bezoeken zijn gerespecteerd.`:'Planning automatisch opnieuw gemaakt. Vastgezette bezoeken zijn gerespecteerd.',8000)}break;
+    case'auto':{const P0=getPlan(S.date);P0.skip={};P0.editW={};}autoPlan(S.date);save();render();{const li=getPlan(S.date).lastImprove;toast((li&&li.repaired&&li.repaired.length?`${li.repaired.length} ${li.repaired.length===1?'bezoek':'bezoeken'} alsnog ingepland door een ander bezoek te verschuiven. `:'')+(li&&li.moved?`Planning verbeterd: ${li.moved} ${li.moved===1?'bezoek':'bezoeken'} verplaatst, ${li.trav} minuten minder reistijd en ${li.km} km minder. Vastgezette bezoeken zijn gerespecteerd.`:'Planning automatisch opnieuw gemaakt. Vastgezette bezoeken zijn gerespecteerd.'),8000)}break;
     case'unpinall':{const P=getPlan(S.date);P.pinned={};P.pinAuto={};P.editW={};P.edited=Date.now();save();render();toast('Alle vastzettingen opgeheven. Klik Automatisch plannen om vrij te optimaliseren.');break}
     case'selw':S.wid=el.dataset.wid;S.selLoc=null;render();break;
     case'sel':S.wid=el.dataset.wid;S.selLoc=S.selLoc===el.dataset.loc?null:el.dataset.loc;render();break;

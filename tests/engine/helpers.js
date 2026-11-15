@@ -7,10 +7,10 @@ function T_build(fx, opts) {
   const S0 = sample();
   D = S0;
   D.customers = []; D.locations = []; D.jobs = []; D.plans = {}; D.absences = []; D.sickLog = [];
-  D.types = [{ id: 'std', name: 'Standaard', dur: 30, skill: '' }];
+  D.types = fx.types || [{ id: 'std', name: 'Standaard', dur: 30, skill: '' }];
   D.workers = fx.medewerkers.map((w, i) => ({
     id: w.id, name: w.name, postcode: w.postcode || '', city: w.city || '', lat: w.lat, lng: w.lng, geo: 'manual',
-    start: w.start, end: w.end, days: [0, 1, 2, 3, 4, 5, 6], absent: [], skills: [], overrides: {}, color: i, token: 'tok' + w.id.toLowerCase() + 'test0000000000000'
+    start: w.start, end: w.end, days: [0, 1, 2, 3, 4, 5, 6], absent: [], skills: w.skills || [], overrides: {}, color: i, token: 'tok' + w.id.toLowerCase() + 'test0000000000000'
   }));
   Object.assign(D.settings, fx.instellingen || {}, opts.settings || {});
   if (!('pauseTot' in (fx.instellingen || {})) && !(opts.settings && 'pauseTot' in opts.settings)) D.settings.pauseTot = '';
@@ -24,7 +24,7 @@ function T_build(fx, opts) {
       D.locations.push(loc[lk]);
     }
     const m = /(\d{1,2})[.:](\d{2})\s*tot\s*(\d{1,2})[.:](\d{2})/.exec(r.tijd);
-    D.jobs.push({ id: r.kenteken, plate: r.kenteken, date: r.datum, locationId: loc[lk].id, type: 'std', duration: 30,
+    D.jobs.push({ id: r.kenteken, plate: r.kenteken, date: r.datum, locationId: loc[lk].id, type: r.type || 'std', duration: 30, priority: r.prioriteit || 2,
       from: m[1].padStart(2, '0') + ':' + m[2], to: m[3].padStart(2, '0') + ':' + m[4], info: r.info });
   }
   LEGS.clear();
@@ -83,7 +83,7 @@ function T_metrics(date, R) {
 function T_exact(date) {
   visitReset();
   const vis = T_visits(date), NV = vis.length, ws = D.workers;
-  if (NV > 14) throw new Error('Te veel bezoeken voor de exacte zoektocht: ' + NV);
+  if (NV > 26) throw new Error('Te veel bezoeken voor de exacte zoektocht: ' + NV);
   const best = {};
   for (const w of ws) {
     const B = new Map(); B.set(0, { pm: 0, cost: 0, r: [] });
@@ -126,3 +126,9 @@ function T_state(date) { D.ui = { date, pview: 'dag' }; return D }
 
 /* Pauze per medewerker per dag instellen, zoals 'Pauze deze dag' */
 function T_setPause(date, wid, pz) { const P = getPlan(date); P.pauze = P.pauze || {}; P.pauze[wid] = pz }
+
+/* Werktijd van een medewerker aanpassen (alle dagen) */
+function T_setShift(wid, start, end) { const w = WRK[wid]; if (start) w.start = start; if (end) w.end = end }
+
+/* Wat de repair-pass deed bij de laatste autoPlan */
+function T_repairs(date) { return ((D.plans[date] || {}).lastImprove || {}).repaired || [] }

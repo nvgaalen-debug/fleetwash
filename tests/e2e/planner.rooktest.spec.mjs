@@ -104,20 +104,13 @@ test("6. Excel importeren via het scherm", async ({ page, request }) => {
   await resetServer(request, seedState("moeilijk", DAG));
   /* Lege planning op de server, dan de testset via het scherm importeren */
   await page.request.post("/__test/reset");
-  const geo = Object.fromEntries(fixture("moeilijk").opdrachten.map(o => [o.adres + "|" + o.postcode.replace(/\s/g, ""), o]));
-  await page.route("**/api/adres", async r => {
-    /* Adresopzoeking (PDOK) nabootsen met de coördinaten uit de testset */
-    let body = {}; try { body = r.request().postDataJSON() || {} } catch (e) {}
-    const q = JSON.stringify(body);
-    const hit = Object.values(geo).find(o => q.includes(o.adres) || q.includes(o.postcode.replace(/\s/g, "")));
-    await r.fulfill({ json: hit ? { ok: true, lat: hit.lat, lng: hit.lng, postcode: hit.postcode, city: hit.plaats, results: [{ lat: hit.lat, lng: hit.lng, postcode: hit.postcode, city: hit.plaats }] } : { ok: false } });
-  });
   await openApp(page, DAG);
   await page.locator(`[data-act=navto][data-to="act:import"]`).evaluate(b => b.click());
   await page.locator("#xf").setInputFiles(XLSX_TEST);
   await expect(page.getByText(/opdrachten worden ingepland/)).toBeVisible();
   await expect(page.getByRole("button", { name: /23 opdrachten importeren/ })).toBeVisible();
   await page.getByRole("button", { name: /23 opdrachten importeren/ }).click();
+  await expect(page.locator("#modal")).toBeHidden({ timeout: 45_000 });
   await expect.poll(() => page.evaluate(d => jobsOn(d).length, DAG)).toBe(23);
   const nb = await page.evaluate(() => D.jobs.some(j => j.plate === "O-999-ZZ"));
   expect(nb).toBe(false);
@@ -136,6 +129,28 @@ test("6. Excel importeren via het scherm", async ({ page, request }) => {
   expect(k.split).toBe(0);
   expect(k.late).toBe(0);
   console.log(`Import + plannen: ${k.cars} auto's, ${Math.round(k.trav)} min reizen, ${Math.round(k.km)} km, niet-productief ${Math.round(k.np)} min`);
+});
+
+test("6b. Excel met vijf planners importeren: postcode in adreskolom, 42 van 46 gepland, niets gesplitst", async ({ page }) => {
+  await page.request.post("/__test/reset");
+  await openApp(page, DAG);
+  await page.locator(`[data-act=navto][data-to="act:import"]`).evaluate(b => b.click());
+  await page.locator("#xf").setInputFiles(path.join(here, "..", "fixtures", "vijf-planners.xlsx"));
+  await expect(page.getByRole("button", { name: /46 opdrachten importeren/ })).toBeVisible();
+  await page.getByRole("button", { name: /46 opdrachten importeren/ }).click();
+  await expect(page.locator("#modal")).toBeHidden({ timeout: 45_000 });
+  await expect.poll(() => page.evaluate(d => jobsOn(d).length, DAG)).toBe(46);
+  await page.locator(`[data-act=navto][data-to="planning"]`).first().evaluate(b => b.click());
+  await page.getByRole("button", { name: "Automatisch plannen" }).click();
+  await expect.poll(async () => (await kpi(page)).cars).toBe(42);
+  const k = await kpi(page);
+  expect(k.split).toBe(0);
+  expect(k.late).toBe(0);
+  /* Zelfde fysieke plek bij andere schrijfwijze, ander huisnummer is een andere plek */
+  const same = await page.evaluate(() => { const L = id => LOC[JOB[D.jobs.find(j => j.plate === id).id].locationId];
+    return [samePhysicalLocation(L("P2-101-BB"), L("P2-103-BB")), samePhysicalLocation(L("P3-201-CC"), L("P3-203-CC"))] });
+  expect(same).toEqual([true, false]);
+  console.log(`Vijf planners: ${k.cars}/46 auto's, ${Math.round(k.trav)} min reizen, ${Math.round(k.km)} km`);
 });
 
 test("7. keten: publiceren → medewerker meldt gereed met foto → planner ziet foto → archiveren → foto's opschonen", async ({ page, browser }) => {

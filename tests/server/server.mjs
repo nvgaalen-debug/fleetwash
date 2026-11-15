@@ -14,6 +14,29 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 process.env.AZURE_STORAGE_CONNECTION_STRING ||= "UseDevelopmentStorage=true";
 if (!("APP_PASSWORD" in process.env)) process.env.APP_PASSWORD = "";
 
+/* PDOK (adres opzoeken) nabootsen met de adressen uit tests/fixtures, in het echte PDOK-antwoordformaat,
+   zodat api/src/functions/adres.mjs ongewijzigd meedraait. Andere externe verzoeken worden geweigerd. */
+const GEO = [];
+for (const f of fs.readdirSync(path.join(root, "tests", "fixtures")).filter(f => f.endsWith(".json"))) {
+  for (const o of JSON.parse(fs.readFileSync(path.join(root, "tests", "fixtures", f), "utf8")).opdrachten || [])
+    if (o.lat && o.adres) GEO.push(o);
+}
+const norm = t => String(t || "").toLowerCase().replace(/\s+/g, " ").trim();
+const realFetch = globalThis.fetch;
+globalThis.fetch = async (url, opts) => {
+  const u = String(url);
+  if (u.startsWith("https://api.pdok.nl/")) {
+    const q = norm(new URL(u).searchParams.get("q")), qpc = q.replace(/\s/g, "");
+    const hit = GEO.find(o => o.postcode && qpc.includes(o.postcode.replace(/\s/g, "").toLowerCase()) && q.includes(norm(o.adres)))
+      || GEO.find(o => q.includes(norm(o.adres)) && q.includes(norm(o.plaats)))
+      || GEO.find(o => o.postcode && qpc.includes(o.postcode.replace(/\s/g, "").toLowerCase()));
+    const docs = hit ? [{ weergavenaam: `${hit.adres}, ${hit.postcode} ${hit.plaats}`, centroide_ll: `POINT(${hit.lng} ${hit.lat})`, postcode: hit.postcode.replace(/\s/g, ""), woonplaatsnaam: hit.plaats.charAt(0) + hit.plaats.slice(1).toLowerCase(), straatnaam: hit.adres.replace(/\s*\d.*$/, ""), score: 10 }] : [];
+    return new Response(JSON.stringify({ response: { numFound: docs.length, docs } }), { status: 200, headers: { "content-type": "application/json" } });
+  }
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)/.test(u)) return realFetch(url, opts);
+  throw new Error("Extern verzoek geblokkeerd in de testserver: " + u.slice(0, 80));
+};
+
 const { ROUTES } = await import("./fakes/azure-functions.mjs");
 const { resetTables } = await import("./fakes/data-tables.mjs");
 const { resetBlobs, blobKeys } = await import("./fakes/storage-blob.mjs");

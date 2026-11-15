@@ -256,6 +256,7 @@ function routePanel(st){
     if(g.k==='drive')li+=`<li class="leg-li" style="--c:${c}"><span></span><div class="lbl">${fdur(g.b-g.a)} rijden incl. parkeren · ${fkm(g.km)}</div></li>`;
     else if(g.k==='wait')pendingWait+=g.b-g.a;
     else if(g.k==='pause')li+=`<li class="pause-li"><time>${m2t(g.a)}</time><div class="ev"><span class="lbl">Pauze ${fdur(g.b-g.a)}</span></div></li>`;
+    else if(g.k==='return'&&s.pauseMissing)li+=`<li class="pause-li"><time>⚠</time><div class="ev"><span class="lbl">Pauze niet gepland</span> <span class="sub">De bezoeken gaan voor; de pauze past nergens zonder een bezoek te laat of buiten werktijd te plannen. Pas zo nodig "Pauze deze dag" aan.</span></div></li><li class="leg-li" style="--c:${c}"><span></span><div class="lbl">${fdur(g.b-g.a)} terugrit · ${fkm(g.km)}</div></li>`;
     else if(g.k==='return')li+=`<li class="leg-li" style="--c:${c}"><span></span><div class="lbl">${fdur(g.b-g.a)} terugrit · ${fkm(g.km)}</div></li>`;
     else if(g.k==='job'){
       const p=s.stops.find(x=>x.jobs.includes(g.id));if(!p||seenStop.has(p))continue;seenStop.add(p);stopIdx++;

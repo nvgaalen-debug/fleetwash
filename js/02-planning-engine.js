@@ -334,13 +334,19 @@ function simulateBasis(w,ids,date,force){
   }
   if(stops.length){
     if(!vastDone){if(t<vast){seg.push({k:'wait',a:t,b:vast});wait+=vast-t;t=vast}if(t<vast+pm){seg.push({k:'pause',a:t,b:vast+pm});t=vast+pm}vastDone=true}
-    if(!pauseDone&&t-start>(+st.pauseMinDay||330)&&(pTot==null||t<=pTot))pause();
+    /* Pauze aan het eind van de dag alleen als de medewerker daardoor niet buiten werktijd komt. Een bezoek gaat altijd voor de pauze; past de pauze nergens, dan "Pauze niet gepland". */
+    if(!pauseDone&&t-start>(+st.pauseMinDay||330)&&(pTot==null||t<=pTot)){
+      const back=st.endAtLast===true?t+pm:t+pm+leg(pos,wPt(w)).min;
+      if(back<=end+.5)pause();
+    }
     lastEnd=t;
     const g=leg(pos,wPt(w));seg.push({k:'return',a:t,b:t+g.min,km:g.km});t+=g.min;km+=g.km;trav+=g.min;
   }
   const finish=stops.length?t:start;
   const endRef=st.endAtLast===true&&stops.length?lastEnd:finish;
-  return{seg,stops,km,trav,wait,serv,start,end,depart,finish,over:Math.max(0,endRef-end),late,lateJobs,skillBad,n:ids.length};
+  /* Pauze niet gepland: er is een pauze ingesteld, de dag is lang genoeg of er is een pauzevenster, maar de pauze paste nergens zonder een bezoek te laat of buiten werktijd te maken */
+  const pauseMissing=pm>0&&vast==null&&stops.length>0&&!seg.some(x=>x.k==='pause')&&(lastEnd-start>(+st.pauseMinDay||330)||pTot!=null);
+  return{seg,stops,km,trav,wait,serv,start,end,depart,finish,over:Math.max(0,endRef-end),late,lateJobs,skillBad,n:ids.length,pauseMissing};
 }
 const costOf=s=>s.stops.length?s.trav+D.settings.kmWeight*s.km:0;
 const violOf=s=>s.late+s.over+s.skillBad.length*1000;

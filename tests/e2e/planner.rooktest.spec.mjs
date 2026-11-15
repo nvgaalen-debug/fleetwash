@@ -121,6 +121,21 @@ test("6. Excel importeren via het scherm", async ({ page, request }) => {
   await expect.poll(() => page.evaluate(d => jobsOn(d).length, DAG)).toBe(23);
   const nb = await page.evaluate(() => D.jobs.some(j => j.plate === "O-999-ZZ"));
   expect(nb).toBe(false);
+  /* Duur per auto: vaste slots van 30 min = 30 min; lange tijdvakken (FLEX) = venster met standaardduur 30 min */
+  const duur = await page.evaluate(d => Object.fromEntries(jobsOn(d).map(j => [j.plate, jobDur(j)])), DAG);
+  const std = await page.evaluate(d => { const j = jobsOn(d).find(x => x.plate === "O-301-CC"); return TYP[j.type].dur }, DAG);
+  expect(duur["O-101-AA"]).toBe(30);           // vast slot 08:30-09:00
+  expect(duur["O-301-CC"]).toBe(std);          // venster 09:30-12:00: standaardduur, niet 150 min
+  expect(duur["O-401-DD"]).toBe(std);          // venster 09:30-12:30: standaardduur, niet 180 min
+  /* Na het importeren is alles gepland (importlog: 23 ingepland), daarna nog eens automatisch plannen: niets onbezet of gesplitst */
+  await expect(page.getByRole("button", { name: /Ingepland\s*23/ })).toBeVisible();
+  await page.locator(`[data-act=navto][data-to="planning"]`).first().evaluate(b => b.click());
+  await page.getByRole("button", { name: "Automatisch plannen" }).click();
+  await expect.poll(async () => (await kpi(page)).cars).toBe(23);
+  const k = await kpi(page);
+  expect(k.split).toBe(0);
+  expect(k.late).toBe(0);
+  console.log(`Import + plannen: ${k.cars} auto's, ${Math.round(k.trav)} min reizen, ${Math.round(k.km)} km, niet-productief ${Math.round(k.np)} min`);
 });
 
 test("7. keten: publiceren → medewerker meldt gereed met foto → planner ziet foto → archiveren → foto's opschonen", async ({ page, browser }) => {

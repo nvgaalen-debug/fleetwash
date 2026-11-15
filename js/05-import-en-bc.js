@@ -243,8 +243,13 @@ function xRows(X){const fut=$('#xfuture')&&$('#xfuture').checked,t=todayIso();
 function xDurFn(){const slot=$('#xslot')&&$('#xslot').checked,typ=TYP[$('#xtype')&&$('#xtype').value]||D.types[0]||{dur:30,name:''};
   const share={};xItems().forEach(it=>{if(it.from&&it.to){const k=locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to;share[k]=(share[k]||0)+1}});
   return r=>{const len=r.from&&r.to?t2m(r.to)-t2m(r.from):0;
-    if(len>0&&!r.win){const n=share[locKey({cust:String(r.cust||''),pc:r.pc||'',addr:r.addr||'',city:r.city||''})+'|'+r.date+'|'+r.from+'|'+r.to]||1;return{m:len,src:n>1?`vast tijdslot, let op: ${n} auto's tegelijk`:'vast tijdslot'}}
-    return{m:typ.dur,src:r.win&&slot&&len>0?`venster, dus ${typ.name}`:typ.name}}}
+    const n=share[locKey({cust:String(r.cust||''),pc:r.pc||'',addr:r.addr||'',city:r.city||''})+'|'+r.date+'|'+r.from+'|'+r.to]||1;
+    if(xIsSlot(len,r.win,slot))return{m:Math.max(5,Math.round(len/n)),src:n>1?`vast tijdslot gedeeld door ${n} auto's`:'vast tijdslot'};
+    return{m:typ.dur,src:len>SLOT_MAX_MIN&&!r.win?`tijdvak langer dan ${SLOT_MAX_MIN} min, dus venster met ${typ.name}`:r.win&&len>0?`venster, dus ${typ.name}`:typ.name}}}
+/* Een begin- en eindtijd tot SLOT_MAX_MIN minuten is een vast tijdslot (duur = slot, gedeeld door de auto's in dat slot).
+   Een langer tijdvak is een venster: standaardduur van het type, de planner kiest het moment. Met 'Duur = lengte van het tijdvak' uit: altijd venster. */
+const SLOT_MAX_MIN=60;
+function xIsSlot(len,win,slotOn){return slotOn!==false&&len>0&&!win&&len<=SLOT_MAX_MIN}
 function xPvBody(X){const pv=X.pv||(X.pv={f:'imp',q:''}),rows=xRows(X),q=normQ(pv.q).trim(),words=q?q.split(/\s+/):[];
   const list=rows.filter(r=>(pv.f==='all'||(pv.f==='skip'?!['imp','dup'].includes(r.st):r.st===pv.f))&&(!words.length||words.every(w=>normQ([r.plate,r.veh,r.cust,r.addr,r.pc,r.city,r.note,r.reason,r.date].join(' ')).includes(w))))
     .sort((a,b)=>String(a.date||'9').localeCompare(String(b.date||'9'))||String(a.from||a.time||'').localeCompare(String(b.from||b.time||''))||String(a.cust).localeCompare(String(b.cust),'nl'));
@@ -327,7 +332,7 @@ function renderXPrev(){
   <input class="mini" id="xpvq" type="search" placeholder="Zoek kenteken, klant, plaats\u2026" value="${esc(X.pv.q||'')}" style="flex:1 1 200px;max-width:320px" autocomplete="off"></div>
   <div class="xpv"><table><thead><tr><th>Status</th><th>Datum</th><th>Tijd</th><th>Duur</th><th>Kenteken</th><th>Klant</th><th>Adres</th><th>Opmerking / reden</th></tr></thead><tbody id="xpvBody">${pv.body}</tbody></table></div>
   <p class="hint" id="xpvMore" style="margin:6px 0 0">${pv.more>0?`En nog ${pv.more} regels; zoek om ze te vinden.`:''}</p>
-  <p class="hint" style="margin:4px 0 0">Duur: met "Duur = lengte van het tijdvak" aan telt het tijdslot uit de lijst (gedeeld als meer auto's op hetzelfde adres hetzelfde slot hebben); een venster als "tussen 08.00 en 12.00", alleen een begintijd of geen tijd gebruikt de standaardduur van het gekozen type.</p>
+  <p class="hint" style="margin:4px 0 0">Duur: met "Duur = lengte van het tijdvak" aan telt een tijdslot tot 60 minuten als duur (gedeeld als meer auto's op hetzelfde adres hetzelfde slot hebben); een langer tijdvak is een venster met de standaardduur; een venster als "tussen 08.00 en 12.00", alleen een begintijd of geen tijd gebruikt de standaardduur van het gekozen type.</p>
   <p class="hint" style="margin:4px 0 0">Opnieuw importeren is veilig: wat al bestaat (zelfde kenteken, datum en locatie) wordt overgeslagen. Na het importeren staat alles ook in het Importlog.</p></div>`;
   const go=$('#xgo');go.disabled=!nImp;go.textContent=nImp?`${nImp} opdracht${nImp===1?'':'en'} importeren`:'Importeren';
 }
@@ -358,18 +363,18 @@ function doXImport(){
     let from=it.from,to=it.to;const len=from&&to?t2m(to)-t2m(from):0;
     if(slack){if(from)from=m2t(Math.max(0,t2m(from)-slack));if(to)to=m2t(Math.min(1439,t2m(to)+slack))}
     const jid=uid('j');if(log[it.li]){log[it.li].status='imp';log[it.li].jobId=jid}
-    const isSlot=len>0&&!it.win,nShare=share[locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to]||1;
-    if(isSlot&&nShare>1&&log[it.li])log[it.li].reason=`Let op: ${nShare} auto's tegelijk in dit tijdslot`;
+    const isSlot=xIsSlot(len,it.win,slotDur),nShare=share[locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to]||1;
+    if(isSlot&&nShare>1&&log[it.li])log[it.li].reason=`${nShare} auto's in dit tijdslot: duur gedeeld`;
     if(isSlot)slotIds.push({id:jid,date:it.date});
     if(geenPlan&&!from&&!to)skipIds.push({id:jid,date:it.date});
-    D.jobs.push({id:jid,plate:it.plate,vehicle:it.veh,locationId:lo.id,date:it.date,from,to,type,duration:isSlot?len:'',priority:2,notes:it.note});n++;dates.add(it.date);
+    D.jobs.push({id:jid,plate:it.plate,vehicle:it.veh,locationId:lo.id,date:it.date,from,to,type,duration:isSlot?Math.max(5,Math.round(len/nShare)):'',priority:2,notes:it.note});n++;dates.add(it.date);
   }
   index();closeForm();XIMP=null;
   const ds=[...dates].sort(),today=todayIso();
   /* Bezoeken zonder tijdvak: geïmporteerd, maar niet automatisch ingepland (blijven bij niet ingepland) */
   for(const s of skipIds){const P=getPlan(s.date);P.skip=P.skip||{};P.skip[s.id]=true}
   /* Vaste tijdsloten (begin- en eindtijd, geen tijdvak): eerst plannen, dan bij de gekozen medewerker vastzetten */
-  if(slotIds.length){for(const d of ds)if(!hasPlan(d)&&jobsOn(d).length)autoPlan(d);for(const s of slotIds){const P=getPlan(s.date);for(const wid of Object.keys(P.routes))if(P.routes[wid].includes(s.id))P.pinned[s.id]=wid}}
+  if(slotIds.length){for(const d of ds)if(!hasPlan(d)&&jobsOn(d).length)autoPlan(d);for(const s of slotIds){const P=getPlan(s.date);P.pinAuto=P.pinAuto||{};for(const wid of Object.keys(P.routes))if(P.routes[wid].includes(s.id)){P.pinned[s.id]=wid;P.pinAuto[s.id]=wid}}}
   if(ds.length){S.date=ds.find(d=>d>=today)||ds[0];S.tab='planning';S.selLoc=null}
   D.importLog={file:fileName,at:Date.now(),entries:log};importLogs();const lid=uid('il');D.importLogs=D.importLogs.filter(x=>x.at!==D.importLog.at).concat({id:lid,...D.importLog}).slice(-10);S.logId=lid;delete D.importLog;
   const msg=`${n} opdrachten geïmporteerd (${newC} nieuwe klanten, ${newL} nieuwe locaties)${dup?`, ${dup} dubbele overgeslagen`:''}`;

@@ -603,10 +603,14 @@ function autoPlan(date){
   visitReset();let blocked=new Set();
   const P=cleanPlan(date),pins=P.pinned,skip=P.skip||{},jobs=jobsOn(date).filter(j=>!(skip[j.id]&&!pins[j.id]));
   /* Medewerkers met handmatige aanpassingen (vastgezette bezoeken of P.editW) houden hun route; alleen de overigen worden opnieuw ingepland */
-  const manW=new Set([...Object.values(pins),...Object.keys(P.editW||{})]);
+  /* Vastzetting door de import (P.pinAuto) houdt alleen dat bezoek vast; een handmatige vastzetting houdt de hele route van die medewerker vast */
+  const pa=P.pinAuto||{},autoPin=id=>pins[id]&&pa[id]===pins[id];
+  const manW=new Set([...Object.keys(pins).filter(id=>!autoPin(id)).map(id=>pins[id]),...Object.keys(P.editW||{})]);
   const ws=D.workers.filter(w=>avail(w,date)&&!manW.has(w.id));
   const R={};D.workers.forEach(w=>{if(manW.has(w.id))R[w.id]=(P.routes[w.id]||[]).slice()});
-  const bij=new Set(jobs.map(j=>j.id));ws.forEach(w=>R[w.id]=(P.routes[w.id]||[]).filter(id=>bij.has(id)&&!pins[id]));
+  const bij=new Set(jobs.map(j=>j.id));ws.forEach(w=>R[w.id]=(P.routes[w.id]||[]).filter(id=>bij.has(id)&&(!pins[id]||pins[id]===w.id)));
+  /* Automatisch vastgezette afspraken die nog niet in de route van hun medewerker staan, daar alsnog plaatsen */
+  Object.keys(pins).forEach(id=>{const wid=pins[id];if(!autoPin(id)||!R[wid]||!WRK[wid]||!bij.has(id)||R[wid].includes(id))return;const b=bestPos(WRK[wid],R[wid],[id],false);if(b)R[wid]=b.arr});
   const inR=()=>new Set(Object.values(R).flat());
   /* Oorspronkelijke medewerker per afspraak (vorige planning), voor de stabiliteitspenalty */
   const orig={};Object.entries(P.routes||{}).forEach(([wid,r])=>r.forEach(id=>orig[id]=wid));
@@ -619,7 +623,7 @@ function autoPlan(date){
   /* Drie kandidaat-verdelingen; elk krijgt de ruilstap. Gekozen wordt de beste op harde KPI's en daarna op kosten + stabiliteitspenalty.
      Een kandidaat die afwijkt van 'bestaand verbeteren' moet dezelfde drempel halen als een ruil (≥10 min niet-productieve tijd of ≥5% kosten). */
   const clone=X=>{const o={};Object.keys(X).forEach(k=>o[k]=X[k].slice());return o};
-  const base=clone(R),fresh=clone(R);ws.forEach(w=>fresh[w.id]=[]);
+  const base=clone(R),fresh=clone(R);ws.forEach(w=>fresh[w.id]=(R[w.id]||[]).filter(id=>pins[id]===w.id));
   const todoOf=X=>{const s=new Set(Object.values(X).flat());return jobs.map(j=>j.id).filter(id=>!s.has(id)&&!blocked.has(id))};
   const kpi=X=>{const k={cars:0,pm:0,v:0,c:0,np:0,trav:0,km:0,moved:0};ws.forEach(w=>{const r=X[w.id]||[];const s=simulate(w,r,date);k.cars+=r.length;k.pm+=s.pauseMissing?1:0;k.v+=violOf(s);k.c+=costOf(s);k.np+=npOf(s);k.trav+=s.trav;k.km+=s.km;r.forEach(id=>{if(orig[id]&&orig[id]!==w.id&&visitIds(id)[0]===id)k.moved++})});k.score=k.c+W_MOVE*k.moved;return k};
   const attempt=(start,mode)=>{const X=clone(start);COST_MODE=mode;try{insertLoop(todoOf(X),X,ws)}finally{COST_MODE='full'}

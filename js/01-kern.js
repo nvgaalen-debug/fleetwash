@@ -23,7 +23,8 @@ const I={
   unlock:ic('<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1"/>'),
   imp:ic('<path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 13.5h10"/>'),chat:ic('<path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/>'),send:ic('<path d="M14 2 2 7.2l5 1.8 1.8 5z"/>'),check:ic('<path d="m3 8.5 3.2 3L13 4.5"/>'),copy:ic('<rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M3 10.5V3.5A1 1 0 0 1 4 2.5h6.5"/>')
 };
-const plateHtml=p=>`<span class="plate"><i>NL</i><span>${esc(p||'—')}</span></span>`;
+/* Kenteken als gele plaat (profiel met kentekenplaat), anders als code */
+const plateHtml=p=>(typeof prfRegel==='function'&&!prfRegel('kentekenplaat',true))?`<span class="objcode">${esc(p||'—')}</span>`:`<span class="plate"><i>NL</i><span>${esc(p||'—')}</span></span>`;
 const wc=w=>`var(--w${(w&&w.color!=null?w.color:0)%6})`;
 
 /* ---------- postcode -> coördinaten (schatting) ---------- */
@@ -40,7 +41,9 @@ const KEY='wasroute.v1';
 let D=null;
 const S={tab:'planning',date:'2026-10-29',wid:null,selLoc:null,mapMode:'routes',jobScope:'dag'};
 let JOB={},LOC={},CUS={},WRK={},TYP={};
-function index(){if(typeof physReset==='function')physReset();JOB={};LOC={};CUS={};WRK={};TYP={};D.jobs.forEach(x=>JOB[x.id]=x);D.locations.forEach(x=>LOC[x.id]=x);D.customers.forEach(x=>CUS[x.id]=x);D.workers.forEach(x=>WRK[x.id]=x);if(!D.absences)migrateAbsences();(D.absences||[]).forEach(a=>{if(a.type==='ziek')a.note=''});(D.sickLog||[]).forEach(x=>{if(!x.type||x.type==='ziek')x.note='Ziek'});syncAbsences();D.types.forEach(x=>TYP[x.id]=x)}
+/* Profiel: eerst het standaardprofiel, zodat woorden in lijsten die bij het laden worden gemaakt gevuld zijn */
+if(typeof profielKies==='function')profielKies('wassen');
+function index(){if(typeof profielKies==='function')profielKies((D.settings&&D.settings.profiel)||'wassen');if(typeof physReset==='function')physReset();JOB={};LOC={};CUS={};WRK={};TYP={};D.jobs.forEach(x=>JOB[x.id]=x);D.locations.forEach(x=>LOC[x.id]=x);D.customers.forEach(x=>CUS[x.id]=x);D.workers.forEach(x=>WRK[x.id]=x);if(!D.absences)migrateAbsences();(D.absences||[]).forEach(a=>{if(a.type==='ziek')a.note=''});(D.sickLog||[]).forEach(x=>{if(!x.type||x.type==='ziek')x.note='Ziek'});syncAbsences();D.types.forEach(x=>TYP[x.id]=x)}
 function rng(seed){return()=>(seed=(seed*1664525+1013904223)%4294967296)/4294967296}
 function sample(){
   const r=rng(11),CON='BDFGHJKLNPRSTVXZ',L=()=>CON[Math.floor(r()*CON.length)],N=()=>Math.floor(r()*10);

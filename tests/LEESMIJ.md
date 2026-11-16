@@ -54,6 +54,10 @@ Browsertests (`npm run browser`):
 7. Keten: publiceren → medewerker meldt gereed met foto (telefoonscherm) → planner ziet foto → archiveren → foto's opschonen
 8. Verlopen sessie → **bekend probleem**, gemarkeerd als "verwacht te falen". Zodra het is opgelost, slaagt de test en geeft Playwright een seintje om de markering weg te halen.
 
+Profielen (`profielen/`):
+- Profiel schoonmaak gebouwen kiezen in Beheer, Excel met ruimtecodes importeren, plannen, medewerker-app met eigen woorden en redenen.
+- Scan: met het schoonmaakprofiel staat op geen enkel scherm, menu, formulier of tooltip nog een woord van het wasprofiel.
+
 Bekende grens (gemarkeerd als TODO, telt niet als fout): dagroute met "pauze uiterlijk 13:30" zit circa 8% van het optimum, omdat daarvoor drie medewerkers tegelijk moeten ruilen.
 
 ## Een nieuwe testset toevoegen

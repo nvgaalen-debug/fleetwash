@@ -1,0 +1,120 @@
+{
+ "naam": "schoonmaak",
+ "bron": "schoonmaak.xlsx (testset voor het profiel schoonmaak-gebouwen)",
+ "opmerking": "Coördinaten benaderd.",
+ "medewerkers": [
+  {
+   "id": "S",
+   "name": "Sanne Jansen",
+   "start": "07:00",
+   "end": "16:00",
+   "lat": 52.07,
+   "lng": 5.11
+  },
+  {
+   "id": "M",
+   "name": "Mark de Vries",
+   "start": "07:00",
+   "end": "16:30",
+   "lat": 51.81,
+   "lng": 5.248
+  }
+ ],
+ "instellingen": {
+  "profiel": "schoonmaak-gebouwen",
+  "pauseMin": 30,
+  "pauseAt": "12:00",
+  "pauseTot": "13:30",
+  "pauseMinDay": 330,
+  "kmWeight": 0.3,
+  "startAtFirst": true,
+  "endAtLast": false,
+  "travelSource": "estimate"
+ },
+ "opdrachten": [
+  {
+   "kenteken": "GB-1.01",
+   "klant": "Kantoorgebouw Stadsplateau",
+   "adres": "Stadsplateau 1",
+   "postcode": "3521 AZ",
+   "plaats": "UTRECHT",
+   "datum": "2026-12-17",
+   "tijd": "07.30 tot 09.00",
+   "info": "Vaste ochtendronde 90 min: hard (≤ 120 min)",
+   "lat": 52.089,
+   "lng": 5.11
+  },
+  {
+   "kenteken": "GB-1.02",
+   "klant": "Kantoorgebouw Stadsplateau",
+   "adres": "Stadsplateau 1",
+   "postcode": "3521 AZ",
+   "plaats": "UTRECHT",
+   "datum": "2026-12-17",
+   "tijd": "07.30 tot 09.00",
+   "info": "Zelfde ronde, gedeeld slot",
+   "lat": 52.089,
+   "lng": 5.11
+  },
+  {
+   "kenteken": "GB-2.14",
+   "klant": "Kantoorgebouw Stadsplateau west",
+   "adres": "stadsplateau 1",
+   "postcode": "3521 AZ",
+   "plaats": "Utrecht",
+   "datum": "2026-12-17",
+   "tijd": "09.00 tot 10.00",
+   "info": "Andere schrijfwijze, zelfde pand: 0 min reizen",
+   "lat": 52.089,
+   "lng": 5.11
+  },
+  {
+   "kenteken": "NW-0.10",
+   "klant": "Stadhuis Nieuwegein",
+   "adres": "Stadsplein 1",
+   "postcode": "3431 LZ",
+   "plaats": "NIEUWEGEIN",
+   "datum": "2026-12-17",
+   "tijd": "08.00 tot 12.00",
+   "info": "Ruim tijdvak (4 uur): venster",
+   "lat": 52.029,
+   "lng": 5.087
+  },
+  {
+   "kenteken": "NW-0.11",
+   "klant": "Stadhuis Nieuwegein",
+   "adres": "Stadsplein 1",
+   "postcode": "3431 LZ",
+   "plaats": "NIEUWEGEIN",
+   "datum": "2026-12-17",
+   "tijd": "08.00 tot 12.00",
+   "info": "Zelfde bezoek",
+   "lat": 52.029,
+   "lng": 5.087
+  },
+  {
+   "kenteken": "HO-1.01",
+   "klant": "Bibliotheek Houten",
+   "adres": "Onderdoor 25",
+   "postcode": "3995 DW",
+   "plaats": "HOUTEN",
+   "datum": "2026-12-17",
+   "tijd": "13.00 tot 14.00",
+   "info": "Middag",
+   "lat": 52.028,
+   "lng": 5.168
+  },
+  {
+   "kenteken": "HO-1.02",
+   "klant": "Bibliotheek Houten",
+   "adres": "Onderdoor 25",
+   "postcode": "3995 DW",
+   "plaats": "HOUTEN",
+   "datum": "2026-12-17",
+   "tijd": "Niet beschikbaar",
+   "info": "Niet inplannen",
+   "lat": 52.028,
+   "lng": 5.168
+  }
+ ]
+}

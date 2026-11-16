@@ -14,7 +14,7 @@
 <body>
 
 <header class="top"><div class="top-in gut">
-  <div class="brand"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="var(--accent)"/><path d="M9.5 15.5c1.2 1.8 4.6 2.2 6.4-.4" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round"/></svg>Wasroute <small>dispatch &amp; routeplanning</small></div>
+  <div class="brand"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="var(--accent)"/><path d="M9.5 15.5c1.2 1.8 4.6 2.2 6.4-.4" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round"/></svg><span data-profiel="naam">Wasroute</span> <small data-profiel="slogan">dispatch &amp; routeplanning</small></div>
   <nav class="tabs" id="tabs" aria-label="Hoofdmenu"></nav>
   <div class="datebar" id="datebar">
     <div class="seg" id="pviewSeg" role="group" aria-label="Weergave"><button type="button" data-act="pview" data-v="dag">Dag</button><button type="button" data-act="pview" data-v="week">Week</button><button type="button" data-act="pview" data-v="maand">Maand</button></div>
@@ -31,6 +31,9 @@
 <div id="toast" hidden></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" defer></script>
 
+<script src="js/00-profiel.js"></script>
+<script src="profielen/wassen.js"></script>
+<script src="profielen/schoonmaak-gebouwen.js"></script>
 <script src="js/01-kern.js"></script>
 <script src="js/02-planning-engine.js"></script>
 <script src="js/03-medewerker-en-voorstellen.js"></script>

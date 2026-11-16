@@ -59,7 +59,7 @@ async function fetchStatus(date,force){
 function routePayload(w,date){
   const P=D.plans[date],ids=((P&&P.routes&&P.routes[w.id])||[]).filter(id=>JOB[id]),why=availWhy(w,date);
   const s=simulate(w,ids,date),sh=shiftOf(w,date);
-  return{worker:{id:w.id,name:w.name},date,off:ids.length?'':why,shift:{start:sh.start,end:sh.end,note:sh.o?(sh.o.note||'Afwijkende werktijd'):''},
+  return{profiel:(PRF&&PRF.id)||'wassen',worker:{id:w.id,name:w.name},date,off:ids.length?'':why,shift:{start:sh.start,end:sh.end,note:sh.o?(sh.o.note||'Afwijkende werktijd'):''},
     depart:ids.length?m2t(s.depart):'',finish:ids.length?m2t(s.finish):'',km:Math.round(s.km),
     pauses:s.seg.filter(g=>g.k==='pause').map(g=>({from:m2t(g.a),to:m2t(g.b)})),
     visits:s.stops.map((p,i)=>{const l=p.loc,cu=CUS[l.customerId]||{};return{nr:i+1,arrive:m2t(p.arrive),start:m2t(p.start),end:m2t(p.end),travel:Math.round(p.travel),
@@ -101,7 +101,9 @@ async function registerLinks(){
 
 /* ---------- berichten: planner <-> medewerker-app ---------- */
 const MSG={list:[],at:0,err:'',loading:false};
-const MSGT=['Je planning is gewijzigd, kijk even in de app.','Bel even met kantoor als je kunt.','De volgende klant heeft afgezegd, ga door naar de klant daarna.','De klant is later aanwezig; je kunt pas na {tijd} terecht.','Neem extra tijd voor deze auto, de klant heeft extra wensen.'];
+const MSGT=['Je planning is gewijzigd, kijk even in de app.','Bel even met kantoor als je kunt.','De volgende klant heeft afgezegd, ga door naar de klant daarna.','De klant is later aanwezig; je kunt pas na {tijd} terecht.','Neem extra tijd voor deze {obj}, de klant heeft extra wensen.'];
+/* Snelle berichten met de woorden van het actieve profiel */
+const msgT=()=>MSGT.map(t=>t.replace('{obj}',T.obj));
 let MV=null; // geopende berichtenweergave {wid|'all', draft, urgent, sel:Set, ref, date}
 function msgList(){return SERVER?MSG.list:(D.msgs||[])}
 const msgUnread=wid=>msgList().filter(m=>m.from==='worker'&&!m.readAt&&(!wid||m.wid===wid)).length;
@@ -156,7 +158,7 @@ function renderMsgs(first){
       return sep+`<div class="bub ${x.from==='planner'?'me':'them'}${x.urgent?' urg':''}">${x.urgent?'<b class="small">Urgent</b>':''}${x.ref?`<span class="small muted">Over ${esc(x.ref)}</span>`:''}<div>${esc(x.text)}</div><small>${msgStatus(x)}</small></div>`}).join(''):`<p class="muted small" style="margin:auto;text-align:center">Nog geen berichten met ${esc(w?w.name:'deze medewerker')}.</p>`;
     head=`<h3 id="msT" style="margin:0;display:flex;gap:8px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w?w.name:'')}</h3>${w&&w.phone?`<a class="small" href="tel:${esc(String(w.phone).replace(/[^\d+]/g,''))}">${esc(w.phone)}</a>`:''}`;
   }
-  const tpl=MSGT.map((t,i)=>`<button class="fchip" data-act="msgtpl" data-i="${i}">${esc(t.length>34?t.slice(0,32)+'…':t)}</button>`).join('');
+  const tpl=msgT().map((t,i)=>`<button class="fchip" data-act="msgtpl" data-i="${i}">${esc(t.length>34?t.slice(0,32)+'…':t)}</button>`).join('');
   m.innerHTML=`<div class="dlg msgdlg" role="dialog" aria-modal="true" aria-labelledby="msT">
     <div class="msgside">${side}</div>
     <div class="msgmain"><div class="row">${head}<span class="sp"></span>${SERVER?`<button class="btn sm" data-act="msgref">Ververs</button>`:''}<button class="iconbtn" data-act="msgclose" aria-label="Sluiten"><svg class="ic" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button></div>
@@ -284,7 +286,7 @@ function openPropose(ids){
   const sh=cands.map((c,i)=>c.kind==='shift'?row(c,i):'').join(''),dy=cands.map((c,i)=>c.kind==='day'?row(c,i):'').join('');
   $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="pT" style="width:min(720px,100%)"><h3 id="pT">Slim voorstel</h3>
     <div class="row" style="margin-bottom:6px">${ids.map(id=>plateHtml(JOB[id].plate)).join(' ')}<b>${esc(cu.name)}</b><span class="muted">${esc(l.address)}, ${esc(l.postcode)} ${esc(l.city)}</span></div>
-    <p class="note" style="margin:0 0 4px">${esc(fdate(date))} · tijdvak ${esc(win)} · ${ids.reduce((s,id)=>s+jobDur(JOB[id]),0)} min reinigen</p>
+    <p class="note" style="margin:0 0 4px">${esc(fdate(date))} · tijdvak ${esc(win)} · ${ids.reduce((s,id)=>s+jobDur(JOB[id]),0)} min ${T.werk}</p>
     <p class="small" style="color:var(--warn);margin:0 0 14px">${esc(reason)}</p>
     <h4 class="ph">Per medewerker op het gevraagde tijdstip</h4><ul class="verd">${verd.map(v=>`<li><i class="dot" style="background:${wc(v.w)}"></i><b>${esc(v.w.name)}</b><span style="color:var(--${v.ok?'ok':'warn'})">${esc(v.txt)}</span>${v.extend?`<button class="btn sm" data-act="extend" data-wid="${v.w.id}" data-start="${v.extend.start}" data-end="${v.extend.end}">${v.extend.extraDay?`Extra laten werken ${v.extend.start}–${v.extend.end}`:`Incidenteel tot ${v.extend.end} (+${fdur(v.extend.extra)})`}</button>`:''}</li>`).join('')}</ul>
     <h4 class="ph">Zelfde dag, ander tijdstip</h4>${sh||'<p class="small muted">Ook met een ander tijdstip past dit bij niemand binnen de werktijden.</p>'}
@@ -362,13 +364,13 @@ function openSickResult(){
       const res=Object.values(byW).map(({p,n})=>`<span class="chip ${p.late?'warn':'ok'}"><i class="dot" style="background:${wc(WRK[p.wid])}"></i>${esc(WRK[p.wid].name)}${p.date!==d?' '+esc(fdate(p.date,{weekday:'short',day:'numeric',month:'short'})):''} ${p.start!=null?m2t(p.start):''}${n<ids.length?` (${n})`:''}</span>`).join(' ');
       const un=ids.filter((id,i)=>!(pl[i]&&pl[i].wid));if(un.length)unGroups.push({date:JOB[un[0]].date,ids:un,lid});
       const win=[...new Set(ids.map(id=>JOB[id]).map(j=>j.from||j.to?`${j.from||'—'}–${j.to||'—'}`:'hele dag'))].join(', ');
-      return`<tr><td><b>${esc(cu.name||'')}</b><div class="small muted">${esc(l.city||'')}</div></td><td>${ids.map(id=>plateBtn(JOB[id])).join(' ')}</td><td class="small mono">${esc(win)}</td><td>${res}${un.length?` <span class="chip bad">⚠️ niet herpland: geen medewerker heeft ${un.length} auto${un.length>1?"'s":''} (${un.reduce((s,id)=>s+(JOB[id]?jobDur(JOB[id]):0),0)} min) aaneengesloten ruimte</span> <button class="btn sm" data-act="propose" data-ids="${un.join(',')}">${I.auto} Slim voorstel</button>`:''}</td></tr>`}).join('');
+      return`<tr><td><b>${esc(cu.name||'')}</b><div class="small muted">${esc(l.city||'')}</div></td><td>${ids.map(id=>plateBtn(JOB[id])).join(' ')}</td><td class="small mono">${esc(win)}</td><td>${res}${un.length?` <span class="chip bad">⚠️ niet herpland: geen medewerker heeft ${un.length} ${nObj(un.length)} (${un.reduce((s,id)=>s+(JOB[id]?jobDur(JOB[id]):0),0)} min) aaneengesloten ruimte</span> <button class="btn sm" data-act="propose" data-ids="${un.join(',')}">${I.auto} Slim voorstel</button>`:''}</td></tr>`}).join('');
     const load=Object.keys(P.routes).filter(x=>WRK[x]&&x!==K.wid).map(x=>{const b=day.before[x],a=simulate(WRK[x],P.routes[x],d);const extra=(a.serv+a.trav)-(b||0);return extra>.5?`${esc(WRK[x].name)} +${fdur(extra)} (terug ${m2t(a.finish)})`:''}).filter(Boolean).join(' · ');
-    return`<h4 class="ph">${esc(fdate(d,{weekday:'long',day:'numeric',month:'long'}))}</h4><div class="tbl-wrap"><table><thead><tr><th>Klant</th><th>Auto's</th><th>Tijdvak</th><th>Nieuwe planning</th></tr></thead><tbody>${rows}</tbody></table></div>${load?`<p class="small muted" style="margin:6px 0 0">Extra werk voor collega's: ${load}</p>`:''}`}).join('');
+    return`<h4 class="ph">${esc(fdate(d,{weekday:'long',day:'numeric',month:'long'}))}</h4><div class="tbl-wrap"><table><thead><tr><th>Klant</th><th>${T.ObjMv}</th><th>Tijdvak</th><th>Nieuwe planning</th></tr></thead><tbody>${rows}</tbody></table></div>${load?`<p class="small muted" style="margin:6px 0 0">Extra werk voor collega's: ${load}</p>`:''}`}).join('');
   K.unGroups=unGroups;const mode=aiMode(),kb=!K.type||K.type==='ziek'?'Ziekmelding':'Afwezigheid';
   const period=K.from===K.to?fdate(K.from,{weekday:'long',day:'numeric',month:'long'}):`${fdate(K.from,{day:'numeric',month:'short'})} t/m ${fdate(K.to,{day:'numeric',month:'short'})}`;
   $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="skT" style="width:min(920px,100%)"><h3 id="skT">${K.type&&K.type!=='ziek'&&ABS[K.type]?esc(ABS[K.type].name)+': ':'Ziekmelding '}${esc(w.name)}</h3>
-    <p class="note">${esc(K.note)} · ${esc(period)}. ${tot?`<b>${ok} van ${tot}</b> auto's zijn ingepland bij collega's en vastgezet.`:'Er stonden geen afspraken op deze dag(en).'}${SERVER&&tot?' Publiceer daarna opnieuw, zodat de collega’s het in hun app zien.':''}</p>
+    <p class="note">${esc(K.note)} · ${esc(period)}. ${tot?`<b>${ok} van ${tot}</b> ${T.objMv} zijn ingepland bij collega's en vastgezet.`:'Er stonden geen afspraken op deze dag(en).'}${SERVER&&tot?' Publiceer daarna opnieuw, zodat de collega’s het in hun app zien.':''}</p>
     ${sections}
     ${unGroups.length?`<h4 class="ph">Plan voor wat niet past</h4><div id="sickAi"><p class="small muted" id="sickNote" style="margin:0 0 8px">${mode?`Claude kiest voor ${unGroups.length===1?'de afspraak':`elk van de ${unGroups.length} afspraken`} die niet past het beste alternatief: een ander tijdstip, een andere dag of een collega die incidenteel langer werkt. Daarna pas je het met één klik toe.`:'AI-advies is hier niet beschikbaar. Gebruik per afspraak het Slim voorstel.'}</p>${mode?`<div class="row"><button class="btn primary" id="sickBtn" data-act="sickai">${I.auto} Laat Claude een plan maken</button></div>`:''}<div id="sickOut"></div></div>`:tot?'<p class="ok-line">Alle afspraken zijn herverdeeld.</p>':''}
     <div class="dlg-foot">${K.snap?`<button class="btn danger" data-act="sickundo">${kb} terugdraaien</button>`:`<button class="btn danger" data-act="unsick" data-id="${K.wid}">${kb} intrekken</button>`}<span class="sp"></span>${SERVER&&tot?`<button class="btn" data-act="publish">${I.send} Publiceer naar medewerker-app</button>`:''}<button class="btn primary" data-act="sickclose">${unGroups.length?'Sluiten, later verder':'Klaar'}</button></div>
@@ -386,7 +388,7 @@ function sickBanner(){
   const seen={},items=[];
   for(const K of [...(D.sickLog||[])].reverse()){if(seen[K.wid]||!WRK[K.wid]||K.to<todayIso())continue;seen[K.wid]=1;const n=sickOpenCount(K);if(n)items.push({K,n})}
   if(!items.length)return'';
-  return items.map(({K,n})=>`<section class="panel sickbar"><div class="row"><span class="abschip" style="--ac:${absVar(K.type||'ziek')}">${esc((ABS[K.type||'ziek']||ABS.ziek).name)}</span><b>${esc(WRK[K.wid].name)}</b><span>${esc(K.from===K.to?fdate(K.from,{weekday:'short',day:'numeric',month:'short'}):fdate(K.from,{day:'numeric',month:'short'})+' t/m '+fdate(K.to,{day:'numeric',month:'short'}))}: <b>${n}</b> ${n===1?'auto is':"auto's zijn"} nog niet herpland.</span><span class="sp"></span><button class="btn sm primary" data-act="sickview" data-id="${K.id}">Bekijken en herplannen</button></div></section>`).join('');
+  return items.map(({K,n})=>`<section class="panel sickbar"><div class="row"><span class="abschip" style="--ac:${absVar(K.type||'ziek')}">${esc((ABS[K.type||'ziek']||ABS.ziek).name)}</span><b>${esc(WRK[K.wid].name)}</b><span>${esc(K.from===K.to?fdate(K.from,{weekday:'short',day:'numeric',month:'short'}):fdate(K.from,{day:'numeric',month:'short'})+' t/m '+fdate(K.to,{day:'numeric',month:'short'}))}: <b>${n}</b> ${n===1?T.obj+' is':T.objMv+' zijn'} nog niet herpland.</span><span class="sp"></span><button class="btn sm primary" data-act="sickview" data-id="${K.id}">Bekijken en herplannen</button></div></section>`).join('');
 }
 /* Ziekmelding later intrekken: medewerker weer beschikbaar maken en eventueel de oorspronkelijke afspraken terugzetten */
 function sickDates(w){return(D.absences||[]).filter(a=>a.wid===w.id&&a.type==='ziek'&&!a.part).flatMap(absDates).sort()}
@@ -436,7 +438,7 @@ async function sickAI(){
   const data=groups.map((g,gi)=>{const l=LOC[g.lid]||{},cu=CUS[l.customerId]||{},js=g.ids.map(id=>JOB[id]);
     return{groep:gi+1,klant:cu.name,plaats:l.city,datum:fdate(g.date,{weekday:'long',day:'numeric',month:'long'}),kentekens:js.map(j=>j.plate),tijdvak:[...new Set(js.map(j=>(j.from||'?')+'-'+(j.to||'?')))].join(', '),
       opties:g.opts.map((c,i)=>({optie:i+1,soort:c.kind==='shift'?'zelfde dag, ander tijdstip':c.kind==='day'?'andere dag, zelfde tijdvak':'collega werkt incidenteel langer, op gevraagde tijdstip',omschrijving:candText(c),afwijking_tijdvak_min:Math.round(c.dev||0),extra_rijtijd_min:Math.round(c.dtrav||0),extra_werktijd_min:c.kind==='extend'?c.extra:0}))}});
-  const prompt=`Je bent ervaren planner bij een bedrijf dat auto's reinigt op de locatie van klanten. Medewerker ${WRK[K.wid].name} heeft zich ziek gemeld (${K.from} t/m ${K.to}). De meeste afspraken zijn al herverdeeld; de afspraken hieronder passen nog niet. De planningssoftware heeft per afspraak de mogelijke opties doorgerekend. Kies per groep precies één optie uit de lijst en verzin niets anders.
+  const prompt=`Je bent ervaren planner bij ${T.bedrijf}. Medewerker ${WRK[K.wid].name} heeft zich ziek gemeld (${K.from} t/m ${K.to}). De meeste afspraken zijn al herverdeeld; de afspraken hieronder passen nog niet. De planningssoftware heeft per afspraak de mogelijke opties doorgerekend. Kies per groep precies één optie uit de lijst en verzin niets anders.
 
 Afwegingen, in volgorde: de afspraak met de klant zo veel mogelijk nakomen (zelfde dag en tijdvak), daarna zo weinig mogelijk overwerk, daarna zo weinig mogelijk extra rijtijd. Een collega incidenteel langer laten werken is acceptabel als het om maximaal circa een uur gaat. Een andere dag is de laatste keus. Groepen zonder opties sla je over.
 
@@ -549,12 +551,12 @@ async function askAI(){
   const ids=PROP.ids,j0=JOB[ids[0]],l=LOC[j0.locationId]||{},cu=CUS[l.customerId]||{},N=PROP.cands.length;
   const opts=PROP.cands.map((c,i)=>({optie:i+1,soort:c.kind==='shift'?'zelfde dag, ander tijdstip':'andere dag, zelfde tijdvak',datum:fdate(c.date,{weekday:'long',day:'numeric',month:'long'}),medewerker:WRK[c.wid].name,standplaats:WRK[c.wid].city,tijd:m2t(c.start)+'-'+m2t(c.end),afwijking_van_tijdvak_min:Math.round(c.dev),richting:c.dev<.5?'binnen tijdvak':(c.early?'eerder':'later'),extra_rijtijd_min:Math.round(c.dtrav),extra_km:Math.round(c.dkm)}));
   const win=ids.map(id=>JOB[id]).map(j=>j.from||j.to?(j.from||'?')+'-'+(j.to||'?'):'hele dag').join(', ');
-  const prompt=`Je bent ervaren planner bij een bedrijf dat auto's reinigt op de locatie van klanten. Een afspraak past niet goed in de planning. De planningssoftware heeft de mogelijke opties doorgerekend. Kies alleen uit deze opties en verzin geen andere tijden, datums of medewerkers.
+  const prompt=`Je bent ervaren planner bij ${T.bedrijf}. Een afspraak past niet goed in de planning. De planningssoftware heeft de mogelijke opties doorgerekend. Kies alleen uit deze opties en verzin geen andere tijden, datums of medewerkers.
 
 Afspraak:
 - Klant: ${cu.name}${cu.contact?' (contactpersoon '+cu.contact+')':''}
 - Adres: ${[l.address,l.postcode,l.city].filter(Boolean).join(', ')}
-- Voertuig(en): ${ids.map(id=>JOB[id].plate).join(', ')}
+- ${T.ObjLang}(en) (${T.id}): ${ids.map(id=>JOB[id].plate).join(', ')}
 - Gewenste datum: ${fdate(PROP.date,{weekday:'long',day:'numeric',month:'long',year:'numeric'})}
 - Tijdvak klant: ${win}
 - Probleem: ${PROP.reason}

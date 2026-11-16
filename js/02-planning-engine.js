@@ -701,7 +701,7 @@ function whyUnplanned(j,date){
   const vis=visitIds(j.id),PP=D.plans[date]&&D.plans[date].pinned||{};
   const pw=vis.map(x=>PP[x]).find(x=>x&&WRK[x]);
   if(pw&&vis.length>1&&!feas(simulate(WRK[pw],vis.filter(x=>JOB[x]))))return`⚠ Bezoek kan door de vastzetting niet volledig bij ${WRK[pw].name.split(' ')[0]} worden gepland`;
-  if(vis.length>1&&!cap.some(w=>feas(simulate(w,vis)))&&cap.some(w=>feas(simulate(w,[j.id]))))return`Bezoek kan niet volledig door één medewerker worden uitgevoerd (${vis.length} auto's): geen medewerker past het hele bezoek binnen werktijd en tijdvenster`;
+  if(vis.length>1&&!cap.some(w=>feas(simulate(w,vis)))&&cap.some(w=>feas(simulate(w,[j.id]))))return`Bezoek kan niet volledig door één medewerker worden uitgevoerd (${vis.length} ${T.objMv}): geen medewerker past het hele bezoek binnen werktijd en tijdvenster`;
   if(!cap.some(w=>feas(simulate(w,[j.id])))){
     let b=null;for(const w of cap){const s=simulate(w,[j.id]);if(!b||violOf(s)<b.v)b={w,s,v:violOf(s)}}
     const p=b.s.stops[0];

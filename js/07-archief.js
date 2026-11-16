@@ -97,7 +97,7 @@ function archiefViewerHtml(){
   else if(v.items){
     const rijen=v.items;
     inhoud=rijen.length?`<p class="small muted">${rijen.length} bezoeken van ${esc(v.van)} t/m ${esc(v.tot)}. Alleen-lezen.</p>
-      <div style="overflow:auto;max-height:360px"><table class="tbl"><thead><tr><th>Datum</th><th>Medewerker</th><th>Klant</th><th>Locatie</th><th>Kenteken</th><th>Type</th><th>Melding</th><th>Reden</th></tr></thead><tbody>
+      <div style="overflow:auto;max-height:360px"><table class="tbl"><thead><tr><th>Datum</th><th>Medewerker</th><th>Klant</th><th>Locatie</th><th>${T.Id}</th><th>Type</th><th>Melding</th><th>Reden</th></tr></thead><tbody>
       ${rijen.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.medewerker||'')}</td><td>${esc(x.klant||'')}</td><td>${esc(x.locatie||'')}</td><td>${esc((x.job||{}).plate||'')}</td><td>${esc((x.job||{}).type||'')}</td><td>${esc(ARCH_STATUS_TXT[(x.melding||{}).st]||(x.melding||{}).st||'')}</td><td>${esc((x.melding||{}).reden||'')}</td></tr>`).join('')}
       </tbody></table></div>`:`<p class="small muted">Geen bezoeken gevonden van ${esc(v.van)} t/m ${esc(v.tot)}.</p>`;
   }

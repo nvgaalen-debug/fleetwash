@@ -27,7 +27,7 @@ async function aiVoorstel(dates){
     lines.push('Bezoeken (vast=ja: blijft staan zoals het is; vast=nee: plan in):');
     jobs.forEach(j=>{const P=getPlan(j.date),cur=aiHuidigeWerker(j,P),v=aiVast(j,P)&&cur!=null;const s=aiStart(j,P);
       lines.push(`${jC[j.id]} dag=${j.date} loc=${lC[j.locationId]} duur=${jobDur(j)} van=${j.from||'-'} tot=${j.to||'-'} vaardigheid=${jobSkill(j)||'geen'} vast=${v?'ja':'nee'}${v?' werker='+wC[cur]+' start='+(s!=null?m2t(s):'-'):''}`)});
-    const prompt=`Je bent planner voor reinigingsbezoeken aan auto's. Geef ALLEEN JSON terug, zonder tekst eromheen, in dit formaat:
+    const prompt=`Je bent planner bij ${T.bedrijf}. Geef ALLEEN JSON terug, zonder tekst eromheen, in dit formaat:
 {"plan":[{"job":"J01","werker":"W02","start":"08:30","reden":"korte zin, max 10 woorden, Nederlands"}]}
 Regels:
 - Neem alleen bezoeken met vast=nee op in het antwoord. Bezoeken met vast=ja blijven staan zoals ze zijn.
@@ -117,7 +117,7 @@ ${lines.join('\n')}`;
 function aiOverzicht(rijen,samen){
   return new Promise(res=>{
     const m=$('#modal');
-    m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="aivT" style="max-width:860px"><h3 id="aivT">AI-voorstel: wat verandert er</h3><p class="note">${esc(samen)} Vaste tijdsloten en vastgezette bezoeken worden niet gewijzigd.</p><div class="tbl-wrap" style="max-height:55vh;overflow:auto"><table><thead><tr><th>Kenteken</th><th>Klant en locatie</th><th>Nu</th><th>Voorstel</th><th>Reden</th></tr></thead><tbody>${rijen.map(r=>`<tr><td class="mono">${esc(r.plate)}</td><td>${esc(r.loc)}</td><td>${esc(r.nu)}</td><td><b>${esc(r.nieuw)}</b></td><td>${esc(r.reden)}</td></tr>`).join('')}</tbody></table></div><div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" id="aivNee">Annuleren</button><button type="button" class="btn primary" id="aivJa">Doorvoeren</button></div></div>`;
+    m.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="aivT" style="max-width:860px"><h3 id="aivT">AI-voorstel: wat verandert er</h3><p class="note">${esc(samen)} Vaste tijdsloten en vastgezette bezoeken worden niet gewijzigd.</p><div class="tbl-wrap" style="max-height:55vh;overflow:auto"><table><thead><tr><th>${T.Id}</th><th>Klant en locatie</th><th>Nu</th><th>Voorstel</th><th>Reden</th></tr></thead><tbody>${rijen.map(r=>`<tr><td class="mono">${esc(r.plate)}</td><td>${esc(r.loc)}</td><td>${esc(r.nu)}</td><td><b>${esc(r.nieuw)}</b></td><td>${esc(r.reden)}</td></tr>`).join('')}</tbody></table></div><div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" id="aivNee">Annuleren</button><button type="button" class="btn primary" id="aivJa">Doorvoeren</button></div></div>`;
     m.hidden=false;
     const klaar=v=>{m.hidden=true;m.innerHTML='';res(v)};
     $('#aivNee').onclick=()=>klaar(false);
@@ -142,7 +142,7 @@ function mailKlantKies(date){
   m.querySelectorAll('[data-mk]').forEach(b=>b.onclick=()=>{
     const r=rijen[+b.dataset.mk];
     const regels=per[r.cid].map(j=>{const wj=jobWhere(j.id);return{t:wj&&wj.start!=null?m2t(wj.start):'',plate:j.plate}}).sort((a,b)=>a.t.localeCompare(b.t)).map(x=>`${x.t||'tijd nog te bevestigen'}  ${x.plate}`);
-    const onderwerp=`Planning reiniging ${fdate(date,{weekday:'long',day:'numeric',month:'long'})}`;
+    const onderwerp=`Planning ${T.werkZn} ${fdate(date,{weekday:'long',day:'numeric',month:'long'})}`;
     const tekst=`Beste ${r.naam},\n\nHierbij de planning voor ${fdate(date,{weekday:'long',day:'numeric',month:'long'})}:\n\n${regels.join('\n')}\n\nMet vriendelijke groet`;
     m.hidden=true;m.innerHTML='';
     window.location.href=`mailto:${encodeURIComponent(r.mail)}?subject=${encodeURIComponent(onderwerp)}&body=${encodeURIComponent(tekst)}`;

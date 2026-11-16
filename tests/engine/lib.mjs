@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const root = path.resolve(here, "..", "..");
-const APP_SCRIPTS = ["js/01-kern.js", "js/02-planning-engine.js"];
+const APP_SCRIPTS = ["js/00-profiel.js", "profielen/wassen.js", "profielen/schoonmaak-gebouwen.js", "js/01-kern.js", "js/02-planning-engine.js"];
 
 export function fixture(name) {
   return JSON.parse(fs.readFileSync(path.join(root, "tests", "fixtures", name + ".json"), "utf8"));

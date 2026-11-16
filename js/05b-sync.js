@@ -12,7 +12,7 @@ let PUSH_P=null, PUSH_DIRTY=false;
 // Wachtscherm of foutmelding in plaats van de planning
 function setLaden(html){
   const v=$('#view');if(!v)return;
-  v.innerHTML=`<section class="panel sec" style="margin-top:24px"><h2>Wasroute Planner</h2>${html}</section>`;
+  v.innerHTML=`<section class="panel sec" style="margin-top:24px"><h2>${(PRF&&PRF.titel)||'Wasroute Planner'}</h2>${html}</section>`;
 }
 function startFout(msg){
   SYNC_READY=false;

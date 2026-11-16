@@ -32,7 +32,7 @@ let FORM=null;
 function fieldHtml(f,v){
   const id='f_'+f.k,w=f.wide?' wide':'';
   if(f.type==='select')return`<label class="fld${w}"><span>${esc(f.label)}</span><select id="${id}">${f.options.map(([a,b])=>`<option value="${esc(a)}"${String(v??'')===String(a)?' selected':''}>${esc(b)}</option>`).join('')}</select></label>`;
-  if(f.type==='checks')return`<fieldset class="fld wide"><legend>${esc(f.label)}</legend><div class="checks">${f.options.length?f.options.map(([a,b])=>`<label class="chk"><input type="checkbox" name="${id}" value="${esc(a)}"${(v||[]).map(String).includes(String(a))?' checked':''}>${esc(b)}</label>`).join(''):'<span class="muted small">Geen opties. Voeg vaardigheden toe via reinigingstypes.</span>'}</div></fieldset>`;
+  if(f.type==='checks')return`<fieldset class="fld wide"><legend>${esc(f.label)}</legend><div class="checks">${f.options.length?f.options.map(([a,b])=>`<label class="chk"><input type="checkbox" name="${id}" value="${esc(a)}"${(v||[]).map(String).includes(String(a))?' checked':''}>${esc(b)}</label>`).join(''):'<span class="muted small">Geen opties. Voeg vaardigheden toe via '+T.Types.toLowerCase()+'.</span>'}</div></fieldset>`;
   if(f.type==='combo')return comboHtml(f,v);
   if(f.type==='heading')return`<div class="fld wide fsec">${esc(f.label)}</div>`;
   if(f.type==='textarea')return`<label class="fld wide"><span>${esc(f.label)}</span><textarea id="${id}"${f.plain?' class="plain"':''} placeholder="${esc(f.ph||'')}">${esc(v??'')}</textarea></label>`;
@@ -57,15 +57,15 @@ function formDraft(fields){const v={};for(const f of fields){if(f.type==='headin
 
 /* ---------- import / export ---------- */
 function openImport(){
-  openForm({title:'Opdrachten importeren',okLabel:'Importeren',note:'Plak regels uit Excel of een CSV. Kolommen: kenteken; voertuig; klant; adres; postcode; plaats; datum; vanaf; tot; type; duur; prioriteit. Onbekende klanten en locaties worden aangemaakt.',
-    fields:[{k:'csv',label:'Gegevens',type:'textarea',ph:'kenteken;voertuig;klant;adres;postcode;plaats;datum;vanaf;tot;type;duur;prioriteit\nGZ-381-K;VW Golf;Autobedrijf Van Dijk;Industrieweg 12;5301 LK;Zaltbommel;2026-10-29;08:00;12:00;compleet;;2'}],values:{},
+  openForm({title:'Opdrachten importeren',okLabel:'Importeren',note:'Plak regels uit Excel of een CSV. Kolommen: '+T.id+'; '+T.objVeld.toLowerCase()+'; klant; adres; postcode; plaats; datum; vanaf; tot; type; duur; prioriteit. Onbekende klanten en locaties worden aangemaakt.',
+    fields:[{k:'csv',label:'Gegevens',type:'textarea',ph:T.id+';'+T.objLang+';klant;adres;postcode;plaats;datum;vanaf;tot;type;duur;prioriteit\nGZ-381-K;VW Golf;Autobedrijf Van Dijk;Industrieweg 12;5301 LK;Zaltbommel;2026-10-29;08:00;12:00;compleet;;2'}],values:{},
     onSave:v=>{const r=importCsv(v.csv);if(typeof r==='string')return r;replan(r.dates);toast(`${r.n} opdracht(en) geïmporteerd${r.newLoc?`, ${r.newLoc} nieuwe locatie(s)`:''}.`)}});
 }
 function importCsv(txt){
   const lines=String(txt||'').split(/\r?\n/).filter(l=>l.trim());if(!lines.length)return'Plak minimaal één regel.';
   const sep=lines[0].includes('\t')?'\t':lines[0].includes(';')?';':',';
   let n=0,newLoc=0;const dates=[],errs=[];
-  lines.forEach((ln,i)=>{const c=ln.split(sep).map(x=>x.trim().replace(/^"|"$/g,''));if(i===0&&/kenteken/i.test(c[0]))return;
+  lines.forEach((ln,i)=>{const c=ln.split(sep).map(x=>x.trim().replace(/^"|"$/g,''));if(i===0&&prfRe('id','kenteken').test(c[0]))return;
     const[plate,veh,cust,addr,pc,city,dRaw,from,to,typ,durS,prio]=c;
     let date=dRaw||'';const m=/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/.exec(date);if(m)date=`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
     if(!plate||!cust||!pc||!/^\d{4}-\d{2}-\d{2}$/.test(date)){errs.push(i+1);return}
@@ -75,7 +75,7 @@ function importCsv(txt){
     if(!lo){const g=geocode(pc);if(!g){errs.push(i+1);return}lo={id:uid('l'),customerId:cu.id,name:addr||'Locatie',address:addr||'',postcode:pc,city:city||'',...g};D.locations.push(lo);newLoc++}
     const tt=D.types.find(t=>t.id===(typ||'').toLowerCase()||t.name.toLowerCase().startsWith((typ||'').toLowerCase()))||D.types[0];
     D.jobs.push({id:uid('j'),plate:plate.toUpperCase(),vehicle:veh||'',locationId:lo.id,date,from:from||'',to:to||'',type:tt.id,duration:+durS||'',priority:+prio||2,notes:''});n++;dates.push(date)});
-  if(!n)return`Geen regels geïmporteerd. Controleer regel(s) ${errs.slice(0,8).join(', ')}: kenteken, klant, postcode en datum zijn verplicht.`;
+  if(!n)return`Geen regels geïmporteerd. Controleer regel(s) ${errs.slice(0,8).join(', ')}: ${T.id}, klant, postcode en datum zijn verplicht.`;
   index();return{n,newLoc,dates};
 }
 /* ---------- Excel-import: één rij per voertuig, herhalende kolommen Datum / Tijd / Opmerking ---------- */
@@ -98,7 +98,7 @@ function xTime(v){
 function sheetMeta(top){
   const cells=top.flat().map(clean).filter(Boolean),m={cust:'',login:'',phone:'',info:[]};
   for(const c of cells){
-    if(!m.cust&&/(overzicht|planning|lijst|rooster|schema)/i.test(c)){let t=c.replace(/[:\s]+$/,'').replace(/^.*?(auto['\u2019]?s|voertuigen|wagens|leasewagens|bedrijfswagens)\s+(van|voor)?\s*/i,'').replace(/^(overzicht|planning|wasplanning|lijst|rooster|schema)\s+(van|voor)?\s*/i,'');if(t&&t.length<=40)m.cust=t;continue}
+    if(!m.cust&&/(overzicht|planning|lijst|rooster|schema)/i.test(c)){let t=c.replace(/[:\s]+$/,'').replace(new RegExp('^.*?('+((PRF&&PRF.import&&PRF.import.objTitel)||"auto['\u2019]?s|voertuigen|wagens|leasewagens|bedrijfswagens")+')\\s+(van|voor)?\\s*','i'),'').replace(/^(overzicht|planning|wasplanning|lijst|rooster|schema)\s+(van|voor)?\s*/i,'');if(t&&t.length<=40)m.cust=t;continue}
     if(/inlog|login/i.test(c)){m.login=c.replace(/^\s*(inlog|login)\s*:?\s*/i,'');continue}
     if(/^(\+31|0)[\d\s-]{8,}$/.test(c)){m.phone=c;continue}
     if(c.length<=80)m.info.push(c);
@@ -116,15 +116,15 @@ const geoKey=(addr,city)=>normTxt(addr)+'|'+normTxt(city);
 const pdokAddr=a=>String(a||'').split(/\s+\/\s+|\s+en\s+|;/)[0].trim();
 let XGEO={};
 function parseAny(rows,opts={}){
-  const hi=rows.findIndex(r=>r&&r.some(c=>/kenteken/i.test(clean(c))));
+  const hi=rows.findIndex(r=>r&&r.some(c=>prfRe('id','kenteken').test(clean(c))));
   const hasKlant=hi>=0&&rows[hi].some(c=>/klant|bedrijf|debiteur|relatie/i.test(clean(c))&&!/mail/i.test(clean(c)));
   return hasKlant?parseSheet(rows,opts):parseBlocks(rows,opts);
 }
 function parseSheet(rows,opts={}){
-  const hi=rows.findIndex(r=>r&&r.some(c=>/kenteken/i.test(clean(c))));
-  if(hi<0)return{error:'Geen kolom "Kenteken" gevonden. Zorg dat er een rij met kolomnamen boven de gegevens staat.'};
+  const hi=rows.findIndex(r=>r&&r.some(c=>prfRe('id','kenteken').test(clean(c))));
+  if(hi<0)return{error:'Geen kolom "'+T.Id+'" gevonden. Zorg dat er een rij met kolomnamen boven de gegevens staat.'};
   const H=rows[hi].map(c=>clean(c).toLowerCase()),col=(re,not)=>H.findIndex(h=>re.test(h)&&!(not&&not.test(h)));
-  const c={plate:col(/kenteken/),cust:col(/klant|bedrijf|debiteur|relatie/,/mail/),addr:col(/straat|adres/,/mail/),pc:col(/postcode/),city:col(/plaats|stad/),veh:col(/voertuig|merk|model|soort/),
+  const c={plate:col(prfRe('id','kenteken')),cust:col(/klant|bedrijf|debiteur|relatie/,/mail/),addr:col(/straat|adres/,/mail/),pc:col(/postcode/),city:col(/plaats|stad/),veh:col(prfRe('obj','voertuig|merk|model|soort')),
     mail:col(/mail/),login:col(/inlog|login|account/),info:col(/locatie\s*info|parkeer|instructie|bijzonderhe/)};
   const meta=sheetMeta(rows.slice(0,hi)),fixedCust=c.cust<0?clean(opts.cust!=null?opts.cust:meta.cust):'';
   if(c.pc<0&&c.city<0)return{error:'Een kolom "Postcode" of "Plaats" is nodig om de locatie te bepalen.'};
@@ -138,7 +138,7 @@ function parseSheet(rows,opts={}){
   for(let r=hi+1;r<rows.length;r++){
     const row=rows[r]||[],plate=cell(row,c.plate).toUpperCase(),cust=c.cust<0?(fixedCust||'Onbekende klant'):cell(row,c.cust);
     if(!plate&&!cust)continue;
-    if(!plate||!cust){skipped.push(`Rij ${r+1}: kenteken of klant ontbreekt`);continue}
+    if(!plate||!cust){skipped.push(`Rij ${r+1}: ${T.id} of klant ontbreekt`);continue}
     const sp=splitAddr(cell(row,c.addr),cell(row,c.city),cell(row,c.pc).toUpperCase());let{pc,city}=sp;const addr=sp.addr;
     let exact=null;
     if(!pc&&addr&&city){const k=geoKey(addr,city),g=XGEO[k];if(g&&g.ok){pc=g.postcode;exact=g;if(g.city)city=g.city}else if(!g)lookups.set(k,{key:k,addr,city,q:pdokAddr(addr)+' '+city})}
@@ -171,10 +171,10 @@ function openXlsxImport(){
   XIMP=null;FORM=null;const m=$('#modal');
   m.innerHTML=`<div class="dlg wide" role="dialog" aria-modal="true" aria-labelledby="xT"><h3 id="xT">Opdrachten importeren uit Excel</h3>
   <p class="note" style="margin-bottom:10px">Kies een bestand. Je ziet eerst precies welke regels worden ingepland en welke niet; er verandert niets tot je op Importeren klikt.
-  <details style="display:inline"><summary class="small" style="display:inline;cursor:pointer;color:var(--accent)">Welke lijsten werken?</summary><span class="small"> Eén rij per voertuig met Kenteken, Klant, Adres en Postcode en/of Plaats (ook "Straat 1, Plaats" in één kolom). Ontbreekt de postcode, dan zoekt de app die op via PDOK; ontbreekt de kolom Klant, dan komt de klantnaam uit de titel boven de lijst. Lijsten met meerdere klanten onder elkaar (titelregel, kolomnamen, voertuigen; steeds herhaald) werken ook: elke titel wordt een klant. Per maand een kolom Datum met daarna Tijd (bijv. "08.30 tot 09.00"), en eventueel Informatie en Geannuleerd. "Niet beschikbaar" of een ingevulde Geannuleerd wordt overgeslagen.</span></details></p>
+  <details style="display:inline"><summary class="small" style="display:inline;cursor:pointer;color:var(--accent)">Welke lijsten werken?</summary><span class="small"> Eén rij per ${T.objLang} met ${T.Id}, Klant, Adres en Postcode en/of Plaats (ook "Straat 1, Plaats" in één kolom). Ontbreekt de postcode, dan zoekt de app die op via PDOK; ontbreekt de kolom Klant, dan komt de klantnaam uit de titel boven de lijst. Lijsten met meerdere klanten onder elkaar (titelregel, kolomnamen, ${T.objLangMv}; steeds herhaald) werken ook: elke titel wordt een klant. Per maand een kolom Datum met daarna Tijd (bijv. "08.30 tot 09.00"), en eventueel Informatie en Geannuleerd. "Niet beschikbaar" of een ingevulde Geannuleerd wordt overgeslagen.</span></details></p>
   <div class="ximp-top">
     <label class="fld"><span>Bestand (.xlsx, .xls of .csv)</span><input type="file" id="xf" accept=".xlsx,.xls,.csv"></label>
-    <label class="fld"><span>Type reiniging</span><select id="xtype">${D.types.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} (${t.dur} min)</option>`).join('')}</select></label>
+    <label class="fld"><span>${T.TypeVeld}</span><select id="xtype">${D.types.map(t=>`<option value="${esc(t.id)}">${esc(t.name)} (${t.dur} min)</option>`).join('')}</select></label>
     <label class="fld"><span>Speling (min)</span><input type="number" id="xslack" value="0" min="0" step="5"></label>
   </div>
   <div class="ximp-opts">
@@ -226,10 +226,10 @@ function xBillToHtml(X){
   const cs=D.customers.slice().sort((a,b)=>a.name.localeCompare(b.name,'nl'));
   return`<div class="row" style="align-items:flex-end;gap:10px;flex-wrap:wrap"><label class="fld" style="max-width:360px;flex:1 1 260px"><span>Factureren aan</span><select id="xbill">
     <option value=""${!X.billTo?' selected':''}>Elk bedrijf in de lijst is zelf de klant</option>
-    <optgroup label="Leasemaatschappij of verhuurder">${cs.map(c=>`<option value="${esc(c.id)}"${X.billTo===c.id?' selected':''}>${esc(c.name)}${c.bcNo?' ('+esc(c.bcNo)+')':''}</option>`).join('')}</optgroup>
-    <option value="__new"${X.billTo==='__new'?' selected':''}>Nieuwe leasemaatschappij…</option></select></label>
-    ${X.billTo==='__new'?`<label class="fld" style="max-width:300px;flex:1 1 220px"><span>Naam leasemaatschappij</span><input id="xbillnew" value="${esc(X.billToNew||'')}" placeholder="bijv. Athlon"></label>`:''}</div>
-    <p class="hint" style="margin:0">${X.billTo?'De bedrijven uit de lijst blijven zelf de klant in de planning; alleen de factuur gaat naar deze leasemaatschappij. Op de factuur staan de kentekens gegroepeerd per bedrijf.':'Komt de lijst van een lease- of verhuurmaatschappij? Kies die hier, dan gaat de factuur daarheen. De bedrijven blijven gewoon de klant in de planning.'}</p>`;
+    <optgroup label="${T.facturantGroep}">${cs.map(c=>`<option value="${esc(c.id)}"${X.billTo===c.id?' selected':''}>${esc(c.name)}${c.bcNo?' ('+esc(c.bcNo)+')':''}</option>`).join('')}</optgroup>
+    <option value="__new"${X.billTo==='__new'?' selected':''}>Nieuwe ${T.facturant}…</option></select></label>
+    ${X.billTo==='__new'?`<label class="fld" style="max-width:300px;flex:1 1 220px"><span>Naam ${T.facturant}</span><input id="xbillnew" value="${esc(X.billToNew||'')}" placeholder="bijv. Athlon"></label>`:''}</div>
+    <p class="hint" style="margin:0">${X.billTo?'De bedrijven uit de lijst blijven zelf de klant in de planning; alleen de factuur gaat naar deze '+T.facturant+'. Op de factuur staan de '+T.idMv+' gegroepeerd per bedrijf.':T.facturantVraag+' Kies die hier, dan gaat de factuur daarheen. De bedrijven blijven gewoon de klant in de planning.'}</p>`;
 }
 function xReparse(){const X=XIMP;if(!X)return;const r=parseAny(X.rows,{cust:X.custEdit,names:X.names});XIMP={...X,...r};renderXPrev()}
 /* Voorbeeld: elke regel uit de lijst met wat ermee gebeurt */
@@ -244,12 +244,12 @@ function xDurFn(){const slot=$('#xslot')&&$('#xslot').checked,typ=TYP[$('#xtype'
   const share={};xItems().forEach(it=>{if(it.from&&it.to){const k=locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to;share[k]=(share[k]||0)+1}});
   return r=>{const len=r.from&&r.to?t2m(r.to)-t2m(r.from):0;
     const n=share[locKey({cust:String(r.cust||''),pc:r.pc||'',addr:r.addr||'',city:r.city||''})+'|'+r.date+'|'+r.from+'|'+r.to]||1;
-    if(xIsSlot(len,r.win,slot))return{m:Math.max(5,Math.round(len/n)),src:n>1?`vast tijdslot gedeeld door ${n} auto's`:'vast tijdslot'};
-    return{m:typ.dur,src:len>SLOT_MAX_MIN&&!r.win?`tijdvak langer dan ${SLOT_MAX_MIN} min, dus venster met ${typ.name}`:r.win&&len>0?`venster, dus ${typ.name}`:typ.name}}}
+    if(xIsSlot(len,r.win,slot))return{m:Math.max(5,Math.round(len/n)),src:n>1?`vast tijdslot gedeeld door ${n} ${T.objMv}`:'vast tijdslot'};
+    return{m:typ.dur,src:len>SLOT_MAX_MIN()&&!r.win?`tijdvak langer dan ${SLOT_MAX_MIN()} min, dus venster met ${typ.name}`:r.win&&len>0?`venster, dus ${typ.name}`:typ.name}}}
 /* Een begin- en eindtijd tot SLOT_MAX_MIN minuten is een vast tijdslot (duur = slot, gedeeld door de auto's in dat slot).
    Een langer tijdvak is een venster: standaardduur van het type, de planner kiest het moment. Met 'Duur = lengte van het tijdvak' uit: altijd venster. */
-const SLOT_MAX_MIN=60;
-function xIsSlot(len,win,slotOn){return slotOn!==false&&len>0&&!win&&len<=SLOT_MAX_MIN}
+const SLOT_MAX_MIN=()=>prfRegel('slotMaxMin',60);
+function xIsSlot(len,win,slotOn){return slotOn!==false&&len>0&&!win&&len<=SLOT_MAX_MIN()}
 function xPvBody(X){const pv=X.pv||(X.pv={f:'imp',q:''}),rows=xRows(X),q=normQ(pv.q).trim(),words=q?q.split(/\s+/):[];
   const list=rows.filter(r=>(pv.f==='all'||(pv.f==='skip'?!['imp','dup'].includes(r.st):r.st===pv.f))&&(!words.length||words.every(w=>normQ([r.plate,r.veh,r.cust,r.addr,r.pc,r.city,r.note,r.reason,r.date].join(' ')).includes(w))))
     .sort((a,b)=>String(a.date||'9').localeCompare(String(b.date||'9'))||String(a.from||a.time||'').localeCompare(String(b.from||b.time||''))||String(a.cust).localeCompare(String(b.cust),'nl'));
@@ -267,16 +267,16 @@ function xDetHtml(X,ctx){const k=X.det;if(!k)return'';const{items,custs,knownLoc
   const nd=d=>esc(fdate(d,{weekday:'short',day:'numeric',month:'short'}));
   const grp=(keyf)=>{const m=new Map();items.forEach(i=>{const k=keyf(i);if(!m.has(k))m.set(k,[]);m.get(k).push(i)});return[...m.entries()]};
   if(k==='veh'){const g=grp(i=>i.plate).sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0]));
-    return head('Voertuigen',` \u00b7 klik op een regel om de afspraken te zien`)+tbl(['Kenteken','Voertuig','Klant','Afspraken','Datums'],g.map(([pl,its])=>{const ds=[...new Set(its.map(i=>i.date))].sort();return`<tr ${go(pl)}><td>${plateHtml(pl)}</td><td class="small">${esc(its[0].veh||'')}</td><td>${esc(its[0].cust)}</td><td>${its.length}</td><td class="small">${ds.slice(0,4).map(nd).join(', ')}${ds.length>4?' \u2026':''}</td></tr>`}).join(''))}
+    return head(T.ObjLangMv,` \u00b7 klik op een regel om de afspraken te zien`)+tbl([T.Id,T.objVeld,'Klant','Afspraken','Datums'],g.map(([pl,its])=>{const ds=[...new Set(its.map(i=>i.date))].sort();return`<tr ${go(pl)}><td>${plateHtml(pl)}</td><td class="small">${esc(its[0].veh||'')}</td><td>${esc(its[0].cust)}</td><td>${its.length}</td><td class="small">${ds.slice(0,4).map(nd).join(', ')}${ds.length>4?' \u2026':''}</td></tr>`}).join(''))}
   if(k==='cus'){const g=grp(i=>i.cust).sort((a,b)=>a[0].localeCompare(b[0],'nl'));
-    return head('Klanten',` \u00b7 ${X.billTo?'factuur naar '+esc(xBillName(X)||'\u2026'):'elk bedrijf is zelf de klant'}`)+tbl(['Klant','','Voertuigen','Locaties','Opdrachten'],g.map(([c,its])=>`<tr ${go(c)}><td><b>${esc(c)}</b></td><td>${custs.includes(c.toLowerCase())?'<span class="chip">bestaat al</span>':'<span class="chip acc">nieuw</span>'}</td><td>${new Set(its.map(i=>i.plate)).size}</td><td>${new Set(its.map(locKey)).size}</td><td>${its.length}</td></tr>`).join(''))}
+    return head('Klanten',` \u00b7 ${X.billTo?'factuur naar '+esc(xBillName(X)||'\u2026'):'elk bedrijf is zelf de klant'}`)+tbl(['Klant','',T.ObjLangMv,'Locaties','Opdrachten'],g.map(([c,its])=>`<tr ${go(c)}><td><b>${esc(c)}</b></td><td>${custs.includes(c.toLowerCase())?'<span class="chip">bestaat al</span>':'<span class="chip acc">nieuw</span>'}</td><td>${new Set(its.map(i=>i.plate)).size}</td><td>${new Set(its.map(locKey)).size}</td><td>${its.length}</td></tr>`).join(''))}
   if(k==='loc'){const g=grp(locKey).sort((a,b)=>a[1][0].cust.localeCompare(b[1][0].cust,'nl'));const GL={pdok:['exact (PDOK)','ok'],manual:['exact','ok'],pc6:['postcode','ok'],pc4:['postcode (4 cijfers)','acc'],plaats:['geschat op plaats','warn']};
     return head('Locaties',` \u00b7 positie bepaalt de rijtijden`)+tbl(['Klant','Adres','Postcode en plaats','Positie','','Opdrachten'],g.map(([key,its])=>{const i=its[0],geo=i.lat?{geo:'pdok'}:(geocode(i.pc,i.city)||{}),gl=GL[geo.geo]||[geo.geo?geo.geo:'onbekend',geo.geo?'':'bad'];const isNew=!knownLoc.has(lk(i.cust,i.pc,i.addr,i.city));
       return`<tr ${go(i.addr||i.city||i.cust)}><td>${esc(i.cust)}</td><td class="small">${esc(i.addr||'')}</td><td class="small">${esc([i.pc,i.city].filter(Boolean).join(' '))}</td><td><span class="chip ${gl[1]}">${esc(gl[0])}</span></td><td>${isNew?'<span class="chip acc">nieuw</span>':'<span class="chip">bestaat al</span>'}</td><td>${its.length}</td></tr>`}).join(''))}
   if(k==='per'){const g=grp(i=>i.date).sort((a,b)=>a[0].localeCompare(b[0]));
-    return head('Per datum',` \u00b7 rood = op die dag werkt geen medewerker`)+tbl(['Datum','Opdrachten','Voertuigen','Tijden','Plaatsen','Medewerkers'],g.map(([d,its])=>{const ts=its.map(i=>i.from).filter(Boolean).sort(),te=its.map(i=>i.to).filter(Boolean).sort(),cs=[...new Set(its.map(i=>i.city===i.city.toUpperCase()?i.city.charAt(0)+i.city.slice(1).toLowerCase():i.city))],n=wday(d),nw=D.workers.filter(w=>(w.days||[]).includes(n)&&!(w.absent||[]).includes(d)).length;
+    return head('Per datum',` \u00b7 rood = op die dag werkt geen medewerker`)+tbl(['Datum','Opdrachten',T.ObjLangMv,'Tijden','Plaatsen','Medewerkers'],g.map(([d,its])=>{const ts=its.map(i=>i.from).filter(Boolean).sort(),te=its.map(i=>i.to).filter(Boolean).sort(),cs=[...new Set(its.map(i=>i.city===i.city.toUpperCase()?i.city.charAt(0)+i.city.slice(1).toLowerCase():i.city))],n=wday(d),nw=D.workers.filter(w=>(w.days||[]).includes(n)&&!(w.absent||[]).includes(d)).length;
       return`<tr ${go(d)}><td style="white-space:nowrap"><b>${nd(d)}</b></td><td>${its.length}</td><td>${new Set(its.map(i=>i.plate)).size}</td><td class="mono small">${ts.length?ts[0]+'\u2013'+(te[te.length-1]||''):'hele dag'}</td><td class="small">${esc(cs.slice(0,5).join(', '))}${cs.length>5?' \u2026':''}</td><td>${nw?nw:'<span class="chip bad">geen</span>'}</td></tr>`}).join(''))}
-  if(k==='skip'){const R=[['past','In het verleden','Datum ligt v\u00f3\u00f3r vandaag; zet "Alleen datums vanaf vandaag" uit om ze toch te importeren.'],['nb','Niet beschikbaar','Volgens de lijst kon de auto niet.'],['cancel','Geannuleerd','In de kolom Geannuleerd staat iets ingevuld.'],['city','Plaats onbekend','Adres niet gevonden; voeg een postcode toe of maak de locatie handmatig aan.'],['dup','Bestaat al','Staat al in de planning (zelfde kenteken en datum).']].filter(r=>cnt[r[0]]);
+  if(k==='skip'){const R=[['past','In het verleden','Datum ligt v\u00f3\u00f3r vandaag; zet "Alleen datums vanaf vandaag" uit om ze toch te importeren.'],['nb','Niet beschikbaar',T.nietAanwezig],['cancel','Geannuleerd','In de kolom Geannuleerd staat iets ingevuld.'],['city','Plaats onbekend','Adres niet gevonden; voeg een postcode toe of maak de locatie handmatig aan.'],['dup','Bestaat al','Staat al in de planning (zelfde '+T.id+' en datum).']].filter(r=>cnt[r[0]]);
     const reasons={};rows.filter(r=>r.st==='nb'||r.st==='cancel').forEach(r=>{const t=(r.reason||r.note||'').trim();if(t)reasons[t]=(reasons[t]||0)+1});const top=Object.entries(reasons).sort((a,b)=>b[1]-a[1]).slice(0,6);
     return head('Niet ingepland',` \u00b7 klik om die regels te tonen`)+`<div class="xreason">${R.map(([st,l,why])=>`<button type="button" class="btn sm" data-act="xpvf" data-f="${st}" title="${esc(why)}">${esc(l)} <b>${cnt[st]}</b></button>`).join('')}</div>
       <ul class="xwarn" style="margin-top:8px">${R.map(([st,l,why])=>`<li><b>${esc(l)}:</b> ${esc(why)}</li>`).join('')}</ul>${top.length?`<p class="small muted" style="margin:8px 0 0">Meest genoemd in de lijst: ${top.map(([t,n])=>`"${esc(t)}" ${n}\u00d7`).join(', ')}</p>`:''}`}
@@ -301,16 +301,16 @@ function renderXPrev(){
   const W=[];
   const bc=Object.entries(X.badCity||{});
   if(bc.length)W.push(['bad',`${X.skipped.length} rij(en) overgeslagen omdat de plaats onbekend is: ${bc.map(([k,v])=>esc(k)+' ('+v+')').join(', ')}. Voeg een postcode toe of maak de locatie handmatig aan.`]);
-  else if(X.skipped.length)W.push(['bad',`${X.skipped.length} rij(en) zonder kenteken of klant overgeslagen: ${X.skipped.slice(0,3).map(esc).join('; ')}${X.skipped.length>3?' \u2026':''}`]);
+  else if(X.skipped.length)W.push(['bad',`${X.skipped.length} rij(en) zonder ${T.id} of klant overgeslagen: ${X.skipped.slice(0,3).map(esc).join('; ')}${X.skipped.length>3?' \u2026':''}`]);
   if(wk.length)W.push(['warn',`${wk.length} datum(s) vallen op een dag waarop geen medewerker werkt: ${wk.slice(0,5).map(d=>esc(fdate(d,{weekday:'short',day:'numeric',month:'short'}))).join(', ')}${wk.length>5?' \u2026':''}.`]);
   if(D.workers.length&&far>60)W.push(['warn',`Sommige locaties liggen tot ${Math.round(far)} km van de dichtstbijzijnde medewerker.`]);
   const gr=X.geoRes||[],grOk=gr.filter(g=>g.ok).length;
   if(gr.length)W.push([gr.length-grOk?'warn':'',`${grOk} van ${gr.length} adressen zonder postcode gevonden via PDOK. <details style="display:inline"><summary style="display:inline;cursor:pointer;color:var(--accent)">Bekijk</summary><div class="tbl-wrap" style="max-height:180px;overflow:auto;margin-top:6px"><table><thead><tr><th>Adres in de lijst</th><th>Gevonden</th></tr></thead><tbody>${gr.map(g=>`<tr><td class="small">${esc(g.addr)}, ${esc(g.city)}</td><td class="small">${g.ok?`<span class="chip ok">${esc(g.postcode)}</span> ${esc(g.label)}`:`<span style="color:var(--bad)">${esc(g.why)}</span>`}</td></tr>`).join('')}</tbody></table></div></details>`]);
   else if(X.geoErr)W.push(['bad',`Postcodes opzoeken via PDOK lukte niet: ${esc(X.geoErr)} De positie wordt geschat op basis van de plaats.`]);
   if(est)W.push(['',`${est} locatie(s) zonder postcode krijgen een geschatte positie op basis van de plaats.`]);
-  if(nDup)W.push(['',`${nDup} regel(s) staan al in de planning (zelfde kenteken en datum) en worden niet dubbel aangemaakt.`]);
+  if(nDup)W.push(['',`${nDup} regel(s) staan al in de planning (zelfde ${T.id} en datum) en worden niet dubbel aangemaakt.`]);
   // blokken (lijst met meerdere klanten)
-  const blkH=X.multi&&X.blocks?`<details class="ximp-sec"${X.blocks.length<=6?' open':''}><summary style="cursor:pointer"><b>Klanten in de lijst (${X.blocks.length})</b> <span class="small muted">namen zijn aan te passen</span></summary><div class="tbl-wrap" style="max-height:220px;overflow:auto;margin-top:8px"><table><thead><tr><th>Klant</th><th>Voertuigen</th><th>Afspraken</th><th>Vanaf vandaag</th></tr></thead><tbody>${X.blocks.map(b=>`<tr><td><input class="mini" data-xname="${b.i}" value="${esc(b.cust)}" aria-label="Klantnaam blok rij ${b.row}" style="width:100%;min-width:180px"><div class="small muted">rij ${b.row}${b.meta.info.length?' \u00b7 '+esc(b.meta.info.filter(x=>!/^datum/i.test(x)).slice(0,2).join(' \u00b7 ')):''}</div></td><td>${b.plates}</td><td>${b.ok}</td><td><b>${b.future}</b></td></tr>`).join('')}</tbody></table></div></details>`:'';
+  const blkH=X.multi&&X.blocks?`<details class="ximp-sec"${X.blocks.length<=6?' open':''}><summary style="cursor:pointer"><b>Klanten in de lijst (${X.blocks.length})</b> <span class="small muted">namen zijn aan te passen</span></summary><div class="tbl-wrap" style="max-height:220px;overflow:auto;margin-top:8px"><table><thead><tr><th>Klant</th><th>${T.ObjLangMv}</th><th>Afspraken</th><th>Vanaf vandaag</th></tr></thead><tbody>${X.blocks.map(b=>`<tr><td><input class="mini" data-xname="${b.i}" value="${esc(b.cust)}" aria-label="Klantnaam blok rij ${b.row}" style="width:100%;min-width:180px"><div class="small muted">rij ${b.row}${b.meta.info.length?' \u00b7 '+esc(b.meta.info.filter(x=>!/^datum/i.test(x)).slice(0,2).join(' \u00b7 ')):''}</div></td><td>${b.plates}</td><td>${b.ok}</td><td><b>${b.future}</b></td></tr>`).join('')}</tbody></table></div></details>`:'';
   const custH=(X.noCust?`<label class="fld" style="max-width:360px"><span>Klant (geen kolom Klant in de lijst${X.meta&&X.meta.cust?', gevonden in de titel':''})</span><input id="xcust" value="${esc(X.custEdit!=null?X.custEdit:X.cust)}" placeholder="Naam van de klant"></label>`:'')+xBillToHtml(X);
   const tile=(k,cls,inner,more)=>`<button type="button" class="${cls}" data-act="xdet" data-k="${k}" aria-pressed="${X.det===k}">${inner}<span class="xmore">${X.det===k?'Verberg details':(more||'Details')} \u203a</span></button>`;
   const f=X.pv.f,segB=(k,l,n)=>`<button type="button" data-act="xpvf" data-f="${k}" aria-pressed="${f===k}">${l} <b>${n}</b></button>`;
@@ -318,7 +318,7 @@ function renderXPrev(){
   out.innerHTML=`<div class="ximp-sec"><h4>${esc(X.file)} <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:400">\u00b7 blad "${esc(X.sheet)}"</span></h4>
   <div class="xkpis">
     ${tile('imp','xkpi main',`<b>${nImp}</b><span>opdrachten worden ingepland</span>`,'Toon in de tabel')}
-    ${tile('veh','xkpi',`<b>${plates.size}</b><span>voertuigen</span>`)}
+    ${tile('veh','xkpi',`<b>${plates.size}</b><span>${T.objLangMv}</span>`)}
     ${tile('cus','xkpi',`<b>${cu.size}</b><span>klanten${newC?` \u00b7 ${newC} nieuw`:''}</span>`)}
     ${tile('loc','xkpi',`<b>${locs.size}</b><span>locaties${newL?` \u00b7 ${newL} nieuw`:''}</span>`)}
     ${tile('per','xkpi',`<b style="font-size:16px;line-height:1.7">${per}</b><span>${dates.length} datum(s)</span>`,'Per datum')}
@@ -329,11 +329,11 @@ function renderXPrev(){
   <div class="ximp-sec"><h4>Klant en facturatie</h4>${custH}</div>${blkH}
   <div class="ximp-sec"><h4>Regels uit de lijst</h4>
   <div class="xpv-bar"><div class="seg">${segB('imp','Wordt ingepland',nImp)}${segB('skip','Niet ingepland',nSkip)}${nDup?segB('dup','Bestaat al',nDup):''}${segB('all','Alles',pv.rows.length)}</div>
-  <input class="mini" id="xpvq" type="search" placeholder="Zoek kenteken, klant, plaats\u2026" value="${esc(X.pv.q||'')}" style="flex:1 1 200px;max-width:320px" autocomplete="off"></div>
-  <div class="xpv"><table><thead><tr><th>Status</th><th>Datum</th><th>Tijd</th><th>Duur</th><th>Kenteken</th><th>Klant</th><th>Adres</th><th>Opmerking / reden</th></tr></thead><tbody id="xpvBody">${pv.body}</tbody></table></div>
+  <input class="mini" id="xpvq" type="search" placeholder="Zoek ${T.id}, klant, plaats\u2026" value="${esc(X.pv.q||'')}" style="flex:1 1 200px;max-width:320px" autocomplete="off"></div>
+  <div class="xpv"><table><thead><tr><th>Status</th><th>Datum</th><th>Tijd</th><th>Duur</th><th>${T.Id}</th><th>Klant</th><th>Adres</th><th>Opmerking / reden</th></tr></thead><tbody id="xpvBody">${pv.body}</tbody></table></div>
   <p class="hint" id="xpvMore" style="margin:6px 0 0">${pv.more>0?`En nog ${pv.more} regels; zoek om ze te vinden.`:''}</p>
-  <p class="hint" style="margin:4px 0 0">Duur: met "Duur = lengte van het tijdvak" aan telt een tijdslot tot 60 minuten als duur (gedeeld als meer auto's op hetzelfde adres hetzelfde slot hebben); een langer tijdvak is een venster met de standaardduur; een venster als "tussen 08.00 en 12.00", alleen een begintijd of geen tijd gebruikt de standaardduur van het gekozen type.</p>
-  <p class="hint" style="margin:4px 0 0">Opnieuw importeren is veilig: wat al bestaat (zelfde kenteken, datum en locatie) wordt overgeslagen. Na het importeren staat alles ook in het Importlog.</p></div>`;
+  <p class="hint" style="margin:4px 0 0">Duur: met "Duur = lengte van het tijdvak" aan telt een tijdslot tot ${SLOT_MAX_MIN()} minuten als duur (gedeeld als meer ${T.objMv} op hetzelfde adres hetzelfde slot hebben); een langer tijdvak is een venster met de standaardduur; een venster als "tussen 08.00 en 12.00", alleen een begintijd of geen tijd gebruikt de standaardduur van het gekozen type.</p>
+  <p class="hint" style="margin:4px 0 0">Opnieuw importeren is veilig: wat al bestaat (zelfde ${T.id}, datum en locatie) wordt overgeslagen. Na het importeren staat alles ook in het Importlog.</p></div>`;
   const go=$('#xgo');go.disabled=!nImp;go.textContent=nImp?`${nImp} opdracht${nImp===1?'':'en'} importeren`:'Importeren';
 }
 function doXImport(){
@@ -341,7 +341,7 @@ function doXImport(){
   const log=XIMP.log.map(e=>({...e})),fileName=XIMP.file,fut0=$('#xfuture').checked,today0=todayIso();
   log.forEach(e=>{if(e.status==='ok'&&fut0&&e.date<today0){e.status='past';e.reason='Datum ligt voor vandaag'}});
   const type=$('#xtype').value,slack=+$('#xslack').value||0,slotDur=$('#xslot').checked;
-  if(XIMP.billTo==='__new'&&!xBillName(XIMP)){toast('Vul de naam van de leasemaatschappij in, of kies een bestaande klant bij Factureren aan.');const i=$('#xbillnew');if(i)i.focus();return}
+  if(XIMP.billTo==='__new'&&!xBillName(XIMP)){toast('Vul de naam van de '+T.facturant+' in, of kies een bestaande klant bij Factureren aan.');const i=$('#xbillnew');if(i)i.focus();return}
   if($('#xclear').checked)removeSample();
   let n=0,dup=0,newC=0,newL=0;const dates=new Set(),newLocs=[],slotIds=[],skipIds=[];
   const geenPlan=$('#xgeen')&&!$('#xgeen').checked;
@@ -359,12 +359,12 @@ function doXImport(){
     let lo=D.locations.find(l=>l.customerId===cu.id&&(npc?String(l.postcode||'').replace(/\s/g,'').toUpperCase()===npc&&(!it.addr||!l.address||clean(l.address).toLowerCase()===na):clean(l.address).toLowerCase()===na&&clean(l.city).toLowerCase()===nc));
     if(!lo){const city=it.city&&it.city===it.city.toUpperCase()?it.city.toLowerCase().replace(/(^|[\s-])(\S)/g,(m,a,b)=>a+b.toUpperCase()):it.city||'';lo={id:uid('l'),customerId:cu.id,name:it.addr||'Locatie',address:it.addr,postcode:it.pc,city,info:it.info||'',...(it.lat?{lat:it.lat,lng:it.lng,geo:'pdok',pdokLabel:it.geoLabel||''}:geocode(it.pc,it.city))};D.locations.push(lo);newLocs.push(lo);newL++}
     else if(!lo.info&&it.info)lo.info=it.info;
-    if(D.jobs.some(j=>j.plate===it.plate&&j.date===it.date&&j.locationId===lo.id)){dup++;if(log[it.li]){log[it.li].status='dup';log[it.li].reason='Bestaat al (zelfde kenteken, datum en locatie)'}continue}
+    if(D.jobs.some(j=>j.plate===it.plate&&j.date===it.date&&j.locationId===lo.id)){dup++;if(log[it.li]){log[it.li].status='dup';log[it.li].reason='Bestaat al (zelfde '+T.id+', datum en locatie)'}continue}
     let from=it.from,to=it.to;const len=from&&to?t2m(to)-t2m(from):0;
     if(slack){if(from)from=m2t(Math.max(0,t2m(from)-slack));if(to)to=m2t(Math.min(1439,t2m(to)+slack))}
     const jid=uid('j');if(log[it.li]){log[it.li].status='imp';log[it.li].jobId=jid}
     const isSlot=xIsSlot(len,it.win,slotDur),nShare=share[locKey(it)+'|'+it.date+'|'+it.from+'|'+it.to]||1;
-    if(isSlot&&nShare>1&&log[it.li])log[it.li].reason=`${nShare} auto's in dit tijdslot: duur gedeeld`;
+    if(isSlot&&nShare>1&&log[it.li])log[it.li].reason=`${nShare} ${T.objMv} in dit tijdslot: duur gedeeld`;
     if(isSlot)slotIds.push({id:jid,date:it.date});
     if(geenPlan&&!from&&!to)skipIds.push({id:jid,date:it.date});
     D.jobs.push({id:jid,plate:it.plate,vehicle:it.veh,locationId:lo.id,date:it.date,from,to,type,duration:isSlot?Math.max(5,Math.round(len/nShare)):'',priority:2,notes:it.note});n++;dates.add(it.date);
@@ -388,7 +388,7 @@ const PLATE_RE=/^(?=.*\d)(?=.*[A-Z])[A-Z0-9]{1,3}-[A-Z0-9]{1,3}-[A-Z0-9]{1,3}$/;
 const isPlate=v=>{const p=clean(v).toUpperCase().replace(/\s/g,'');return PLATE_RE.test(p)||(/^[A-Z0-9]{6}$/.test(p)&&/\d/.test(p)&&/[A-Z]/.test(p))};
 const MONTHS_RE=/\b(jan|feb|mrt|maa|apr|mei|jun|jul|aug|sep|okt|nov|dec)[a-z]*\b\s*,/i;
 function custFromTitle(t,login){
-  let c=clean(t).replace(/^overzicht\s+(gereinigde\s+)?(auto['’]?s|voertuigen|wagens)?\s*(van|voor)?\s*/i,'').split(':')[0].split(/\s[-\u2013]\s/)[0].trim();
+  let c=clean(t).replace(new RegExp('^overzicht\\s+(gereinigde\\s+)?('+((PRF&&PRF.import&&PRF.import.objTitel)||"auto['’]?s|voertuigen|wagens")+')?\\s*(van|voor)?\\s*','i'),'').split(':')[0].split(/\s[-\u2013]\s/)[0].trim();
   if(!c&&login){const m=/@([\w.-]+)/.exec(login);if(m)c=m[1].length<=4?m[1].toUpperCase():m[1].charAt(0).toUpperCase()+m[1].slice(1)}
   if(c&&c===c.toLowerCase())c=c.replace(/(^|\s)(\S)/g,(m,a,b)=>a+b.toUpperCase());
   return c;
@@ -432,7 +432,7 @@ function restInfo(appt,rest){
 function parseBlocks(rows,opts={}){
   const names=opts.names||{},items=[],skipped=[],stat={nb:0,cancel:0,reasons:{}},badCity={},log=[],lookups=new Map(),blocks=[];
   let blk=null,group='',pendingTitle=[];
-  const isHeader=r=>r&&/kenteken/i.test(clean(r[0]));
+  const isHeader=r=>r&&prfRe('id','kenteken').test(clean(r[0]));
   for(let r=0;r<rows.length;r++){
     const row=rows[r]||[];if(!row.some(v=>clean(v)))continue;
     if(isHeader(row)){
@@ -440,7 +440,7 @@ function parseBlocks(rows,opts={}){
       const bi=blocks.length,auto=custFromTitle(tcell,meta.login)||`Klant (rij ${r})`;
       const H=row.map(c=>clean(c).toLowerCase());const find=re=>H.findIndex((h,i)=>i>0&&re.test(h));
       blk={i:bi,row:r+1,title:tcell,autoName:auto,cust:clean(names[bi]!=null?names[bi]:auto)||auto,meta,city:cityFromText(tcell),
-        addrIdx:find(/adres|locatie|straat/),cityIdx:find(/plaats|stad/),vehIdx:find(/voertuig|merk|model|type auto/),plates:0,ok:0,future:0,lookups:0};
+        addrIdx:find(/adres|locatie|straat/),cityIdx:find(/plaats|stad/),vehIdx:find(prfRe('obj','voertuig|merk|model|type auto')),plates:0,ok:0,future:0,lookups:0};
       if(blk.addrIdx<0&&blk.cityIdx>=0){blk.addrIdx=blk.cityIdx;blk.cityIdx=-1}
       if(blk.addrIdx<0)blk.addrIdx=1;
       blocks.push(blk);pendingTitle=[];group='';continue;
@@ -453,7 +453,7 @@ function parseBlocks(rows,opts={}){
       if(blk){const t=row.map(clean).filter(Boolean).filter(v=>!/\d{1,2}[:.]\d{2}/.test(v)).join(' ');group=/samen met\s*$/i.test(t)?'':t}
       continue;
     }
-    if(!blk){skipped.push(`Rij ${r+1}: voertuig zonder kolomnamen erboven`);continue}
+    if(!blk){skipped.push(`Rij ${r+1}: ${T.objLang} zonder kolomnamen erboven`);continue}
     const plate=c0.toUpperCase().replace(/\s/g,''),cust=blk.cust;blk.plates++;
     const cityCell=blk.cityIdx>=0?clean(row[blk.cityIdx]):'',cityOk=cityCell&&!/\d/.test(cityCell)&&!MONTHS_RE.test(cityCell+',')&&!/route|samen|bij\s/i.test(cityCell)&&cityCell.length<=40;
     const used=new Set([0,blk.addrIdx,blk.vehIdx,cityOk?blk.cityIdx:-1]);
@@ -498,7 +498,7 @@ function parseBlocks(rows,opts={}){
     }
     if(!appts.length)log.push({row:r+1,plate,cust,city,addr,pc,veh,per:'',date:'',time:'',note:extra.join(' · '),status:'nb',reason:'Geen datum in de lijst'});
   }
-  if(!blocks.length)return{error:'Geen rij met "Kenteken" gevonden.'};
+  if(!blocks.length)return{error:'Geen rij met "'+T.Id+'" gevonden.'};
   return{items,skipped,stat,badCity,log,lookups:[...lookups.values()],blocks,multi:true};
 }
 
@@ -512,7 +512,7 @@ function curLog(){const L=importLogs();return L.find(x=>x.id===S.logId)||L[L.len
 const nextWorkday=d=>{let x=addDays(d,1);while([0,6].includes(wday(x)))x=addDays(x,1);return x};
 function viewImportLog(){
   const L=importLogs(),lg=curLog();
-  if(!lg){LOGSRC=null;return`<section class="panel empty"><h2>Nog geen import</h2><p>Na het importeren van een Excel-lijst zie je hier per voertuig wat er met elke afspraak is gebeurd, en kun je afspraken alsnog inplannen.</p><button class="btn primary" data-act="ximport">${I.imp} Excel importeren</button></section>`}
+  if(!lg){LOGSRC=null;return`<section class="panel empty"><h2>Nog geen import</h2><p>Na het importeren van een Excel-lijst zie je hier per ${T.objLang} wat er met elke afspraak is gebeurd, en kun je afspraken alsnog inplannen.</p><button class="btn primary" data-act="ximport">${I.imp} Excel importeren</button></section>`}
   if(!LOGSRC||LOGSRC.id!==lg.id||LOGSRC.preview){LOGSRC={entries:lg.entries,preview:false,id:lg.id};LOGSEL=new Set()}
   const custs=[...new Set(lg.entries.map(e=>e.cust))].sort();
   return`<section class="panel sec"><div class="toolbar"><h2>Importlog</h2>
@@ -548,9 +548,9 @@ function openLogFix(i){
   const cityProb=e.status==='city';
   openForm({title:cityProb?'Adres aanvullen en inplannen':'Afspraak alsnog inplannen',okLabel:'Afspraak aanmaken',
     note:`${e.plate} · ${e.cust} · ${(LOGST[e.status]||[e.status])[0]}${e.reason?': '+e.reason:''}${e.date?' (oorspronkelijk '+fdate(e.date,{day:'numeric',month:'short',year:'numeric'})+')':''}`,
-    fields:[{k:'h1',type:'heading',label:'Voertuig en klant'},{k:'plate',label:'Kenteken',req:1},{k:'veh',label:'Voertuig'},{k:'cust',label:'Klant',req:1,wide:1},
+    fields:[{k:'h1',type:'heading',label:T.ObjLang+' en klant'},{k:'plate',label:T.Id,req:1},{k:'veh',label:T.objVeld},{k:'cust',label:'Klant',req:1,wide:1},
       {k:'h2',type:'heading',label:cityProb?'Locatie (aanvullen: postcode of juiste plaats)':'Locatie'},{k:'addr',label:'Adres',wide:1},{k:'pc',label:'Postcode',ph:'1234 AB'},{k:'city',label:'Plaats'},
-      {k:'h3',type:'heading',label:'Afspraak'},{k:'date',label:'Datum',type:'date',req:1},{k:'type',label:'Type reiniging',type:'select',options:D.types.map(t=>[t.id,`${t.name} (${t.dur} min)`])},
+      {k:'h3',type:'heading',label:'Afspraak'},{k:'date',label:'Datum',type:'date',req:1},{k:'type',label:T.TypeVeld,type:'select',options:D.types.map(t=>[t.id,`${t.name} (${t.dur} min)`])},
       {k:'from',label:'Tijdvak vanaf',type:'time'},{k:'to',label:'Tijdvak tot',type:'time'},{k:'duration',label:'Duur (min, leeg = standaard type)',type:'number'},{k:'note',label:'Opmerking',wide:1}],
     values:vals,
     onSave:v=>{
@@ -575,8 +575,8 @@ function openLogMove(i){
 function openLogBulk(){
   const ids=[...LOGSEL].map(i=>[i,logEntry(i)]).filter(([,e])=>e&&!(e.status==='imp'&&JOB[e.jobId]));
   if(!ids.length){toast('Selecteer regels die (nog) geen afspraak hebben.');return}
-  openForm({title:`${ids.length} afspraken alsnog inplannen`,okLabel:'Inplannen',note:'Elke geselecteerde auto krijgt een afspraak op de gekozen datum, op hetzelfde adres. Regels met een onbekende plaats worden overgeslagen: vul die eerst per regel aan.',
-    fields:[{k:'date',label:'Datum',type:'date',req:1},{k:'type',label:'Type reiniging',type:'select',options:D.types.map(t=>[t.id,`${t.name} (${t.dur} min)`])},
+  openForm({title:`${ids.length} afspraken alsnog inplannen`,okLabel:'Inplannen',note:'Elke geselecteerde '+T.obj+' krijgt een afspraak op de gekozen datum, op hetzelfde adres. Regels met een onbekende plaats worden overgeslagen: vul die eerst per regel aan.',
+    fields:[{k:'date',label:'Datum',type:'date',req:1},{k:'type',label:T.TypeVeld,type:'select',options:D.types.map(t=>[t.id,`${t.name} (${t.dur} min)`])},
       {k:'keep',label:'Tijdvak',type:'select',options:[['1','Oorspronkelijk tijdvak aanhouden'],['0','Geen tijdvak (hele dag)']]}],values:{date:nextWorkday(todayIso()),type:D.types[0].id,keep:'1'},
     onSave:v=>{if(v.date<todayIso())return'Kies een datum vanaf vandaag.';let n=0,skip=0;
       for(const[,e]of ids){if(e.status==='city'||(!e.pc&&!e.city)||D.jobs.some(j=>j.plate===e.plate&&j.date===v.date)){skip++;continue}
@@ -617,7 +617,7 @@ function bcRow(j,s){
 let BCST={month:'',data:{},loading:false,err:'',demo:false};
 function bcMonths(){const ms=[...new Set(D.jobs.map(j=>j.date.slice(0,7)))].sort();const cur=todayIso().slice(0,7);if(!ms.includes(cur))ms.push(cur);return ms.sort()}
 function demoStatuses(month){
-  const out={},today=todayIso(),R=['Auto niet aanwezig','Geen toegang tot de locatie'];
+  const out={},today=todayIso(),R=(PRF&&PRF.redenen)||['Auto niet aanwezig','Geen toegang tot de locatie'];
   for(const d of Object.keys(D.plans).filter(d=>d.slice(0,7)===month&&d<=today)){const P=D.plans[d];out[d]={};
     for(const wid in P.routes||{})for(const id of P.routes[wid]){if(!JOB[id])continue;let h=2166136261;for(const ch of id+d){h^=ch.charCodeAt(0);h=Math.imul(h,16777619)>>>0}h%=100;
       if(h<84)out[d][id]={st:'done',at:`${d}T${String(8+h%8).padStart(2,'0')}:${String((h*7)%60).padStart(2,'0')}:00`,wid};else if(h<94)out[d][id]={st:'issue',reason:R[h%2],note:'',at:`${d}T10:15:00`,wid}}}
@@ -668,7 +668,7 @@ function viewBC(){
     ${missC.length||missT.length?`<div class="bcwarn"><b>Nog niet compleet voor BC:</b> ${missC.length?`${missC.length} klant(en) zonder debiteurnummer (${missC.slice(0,4).map(c=>`<button class="linkbtn" data-act="editcus" data-id="${c.id}">${esc(c.name)}</button>`).join(', ')})`:''}${missC.length&&missT.length?' · ':''}${missT.length?`${missT.length} type(s) zonder artikelnummer (${missT.map(t=>`<button class="linkbtn" data-act="edittype" data-id="${t.id}">${esc(t.name)}</button>`).join(', ')})`:''}</div>`:''}
     ${sum?`<div class="tbl-wrap"><table><thead><tr><th>Klant</th><th>Gereed</th><th>Niet gelukt</th><th>Niet beschikbaar</th><th>Factureerbaar</th><th>Niet gelukt naar BC</th><th></th></tr></thead><tbody>${sum}</tbody></table></div>`:''}</section>
   <section class="panel sec"><div class="toolbar"><h2>Regels</h2><span class="small muted">${sent.length} naar BC · ${all.length-sent.length} niet</span><span class="sp"></span>${sel('c',[['','Alle klanten'],...Object.values(byC).map(o=>[o.c.id||'',o.c.name||'?'])])}${sel('k',[['','Alle regels'],['send','Naar BC'],['skip','Niet naar BC'],['bill','Factureerbaar'],['miss','Koppeling ontbreekt']])}</div>
-    ${tr?`<div class="tbl-wrap" style="max-height:62vh;overflow:auto"><table><thead><tr><th>Datum</th><th>Kenteken</th><th>Klant</th><th>Locatie</th><th>Type</th><th>Medewerker</th><th>Melding</th><th>Factureerbaar</th><th>Naar BC</th><th>In BC</th></tr></thead><tbody>${tr}</tbody></table></div>`:`<p class="empty">${all.length?'Geen regels in deze selectie.':'Nog geen gereed- of niet-gelukt-meldingen in deze maand.'}</p>`}</section>`;
+    ${tr?`<div class="tbl-wrap" style="max-height:62vh;overflow:auto"><table><thead><tr><th>Datum</th><th>${T.Id}</th><th>Klant</th><th>Locatie</th><th>Type</th><th>Medewerker</th><th>Melding</th><th>Factureerbaar</th><th>Naar BC</th><th>In BC</th></tr></thead><tbody>${tr}</tbody></table></div>`:`<p class="empty">${all.length?'Geen regels in deze selectie.':'Nog geen gereed- of niet-gelukt-meldingen in deze maand.'}</p>`}</section>`;
 }
 function bcSync(){return((D.bcSync||{})[BCST.month])||null}
 function bcInBC(r){const x=bcSync();if(!x)return'<span class="muted small">—</span>';const b=(x.bc||{})[r.api.externalId],e=(x.errors||[]).find(q=>q.externalId===r.api.externalId);
@@ -726,7 +726,7 @@ function liveOne(e,memo){
 }
 function logShell(custs){
   const ms=[...new Set(LOGSRC.entries.map(e=>(e.date||'').slice(0,7)).filter(Boolean))].sort();
-  return`<div class="logbar"><div id="logChips" class="row"></div><div class="row"><select id="logM" class="mini" aria-label="Maand"><option value="">Alle maanden</option>${ms.map(m=>`<option value="${m}"${LOGF.m===m?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>${custs&&custs.length>1?`<select id="logC" class="mini" aria-label="Klant"><option value="">Alle klanten</option>${custs.map(c=>`<option${LOGF.c===c?' selected':''}>${esc(c)}</option>`).join('')}</select>`:''}<label class="jf"><span>Van</span><input type="date" class="mini" id="logFrom" value="${esc(LOGF.from||'')}"></label><label class="jf"><span>Tot en met</span><input type="date" class="mini" id="logTo" value="${esc(LOGF.to||'')}"></label><label class="jf"><span>Sorteren</span><select id="logSort" class="mini">${[['date','Datum oplopend'],['date-','Datum aflopend'],['row','Volgorde in Excel'],['cust','Klant'],['plate','Kenteken']].map(([v,l])=>`<option value="${v}"${(LOGF.sort||'date')===v?' selected':''}>${l}</option>`).join('')}</select></label><label class="search" style="flex:0 1 260px"><input type="search" id="logQ" value="${esc(LOGF.q)}" placeholder="Zoek kenteken, klant, plaats of reden" aria-label="Zoek in log" autocomplete="off"></label></div></div><div id="logBulk"></div><div id="logTbl"></div>`;
+  return`<div class="logbar"><div id="logChips" class="row"></div><div class="row"><select id="logM" class="mini" aria-label="Maand"><option value="">Alle maanden</option>${ms.map(m=>`<option value="${m}"${LOGF.m===m?' selected':''}>${esc(fdate(m+'-01',{month:'long',year:'numeric'}))}</option>`).join('')}</select>${custs&&custs.length>1?`<select id="logC" class="mini" aria-label="Klant"><option value="">Alle klanten</option>${custs.map(c=>`<option${LOGF.c===c?' selected':''}>${esc(c)}</option>`).join('')}</select>`:''}<label class="jf"><span>Van</span><input type="date" class="mini" id="logFrom" value="${esc(LOGF.from||'')}"></label><label class="jf"><span>Tot en met</span><input type="date" class="mini" id="logTo" value="${esc(LOGF.to||'')}"></label><label class="jf"><span>Sorteren</span><select id="logSort" class="mini">${[['date','Datum oplopend'],['date-','Datum aflopend'],['row','Volgorde in Excel'],['cust','Klant'],['plate',T.Id]].map(([v,l])=>`<option value="${v}"${(LOGF.sort||'date')===v?' selected':''}>${l}</option>`).join('')}</select></label><label class="search" style="flex:0 1 260px"><input type="search" id="logQ" value="${esc(LOGF.q)}" placeholder="Zoek ${T.id}, klant, plaats of reden" aria-label="Zoek in log" autocomplete="off"></label></div></div><div id="logBulk"></div><div id="logTbl"></div>`;
 }
 function logFiltered(all){
   const q=LOGF.q.trim().toLowerCase(),qp=normPlate(q);
@@ -745,7 +745,7 @@ function logRefresh(){
   $('#logChips').innerHTML=chips.map(([k,l,n])=>`<button class="fchip" data-act="logf" data-k="${k}" aria-pressed="${LOGF.st===k}">${esc(l)} <span>${n}</span></button>`).join('');
   const rows=logSort(logFiltered(all)),shown=rows.slice(0,500);
   const city=c=>c?(c===c.toUpperCase()?c.charAt(0)+c.slice(1).toLowerCase():c):'';
-  $('#logTbl').innerHTML=rows.length?`<div class="tbl-wrap" style="max-height:${LOGSRC.preview?'300px':'56vh'};overflow:auto"><table><thead><tr>${LOGSRC.preview?'':`<th style="width:28px"><input type="checkbox" id="logAll" aria-label="Alles selecteren"${shown.length&&shown.every(e=>LOGSEL.has(e.i))?' checked':''}></th>`}<th>Rij</th><th>Kenteken</th><th>Klant · plaats</th><th>Datum</th><th>Tijdslot</th><th>Status</th><th>Toelichting</th><th></th></tr></thead><tbody>${shown.map(e=>{const s=LOGST[e.st]||[e.st,''];
+  $('#logTbl').innerHTML=rows.length?`<div class="tbl-wrap" style="max-height:${LOGSRC.preview?'300px':'56vh'};overflow:auto"><table><thead><tr>${LOGSRC.preview?'':`<th style="width:28px"><input type="checkbox" id="logAll" aria-label="Alles selecteren"${shown.length&&shown.every(e=>LOGSEL.has(e.i))?' checked':''}></th>`}<th>Rij</th><th>${T.Id}</th><th>Klant · plaats</th><th>Datum</th><th>Tijdslot</th><th>Status</th><th>Toelichting</th><th></th></tr></thead><tbody>${shown.map(e=>{const s=LOGST[e.st]||[e.st,''];
       return`<tr${e.done?' class="muted-row"':''}>${LOGSRC.preview?'':`<td><input type="checkbox" data-logsel="${e.i}"${LOGSEL.has(e.i)?' checked':''} aria-label="Selecteer ${esc(e.plate)}"></td>`}<td class="mono small">${e.row}</td><td>${plateHtml(e.plate)}</td><td><b>${esc(e.cust)}</b><div class="small muted">${esc(city(e.city))}</div></td><td class="mono small">${e.date?esc(fdate(e.date,{weekday:'short',day:'numeric',month:'short'})):esc(e.per||'—')}</td><td class="mono small">${esc(e.time||'')}</td><td><span class="chip ${s[1]}">${esc(s[0])}</span>${e.fixed?'<div class="small muted" style="margin-top:3px">alsnog ingepland</div>':''}${e.done?'<div class="small muted" style="margin-top:3px">afgehandeld</div>':''}</td><td class="small">${esc(e.reason||'')}${e.note&&e.note!==e.reason?`<div class="muted">${esc(e.note)}</div>`:''}</td><td class="act"><div class="logacts">${LOGSRC.preview?(e.st==='unplanned'?`<button class="btn sm" data-act="propose" data-ids="${e.jobId}">${I.auto} Voorstel</button>`:''):logActs(e)}</div></td></tr>`}).join('')}</tbody></table></div>${rows.length>500?`<p class="hint">De eerste 500 van ${rows.length} regels worden getoond. Verfijn het filter.</p>`:''}`
     :'<p class="empty">Geen regels voor dit filter.</p>';
   logBulkBar();
@@ -761,7 +761,7 @@ function logActs(e){
 function openLog(){S.tab='importlog';LOGSRC=null;const lg=curLog();if(lg){const all=liveEntries({entries:lg.entries});LOGF={st:all.some(e=>PROBLEM.has(e.st)&&!e.done)?'probleem':'alle',q:'',m:'',c:''}}if(!$('#modal').hidden)closeForm();render();window.scrollTo(0,0)}
 function logCsv(){
   const rows=logFiltered(liveEntries(LOGSRC)),q=v=>{const s=String(v??'');return/[;"\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s};
-  const lines=[['Rij','Kenteken','Klant','Plaats','Periode','Datum','Tijdslot','Status','Toelichting','Opmerking'].join(';')].concat(rows.map(e=>[e.row,e.plate,e.cust,e.city,e.per,e.date,e.time,(LOGST[e.st]||[e.st])[0],e.reason,e.note].map(q).join(';')));
+  const lines=[['Rij',T.Id,'Klant','Plaats','Periode','Datum','Tijdslot','Status','Toelichting','Opmerking'].join(';')].concat(rows.map(e=>[e.row,e.plate,e.cust,e.city,e.per,e.date,e.time,(LOGST[e.st]||[e.st])[0],e.reason,e.note].map(q).join(';')));
   copyText(lines.join('\n'),`${rows.length} regels gekopieerd. Plak ze in Excel.`);
 }
 

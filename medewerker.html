@@ -137,9 +137,9 @@ textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:1
 </style>
 <style>[hidden]{display:none!important}body{margin:0}img{max-width:100%}:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}</style>
 </head>
-<body>
+<body data-profiel-titel="app">
 
-<header class="top gut"><div class="wrap"><div class="brand"><svg width="22" height="22" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="currentColor"/></svg>Mijn Wasroute</div><div class="who" id="who"></div><button class="mbtn" data-act="msgs" id="mbtn" aria-label="Berichten van de planner"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><b id="mcount" hidden></b></button></div></header>
+<header class="top gut"><div class="wrap"><div class="brand"><svg width="22" height="22" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="currentColor"/></svg><span data-profiel="appNaam">Mijn Wasroute</span></div><div class="who" id="who"></div><button class="mbtn" data-act="msgs" id="mbtn" aria-label="Berichten van de planner"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><b id="mcount" hidden></b></button></div></header>
 <nav class="daynav gut" aria-label="Dag kiezen"><div class="wrap">
   <div style="display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px">
     <button class="arrow" data-act="day" data-d="-1" aria-label="Vorige dag"><svg class="ic" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -151,7 +151,11 @@ textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:1
 <main class="gut"><div class="wrap" id="app"></div></main>
 <div id="toast" hidden></div>
 
+<script src="js/00-profiel.js"></script>
+<script src="profielen/wassen.js"></script>
+<script src="profielen/schoonmaak-gebouwen.js"></script>
 <script>
+profielKies('wassen');
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -210,6 +214,7 @@ async function load(quiet){
     if(!r.ok){S.err=d.error||('Er ging iets mis ('+r.status+').')}
     else{d.status=d.status||{};
       for(const q of getQ())if(q.date===d.date){if(q.st==='open')delete d.status[q.jobId];else d.status[q.jobId]={st:q.st,at:q.at,reason:q.reason,note:q.note,pending:true}}
+      if(d.route&&d.route.profiel&&(!PRF||PRF.id!==d.route.profiel))profielKies(d.route.profiel);
       if(d.date===S.date){S.data=d;S.dates=d.dates||S.dates;S.err=''}}
   }catch(e){S.err='offline'}
   S.loading=false;if(!S.form||!quiet)render();
@@ -246,7 +251,7 @@ async function loadMsgs(){
   un.forEach(m=>MSG_SEEN.add(m.id));if(!MSG_SEEN.size)MSG_SEEN.add('_');
   msgBadge();if(S.view==='msgs'){markRead();render()}else if(!S.form&&(fresh.length||S.data))render();
 }
-function msgBadge(){const n=unreadMsgs().length,b=$('#mcount');b.hidden=!n;b.textContent=n;$('#mbtn').setAttribute('aria-label',n?`Berichten van de planner, ${n} nieuw`:'Berichten van de planner');document.title=(n?`(${n}) `:'')+'Mijn Wasroute'}
+function msgBadge(){const n=unreadMsgs().length,b=$('#mcount');b.hidden=!n;b.textContent=n;$('#mbtn').setAttribute('aria-label',n?`Berichten van de planner, ${n} nieuw`:'Berichten van de planner');document.title=(n?`(${n}) `:'')+T.appNaam}
 async function markRead(ids){
   const un=unreadMsgs().filter(m=>!ids||ids.includes(m.id));if(!un.length)return;
   const now=new Date().toISOString();un.forEach(m=>m.readAt=now);msgBadge();
@@ -282,7 +287,9 @@ function dayHeader(){
   $('#dchips').innerHTML=ds.map(d=>`<button data-act="goto" data-date="${d}" aria-pressed="${d===S.date}">${d===TODAY?'Vandaag':esc(fdate(d,{weekday:'short',day:'numeric',month:'short'}))}</button>`).join('');
 }
 const mapsUrl=v=>'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent([v.address,[v.postcode,v.city].filter(Boolean).join(' ')].filter(Boolean).join(', ')||`${v.lat},${v.lng}`);
-const REASONS=['Auto niet aanwezig','Geen toegang tot de locatie','Schade of niet goed te reinigen','Anders'];
+/* Redenen als een opdracht niet lukt: uit het profiel */
+const REASONS_STD=['Auto niet aanwezig','Geen toegang tot de locatie','Schade of niet goed te reinigen','Anders'];
+const redenen=()=>(PRF&&PRF.redenen)||REASONS_STD;
 /* Foto bij oplevering: de telefoon-camera, verkleind tot JPEG en opgeslagen bij de afspraak */
 function fotoBtn(j){
   const n=(S.foto||{})[j.id]||0;
@@ -320,7 +327,7 @@ function carHtml(j,st){
     act=`<textarea id="note" placeholder="Opmerking voor de planner, bijv. lichte kras linksvoor of extra vuil interieur">${esc(s&&s.note||'')}</textarea>
       <div class="acts"><button class="big ok" data-act="sendnote" data-id="${esc(j.id)}">${IC.check} Gereed met opmerking</button><button class="big alt" data-act="cancel">Annuleren</button></div>`;
   }else if(S.form===j.id){
-    act=`<div class="reasons" role="radiogroup" aria-label="Wat is er aan de hand?">${REASONS.map((r,i)=>`<label><input type="radio" name="rs" value="${esc(r)}"${i===0?' checked':''}> ${esc(r)}</label>`).join('')}</div>
+    act=`<div class="reasons" role="radiogroup" aria-label="Wat is er aan de hand?">${redenen().map((r,i)=>`<label><input type="radio" name="rs" value="${esc(r)}"${i===0?' checked':''}> ${esc(r)}</label>`).join('')}</div>
       <textarea id="note" placeholder="Toelichting (optioneel)"></textarea>
       <div class="acts"><button class="big bad" data-act="sendissue" data-id="${esc(j.id)}">${IC.warn} Probleem melden</button><button class="big alt" data-act="cancel">Annuleren</button></div>`;
   }else if(!s){
@@ -339,7 +346,7 @@ function visitHtml(v,st){
   return`<li class="visit${all?' alldone':''}"><div class="vhead"><div class="vtime">${esc(v.start||v.arrive)}<small>aankomst ${esc(v.arrive)}</small></div>
     <h2 class="vname">${esc(v.nr)}. ${esc(v.customer)}</h2><a class="addr" href="${esc(mapsUrl(v))}" target="_blank" rel="noopener">${esc(place)}</a></div>
     <div class="vbody">
-      <div class="meta">${v.jobs.length} ${v.jobs.length===1?'auto':"auto's"} · reinigen ${esc(v.start)}–${esc(v.end)}${v.travel?` · ${esc(v.travel)} min rijden`:''}</div>
+      <div class="meta">${v.jobs.length} ${nObj(v.jobs.length)} · ${T.werk} ${esc(v.start)}–${esc(v.end)}${v.travel?` · ${esc(v.travel)} min rijden`:''}</div>
       ${v.info?`<div class="info"><b>Locatie-info</b>${esc(v.info)}</div>`:''}
       ${v.custNote?`<div class="info"><b>Opmerking klant</b>${esc(v.custNote)}</div>`:''}
       ${v.contact||v.phone||v.login?`<div class="contact">${v.contact?`<span>${esc(v.contact)}</span>`:''}${v.phone?`<a href="tel:${esc(tel)}">${esc(v.phone)}</a>`:''}${v.login?`<span>Inlog <code>${esc(v.login)}</code> <button class="minibtn" data-act="copy" data-v="${esc(v.login)}">Kopieer</button></span>`:''}</div>`:''}
@@ -362,7 +369,7 @@ function render(){
   if(!r){a.innerHTML=h+'<div class="msg"><h2>Nog geen planning</h2>Voor deze dag is nog geen planning gepubliceerd. Kijk later nog eens of vraag het de planner.</div>';return}
   if(!r.visits||!r.visits.length){a.innerHTML=h+`<div class="msg"><h2>${r.off?'Vrij':'Geen afspraken'}</h2>${esc(r.off||'Er staan voor deze dag geen afspraken voor je gepland.')}</div>`;return}
   const jobs=r.visits.flatMap(v=>v.jobs),done=jobs.filter(j=>st[j.id]&&st[j.id].st==='done').length,iss=jobs.filter(j=>st[j.id]&&st[j.id].st==='issue').length;
-  h+=`<section class="sum"><div class="sumrow"><div><span>Vertrek</span><b>${esc(r.depart||'')}</b></div><div><span>Bezoeken</span><b>${r.visits.length}</b></div><div><span>Auto's</span><b>${jobs.length}</b></div><div><span>Terug</span><b>${esc(r.finish||'')}</b></div></div>
+  h+=`<section class="sum"><div class="sumrow"><div><span>Vertrek</span><b>${esc(r.depart||'')}</b></div><div><span>Bezoeken</span><b>${r.visits.length}</b></div><div><span>${T.ObjMv}</span><b>${jobs.length}</b></div><div><span>Terug</span><b>${esc(r.finish||'')}</b></div></div>
     <div class="prog" role="progressbar" aria-valuemin="0" aria-valuemax="${jobs.length}" aria-valuenow="${done}"><i style="width:${jobs.length?Math.round((done+iss)/jobs.length*100):0}%"></i></div>
     <p>${done} van ${jobs.length} gereed${iss?` · ${iss} met probleem`:''}${r.shift&&r.shift.note?` · <span class="shift">Werktijd vandaag ${esc(r.shift.start)}–${esc(r.shift.end)} (${esc(r.shift.note)})</span>`:''}</p></section>`;
   const evs=[{t:r.depart,o:0,k:'dep'},...r.visits.map(v=>({t:v.arrive,o:1,k:'v',v})),...(r.pauses||[]).map(p=>({t:p.from,o:2,k:'p',p})),{t:r.finish,o:3,k:'end'}].filter(e=>e.t).sort((x,y)=>x.t===y.t?x.o-y.o:x.t<y.t?-1:1);

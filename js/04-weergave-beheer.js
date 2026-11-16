@@ -4,7 +4,7 @@ function toast(msg,ms){const t=$('#toast');t.textContent=msg;t.hidden=false;clea
 /* ---------- menu: indeling instelbaar via Beheer > Menu indelen ---------- */
 const MENU_ITEMS={
   'planning':['Planning','Dagplanning, kaart en meldingen'],
-  'opdrachten':['Overzicht opdrachten','Alle reinigingsopdrachten zoeken en wijzigen'],
+  'opdrachten':['Overzicht opdrachten',T.opdrachtenUitleg||'Alle opdrachten zoeken en wijzigen'],
   'importlog':['Importlog','Wat er met elke geïmporteerde afspraak gebeurde'],
   'act:import':['Excel importeren','Nieuwe lijst inlezen en plannen'],
   'klanten':['Klanten & locaties','Klanten, adressen en locatie-info'],
@@ -12,13 +12,15 @@ const MENU_ITEMS={
   'afwezigheid':['Afwezigheid','Verlofkalender, ziekte, training en verlofsaldo'],
   'act:msgs':['Berichten','Berichten naar de app van medewerkers'],
   'instellingen:planning':['Planning en reistijd','Rekenregels, pauze, werkdag en rijtijden'],
-  'instellingen:types':['Reinigingstypes','Soorten reiniging, duur en vaardigheden'],
+  'instellingen:types':[T.Types||'Reinigingstypes',T.TypesUitleg||'Soorten reiniging, duur en vaardigheden'],
   'instellingen:data':['Gegevens en back-up','Back-up kopiëren of terugzetten'],
   'instellingen:archief':['Archief','Gereed gemelde bezoeken archiveren, bekijken en oude planningen opruimen'],
   'instellingen:menu':['Menu indelen','Kies wat in het hoofdmenu en in de groepen staat'],
   'act:logout':['Uitloggen','App-wachtwoord vergeten op deze computer'],
   'facturatie':['Business Central interface','Gereedmeldingen per maand naar BC voor facturatie'],
   'instellingen:api':['API koppelingen','Business Central testen en exporteren, rijtijden, adressen en AI']};
+/* Menu-teksten die van het profiel afhangen: bijgewerkt bij elke profielkeuze */
+function menuProfiel(){MENU_ITEMS['opdrachten'][1]=T.opdrachtenUitleg;MENU_ITEMS['instellingen:types']=[T.Types,T.TypesUitleg];if(typeof MENU_SHORT!=='undefined'&&MENU_SHORT['instellingen:types'])MENU_SHORT['instellingen:types']=T.Types}
 const MENU_SHORT={'opdrachten':'Overzicht','medewerkers':'Gegevens'};
 const menuDefault=()=>({top:['planning','g:opdr','klanten','g:mw','g:beheer'],groups:{opdr:{l:'Opdrachten',items:['opdrachten','importlog','facturatie','act:import']},mw:{l:'Medewerkers',items:['medewerkers','afwezigheid','act:msgs']},beheer:{l:'Beheer',items:['instellingen:planning','instellingen:types','instellingen:data','instellingen:archief','instellingen:api','instellingen:menu','act:logout']}},hidden:[]});
 function menuCfg(){
@@ -138,11 +140,11 @@ function viewWeek(){
       if(!ids.length)return`<td class="wk-cell"><button class="wk-hit" data-act="gotoday" data-date="${d}" data-wid="${w.id}" aria-label="${esc(w.name)} op ${esc(fdate(d))}"><span class="small muted">—</span></button></td>`;
       const s=x.sims[w.id]||simulate(w,ids,d),stops=s.stops.map(p=>(CUS[p.loc.customerId]||{}).name||'');const u=Math.min(100,Math.round(s.serv/Math.max(1,s.end-s.start)*100));
       return`<td class="wk-cell has" style="--c:${wc(w)}"><button class="wk-hit" data-act="gotoday" data-date="${d}" data-wid="${w.id}" title="${esc(stops.join(', '))}">
-        <b>${s.n} voert.</b> <span class="small muted">${m2t(s.depart)}–${m2t(s.finish)}</span>
+        <b>${s.n} ${T.objKort||"voert."}</b> <span class="small muted">${m2t(s.depart)}–${m2t(s.finish)}</span>
         <span class="wk-bar"><i style="width:${u}%"></i></span>
         <span class="small">${esc([...new Set(stops)].slice(0,3).join(', '))}${new Set(stops).size>3?' …':''}</span>
         <span class="small muted">${fkm(s.km)} · ${fdur(s.trav)} rijden</span>${s.lateJobs.length||s.over>.5?'<span class="chip bad">let op</span>':''}</button></td>`}).join('')}</tr>`).join('');
-  return`<section class="panel kpis"><div class="kpi ${unT?'':'okk'}"><b>${pl} / ${tot}</b><span>voertuigen gepland deze week</span></div><div class="kpi ${unT?'bad':'okk'}"><b>${unT}</b><span>niet ingepland</span></div><div class="kpi"><b>${days.filter((d,i)=>st[i].jobs.length).length}</b><span>dagen met opdrachten</span></div>
+  return`<section class="panel kpis"><div class="kpi ${unT?'':'okk'}"><b>${pl} / ${tot}</b><span>${T.objLangMv} gepland deze week</span></div><div class="kpi ${unT?'bad':'okk'}"><b>${unT}</b><span>niet ingepland</span></div><div class="kpi"><b>${days.filter((d,i)=>st[i].jobs.length).length}</b><span>dagen met opdrachten</span></div>
     <div class="acts"><span class="small muted">Klik op een dag of medewerker om de dagplanning te openen · pijltjestoetsen = vorige/volgende week</span></div></section>
     <section class="panel sec"><h2>${esc(weekLabel(S.date))}</h2><div class="tbl-wrap wk-wrap"><table class="wk"><thead><tr><th></th>${head}</tr></thead><tbody>${body||'<tr><td colspan="8" class="empty">Nog geen medewerkers</td></tr>'}</tbody></table></div></section>`;
 }
@@ -174,10 +176,10 @@ function viewPlanning(){
   const warn=late+over+rows.filter(w=>!avail(w,st.date)).length;
   const edited=P.edited?`<span class="chip acc">${I.edit} Handmatig aangepast</span>`:'';
   const kpis=`<section class="panel kpis">
-    <div class="kpi ${un.length?'':'okk'}"><b>${jobs.length-un.length} / ${jobs.length}</b><span>voertuigen gepland</span></div>
+    <div class="kpi ${un.length?'':'okk'}"><b>${jobs.length-un.length} / ${jobs.length}</b><span>${T.objLangMv} gepland</span></div>
     <div class="kpi"><b>${fdur(tr)}</b><span>totale reistijd</span></div>
     <div class="kpi"><b>${fkm(km)}</b><span>gereden</span></div>
-    <div class="kpi"><b>${fdur(sv)}</b><span>reinigingstijd</span></div>
+    <div class="kpi"><b>${fdur(sv)}</b><span>${T.werkTijd}</span></div>
     <div class="kpi"><b>${nUtil?Math.round(util/nUtil*100):0}%</b><span>benutting werktijd</span></div>
     <div class="kpi ${warn?'bad':'okk'}"><b>${warn}</b><span>waarschuwingen</span></div>
     ${stKpi(st.date,rows,P)}
@@ -203,10 +205,10 @@ function timeline(st){
       else if(g.k==='pause')blk+=`<div class="blk pause" style="left:${pc(g.a)};width:${wd(g.a,g.b)}" title="Pauze ${m2t(g.a)}–${m2t(g.b)}">P</div>`;
     }
     s.stops.forEach((p,i)=>{const cu=CUS[p.loc.customerId]||{};const sel=S.selLoc===p.loc.id&&S.wid===w.id;
-      blk+=`<div class="blk job${p.late?' late':''}${sel?' sel':''}" draggable="true" data-drag="${p.jobs.join(',')}" data-act="visit" title="Klik voor details" data-wid="${w.id}" data-loc="${p.loc.id}" style="left:${pc(p.start)};width:${wd(p.start,p.end)};--c:${c}" title="${esc(cu.name)} · ${p.jobs.length} voertuig(en) · ${m2t(p.start)}–${m2t(p.end)}${p.late?' · TE LAAT':''}">${(()=>{const m=stMap(date),ss=p.jobs.map(id=>m[id]).filter(Boolean);return ss.some(x=>x.st==='issue')?'<b class="bmark bad">!</b>':ss.length===p.jobs.length&&ss.length?'<b class="bmark ok">✓</b>':ss.some(x=>x.note)?'<b class="bmark">…</b>':''})()}${i+1}. ${esc(cu.name||'')}<small>${p.jobs.length}× · ${m2t(p.start)}</small></div>`});
+      blk+=`<div class="blk job${p.late?' late':''}${sel?' sel':''}" draggable="true" data-drag="${p.jobs.join(',')}" data-act="visit" title="Klik voor details" data-wid="${w.id}" data-loc="${p.loc.id}" style="left:${pc(p.start)};width:${wd(p.start,p.end)};--c:${c}" title="${esc(cu.name)} · ${p.jobs.length} ${nObjLang(p.jobs.length)} · ${m2t(p.start)}–${m2t(p.end)}${p.late?' · TE LAAT':''}">${(()=>{const m=stMap(date),ss=p.jobs.map(id=>m[id]).filter(Boolean);return ss.some(x=>x.st==='issue')?'<b class="bmark bad">!</b>':ss.length===p.jobs.length&&ss.length?'<b class="bmark ok">✓</b>':ss.some(x=>x.note)?'<b class="bmark">…</b>':''})()}${i+1}. ${esc(cu.name||'')}<small>${p.jobs.length}× · ${m2t(p.start)}</small></div>`});
     blk+=`<i class="endmark" style="left:${pc(s.finish)}" title="Terug ${m2t(s.finish)}"></i>`;
-    return`<div class="tl-row"><button class="tl-who${S.wid===w.id?' sel':''}${why?' na':''}" data-act="selw" data-wid="${w.id}"><b><i class="dot" style="background:${c}"></i>${esc(w.name)}</b><small>${esc(w.postcode)} ${esc(w.city)} · ${esc(shiftOf(w,date).start)}–${esc(shiftOf(w,date).end)}</small>${ovr(w,date)?`<small><span class="chip warn">Afwijkende werktijd</span></small>`:''}<small>${why?`<span style="color:var(--bad)">${esc(why)}</span>`:`${s.n} voert. · ${fkm(s.km)} · ${fdur(s.trav)} rijden`}</small></button><div class="tl-track" data-drop="row:${w.id}" data-wid="${w.id}" data-rs="${rs}" data-re="${re}">${grid}${blk}</div></div>`}).join('');
-  return`<section class="panel"><div class="tl-head"><h2>Dagplanning ${esc(fdate(date,{day:'numeric',month:'long'}))}</h2><div class="legend"><span><i class="lg job"></i>Reinigen</span><span><i class="lg drive"></i>Rijden</span><span><i class="lg wait"></i>Wachten op venster</span><span><i class="lg pause"></i>Pauze</span></div><span class="sp"></span><span class="small muted">Sleep een blok naar een andere medewerker om te herplannen</span></div>
+    return`<div class="tl-row"><button class="tl-who${S.wid===w.id?' sel':''}${why?' na':''}" data-act="selw" data-wid="${w.id}"><b><i class="dot" style="background:${c}"></i>${esc(w.name)}</b><small>${esc(w.postcode)} ${esc(w.city)} · ${esc(shiftOf(w,date).start)}–${esc(shiftOf(w,date).end)}</small>${ovr(w,date)?`<small><span class="chip warn">Afwijkende werktijd</span></small>`:''}<small>${why?`<span style="color:var(--bad)">${esc(why)}</span>`:`${s.n} ${T.objKort||"voert."} · ${fkm(s.km)} · ${fdur(s.trav)} rijden`}</small></button><div class="tl-track" data-drop="row:${w.id}" data-wid="${w.id}" data-rs="${rs}" data-re="${re}">${grid}${blk}</div></div>`}).join('');
+  return`<section class="panel"><div class="tl-head"><h2>Dagplanning ${esc(fdate(date,{day:'numeric',month:'long'}))}</h2><div class="legend"><span><i class="lg job"></i>${T.Werk}</span><span><i class="lg drive"></i>Rijden</span><span><i class="lg wait"></i>Wachten op venster</span><span><i class="lg pause"></i>Pauze</span></div><span class="sp"></span><span class="small muted">Sleep een blok naar een andere medewerker om te herplannen</span></div>
   <div class="tl-wrap"><div class="tl"><div class="tl-row"><div style="background:var(--sunk);border-right:1px solid var(--line)"></div><div class="tl-axis">${ticks}</div></div>${out}</div></div></section>`;
 }
 const NL=[[3.36,51.37],[3.6,51.3],[3.9,51.21],[4.25,51.37],[4.5,51.48],[4.8,51.5],[5.05,51.47],[5.22,51.31],[5.5,51.3],[5.84,51.16],[5.65,50.86],[5.7,50.76],[6.02,50.76],[6.08,50.91],[5.9,51.0],[6.17,51.18],[6.07,51.25],[6.22,51.4],[5.95,51.75],[6.12,51.85],[6.4,51.85],[6.75,51.9],[6.83,52.0],[6.7,52.05],[7.05,52.23],[7.05,52.4],[6.7,52.47],[6.75,52.65],[7.05,52.65],[7.2,53.0],[7.2,53.25],[6.9,53.35],[6.5,53.45],[6.0,53.45],[5.6,53.35],[5.35,53.2],[5.1,52.95],[5.4,52.85],[5.6,52.65],[5.85,52.55],[5.6,52.38],[5.25,52.33],[5.05,52.4],[5.1,52.62],[5.3,52.7],[5.1,52.93],[4.75,52.95],[4.6,52.6],[4.5,52.3],[4.25,52.1],[3.95,51.95],[4.05,51.85],[3.7,51.7],[3.45,51.55],[3.36,51.37]];
@@ -234,11 +236,11 @@ function mapPanel(st){
     const[dxp,dyp]=P(+w.lat,+w.lng);
     let mk=`<g class="depot" data-act="selw" data-wid="${w.id}" style="cursor:pointer"><title>Standplaats ${esc(w.name)} (${esc(w.postcode)})</title><rect x="${dxp-12}" y="${dyp-12}" width="24" height="24" rx="5" style="fill:${c}" stroke="var(--surface)" stroke-width="2"/><text x="${dxp}" y="${dyp}">${esc(w.name.split(' ').map(x=>x[0]).slice(0,2).join(''))}</text></g>`;
     s.stops.forEach((p,i)=>{const[x,y]=P(+p.loc.lat,+p.loc.lng);const cu=CUS[p.loc.customerId]||{};const r=11+Math.min(p.jobs.length,6);
-      mk+=`<g class="mk" data-act="sel" data-wid="${w.id}" data-loc="${p.loc.id}"><title>${i+1}. ${esc(cu.name)} – ${esc(p.loc.city)} · ${p.jobs.length} voertuig(en) · ${m2t(p.arrive)}</title>${S.selLoc===p.loc.id&&S.wid===w.id?`<circle class="selring" cx="${x}" cy="${y}" r="${r+5}"/>`:''}<circle cx="${x}" cy="${y}" r="${r}" style="fill:${c}" stroke="var(--surface)" stroke-width="2"/><text x="${x}" y="${y}">${i+1}</text></g>`});
+      mk+=`<g class="mk" data-act="sel" data-wid="${w.id}" data-loc="${p.loc.id}"><title>${i+1}. ${esc(cu.name)} – ${esc(p.loc.city)} · ${p.jobs.length} ${nObjLang(p.jobs.length)} · ${m2t(p.arrive)}</title>${S.selLoc===p.loc.id&&S.wid===w.id?`<circle class="selring" cx="${x}" cy="${y}" r="${r+5}"/>`:''}<circle cx="${x}" cy="${y}" r="${r}" style="fill:${c}" stroke="var(--surface)" stroke-width="2"/><text x="${x}" y="${y}">${i+1}</text></g>`});
     g+=`<g opacity="${op}">${lines}${mk}</g>`;
   }
   if(S.mapMode!=='focus'){const seen={};un.forEach(j=>{seen[j.locationId]=(seen[j.locationId]||0)+1});
-    for(const lid in seen){const l=LOC[lid];if(!l)continue;const[x,y]=P(+l.lat,+l.lng);const cu=CUS[l.customerId]||{};g+=`<g class="mk mk-un"><title>Niet gepland: ${esc(cu.name)} – ${seen[lid]} voertuig(en)</title><circle cx="${x}" cy="${y}" r="12"/><text x="${x}" y="${y}">!</text></g>`}}
+    for(const lid in seen){const l=LOC[lid];if(!l)continue;const[x,y]=P(+l.lat,+l.lng);const cu=CUS[l.customerId]||{};g+=`<g class="mk mk-un"><title>Niet gepland: ${esc(cu.name)} – ${seen[lid]} ${nObjLang(seen[lid])}</title><circle cx="${x}" cy="${y}" r="12"/><text x="${x}" y="${y}">!</text></g>`}}
   g+=`<text class="note" x="12" y="${H-12}">Schematische kaart · lijnen hemelsbreed · ${useORS()?'reistijd via OpenRouteService':'reistijd berekend met wegfactor'}</text>`;
   const b=(k,l)=>`<button data-act="mapmode" data-k="${k}" aria-pressed="${S.mapMode===k}">${l}</button>`;
   return`<section class="panel"><div class="row"><h2>Routekaart</h2><span class="sp"></span></div><div class="map-ctl"><div class="seg">${b('routes','Alle routes')}${b('focus','Alleen geselecteerd')}${b('nl','Heel Nederland')}</div></div><div class="map-wrap"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Kaart met routes per medewerker">${g}</svg></div></section>`;
@@ -264,9 +266,9 @@ function routePanel(st){
       const wins=[...new Set(p.jobs.map(id=>{const j=JOB[id];return j.from||j.to?`${j.from||'—'}–${j.to||'—'}`:''}).filter(Boolean))];
       const jobsLi=p.jobs.map(id=>{const j=JOB[id];const sg=s.seg.find(x=>x.k==='job'&&x.id===id);return`<li draggable="true" data-drag="${id}">${plateBtn(j)}<span>${esc(j.vehicle||'')}</span><span class="muted">${esc((TYP[j.type]||{}).name||j.type)} · ${jobDur(j)} min</span><span class="mono${sg&&sg.late?' late':''}">${m2t(sg.a)}–${m2t(sg.b)}${sg&&sg.late?' te laat':''}</span>${+j.priority===3?'<span class="chip warn">Hoge prio</span>':''}${stChip(id,date)}<span class="sp"></span><button class="iconbtn" data-act="fotoplan" data-id="${id}" data-date="${date}" title="Foto bij oplevering bekijken" aria-label="Foto van ${esc(j.plate)} bekijken">📷</button><button class="iconbtn" data-act="chat" data-id="${id}" title="Herplan met AI" aria-label="Herplan ${esc(j.plate)} met AI">${I.auto}</button>${moveSel([id])}</li>`}).join('');
       li+=`<li><time>${m2t(p.arrive)}</time><div class="stop${S.selLoc===l.id?' sel':''}" style="--c:${c}" draggable="true" data-drag="${p.jobs.join(',')}" data-drop="before:${w.id}:${p.jobs[0]}" data-act="sel" data-wid="${w.id}" data-loc="${l.id}">
-        <div class="stop-top"><span class="num">${stopIdx}</span><b>${esc(cu.name||'Onbekende klant')}</b><span class="chip">${p.jobs.length} ${p.jobs.length===1?'auto':"auto's"}</span>${p.late?'<span class="chip bad">Buiten tijdvenster</span>':''}${pinned?`<span class="chip acc">${I.pin} vast</span>`:''}${SERVER&&p.jobs.every(id=>(stMap(date)[id]||{}).st==='done')?'<span class="chip ok">Afgerond</span>':''}</div>
+        <div class="stop-top"><span class="num">${stopIdx}</span><b>${esc(cu.name||'Onbekende klant')}</b><span class="chip">${p.jobs.length} ${nObj(p.jobs.length)}</span>${p.late?'<span class="chip bad">Buiten tijdvenster</span>':''}${pinned?`<span class="chip acc">${I.pin} vast</span>`:''}${SERVER&&p.jobs.every(id=>(stMap(date)[id]||{}).st==='done')?'<span class="chip ok">Afgerond</span>':''}</div>
         <div class="sub">${esc([l.address,[l.postcode,l.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))}${wins.length?' · venster '+wins.join(', '):' · hele dag'}${cu.contact?' · '+esc(cu.contact):''}${cu.login?' · inlog '+esc(cu.login):''}</div>${cu.notes?`<div class="sub" style="color:var(--ink)"><b>Klant:</b> ${esc(cu.notes)}</div>`:''}${l.info?`<div class="sub" style="color:var(--ink)"><b>Locatie-info:</b> ${esc(l.info)}</div>`:''}
-        <div class="sub mono">Aankomst ${m2t(p.arrive)}${pendingWait?` · wacht ${fdur(pendingWait)} op venster`:''} · reinigen ${m2t(p.start)}–${m2t(p.end)} (${fdur(p.end-p.start)}) · vertrek ${m2t(p.end)}</div>
+        <div class="sub mono">Aankomst ${m2t(p.arrive)}${pendingWait?` · wacht ${fdur(pendingWait)} op venster`:''} · ${T.werk} ${m2t(p.start)}–${m2t(p.end)} (${fdur(p.end-p.start)}) · vertrek ${m2t(p.end)}</div>
         <ul class="jobs">${jobsLi}</ul>
         <div class="stop-act"><button class="iconbtn" data-act="mv" data-dir="-1" data-wid="${w.id}" data-ids="${p.jobs.join(',')}" aria-label="Bezoek eerder" title="Bezoek eerder">${I.up}</button><button class="iconbtn" data-act="mv" data-dir="1" data-wid="${w.id}" data-ids="${p.jobs.join(',')}" aria-label="Bezoek later" title="Bezoek later">${I.down}</button><button class="iconbtn${pinned?' on':''}" data-act="pin" data-wid="${w.id}" data-ids="${p.jobs.join(',')}" aria-label="${pinned?'Losmaken':'Vastzetten bij deze medewerker'}" title="${pinned?'Losmaken':'Vastzetten bij deze medewerker'}">${I.pin}</button>${moveSel(p.jobs)}<button class="btn sm" data-act="visit" data-wid="${w.id}" data-loc="${l.id}">Details</button></div>
       </div></li>`;pendingWait=0;
@@ -279,21 +281,21 @@ function routePanel(st){
   return`<section class="panel">${chips}
   <div class="rt-head"><div class="row"><h2>Rit ${esc(w.name)}</h2><span class="sp"></span>${sickBtns(w,S.date)}<button class="btn sm" data-act="ovr" data-wid="${w.id}">${I.edit} Werktijd deze dag</button><button class="btn sm" data-act="pauze" data-wid="${w.id}">${I.edit} Pauze deze dag</button><button class="btn sm" data-act="seqopt" data-wid="${w.id}">${I.route} Volgorde optimaliseren</button></div>
   <div class="sub">Standplaats ${esc(w.postcode)} ${esc(w.city)} · werktijd ${esc(shiftOf(w,date).start)}–${esc(shiftOf(w,date).end)}${ovr(w,date)?` <span class="chip warn">Afwijkend vandaag${ovr(w,date).note?': '+esc(ovr(w,date).note):''} · normaal ${esc(w.start)}–${esc(w.end)}</span>`:''}${(w.skills||[]).length?' · '+esc(w.skills.join(', ')):''}${why?` · <b style="color:var(--bad)">${esc(why)}</b>`:''}</div>
-  <dl class="stats"><div><dt>Vertrek</dt><dd>${m2t(s.depart)}</dd></div><div><dt>Terug</dt><dd>${m2t(s.finish)}</dd></div><div><dt>Voertuigen</dt><dd>${s.n}</dd></div><div><dt>Rijtijd</dt><dd>${fdur(s.trav)}</dd></div><div><dt>Afstand</dt><dd>${fkm(s.km)}</dd></div><div><dt>Benutting</dt><dd>${util}%</dd></div></dl></div>
+  <dl class="stats"><div><dt>Vertrek</dt><dd>${m2t(s.depart)}</dd></div><div><dt>Terug</dt><dd>${m2t(s.finish)}</dd></div><div><dt>${T.ObjLangMv}</dt><dd>${s.n}</dd></div><div><dt>Rijtijd</dt><dd>${fdur(s.trav)}</dd></div><div><dt>Afstand</dt><dd>${fkm(s.km)}</dd></div><div><dt>Benutting</dt><dd>${util}%</dd></div></dl></div>
   <ol class="rt">${li}</ol></section>`;
 }
 function unplannedPanel(st){
   const{un,rows,date}=st;
-  if(!un.length)return`<section class="panel"><h2>Niet ingepland</h2><div class="un-zone" data-drop="un"><div class="ok-line">Alle voertuigen van deze dag zijn ingepland. Sleep een bezoek hierheen om het uit de planning te halen.</div></div></section>`;
+  if(!un.length)return`<section class="panel"><h2>Niet ingepland</h2><div class="un-zone" data-drop="un"><div class="ok-line">Alle ${T.objLangMv} van deze dag zijn ingepland. Sleep een bezoek hierheen om het uit de planning te halen.</div></div></section>`;
   const groups={};un.forEach(j=>(groups[j.locationId]=groups[j.locationId]||[]).push(j));
   const cards=Object.entries(groups).map(([lid,js])=>{const l=LOC[lid]||{},cu=CUS[l.customerId]||{},ids=js.map(j=>j.id);
     const reasons=[...new Set(js.map(j=>whyUnplanned(j,date)))];
-    return`<div class="uncard" draggable="true" data-drag="${ids.join(',')}"><div class="stop-top"><b style="font:600 16px var(--f-disp)">${esc(cu.name)}</b><span class="chip">${js.length} ${js.length===1?'auto':"auto's"}</span></div>
+    return`<div class="uncard" draggable="true" data-drag="${ids.join(',')}"><div class="stop-top"><b style="font:600 16px var(--f-disp)">${esc(cu.name)}</b><span class="chip">${js.length} ${nObj(js.length)}</span></div>
     <div class="sub">${esc(l.postcode)} ${esc(l.city)} · ${js.map(j=>`${esc((TYP[j.type]||{}).name||j.type)}${j.from||j.to?` ${esc(j.from||'')}–${esc(j.to||'')}`:''}`).filter((x,i,a)=>a.indexOf(x)===i).join(', ')}</div>
     <div class="row">${js.map(j=>plateBtn(j)).join(' ')}</div>
     <div class="small" style="color:var(--warn)">${reasons.map(esc).join(' · ')}</div>
     <div class="row"><button class="btn sm" data-act="propose" data-ids="${ids.join(',')}">${I.auto} Slim voorstel</button><select class="mini" data-act="moveto" data-ids="${ids.join(',')}" aria-label="Inplannen bij"><option value="">Inplannen bij…</option><option value="__best">Beste medewerker (automatisch)</option>${rows.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('')}</select></div></div>`}).join('');
-  return`<section class="panel"><div class="row"><h2>Niet ingepland</h2><span class="chip warn">${un.length} ${un.length===1?'voertuig':'voertuigen'}</span><span class="sp"></span><span class="small muted">Sleep naar een medewerker in de dagplanning of kies hieronder. Handmatig inplannen mag ook als het niet past; de app toont dan de overschrijding.</span></div><div class="un-zone" data-drop="un">${cards}</div></section>`;
+  return`<section class="panel"><div class="row"><h2>Niet ingepland</h2><span class="chip warn">${un.length} ${nObjLang(un.length)}</span><span class="sp"></span><span class="small muted">Sleep naar een medewerker in de dagplanning of kies hieronder. Handmatig inplannen mag ook als het niet past; de app toont dan de overschrijding.</span></div><div class="un-zone" data-drop="un">${cards}</div></section>`;
 }
 
 /* ---------- beheer: opdrachten ---------- */
@@ -311,7 +313,7 @@ function jobMatches(j,q){
 }
 function viewJobs(){
   const q=S.jobQ||'';
-  return`<section class="panel"><div class="toolbar"><h2>Reinigingsopdrachten</h2><label class="search"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></g></svg><input type="search" id="jobQ" value="${esc(q)}" placeholder="Zoek op kenteken, klant of plaats" aria-label="Zoek op kenteken, klant of plaats" autocomplete="off"></label><span class="sp"></span><div class="seg"><button data-act="jobscope" data-k="dag" aria-pressed="${S.jobScope==='dag'}">${esc(fdate(S.date,{day:'numeric',month:'short'}))}</button><button data-act="jobscope" data-k="alle" aria-pressed="${S.jobScope==='alle'}">Alle datums</button></div>${importLogs().length?`<button class="btn" data-act="openlog">Importlog</button>`:''}<button class="btn" data-act="import">${I.imp} Importeren uit Excel</button><button class="btn primary" data-act="newjob">${I.plus} Nieuwe opdracht</button></div>
+  return`<section class="panel"><div class="toolbar"><h2>${T.Opdrachten}</h2><label class="search"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3.5 3.5"/></g></svg><input type="search" id="jobQ" value="${esc(q)}" placeholder="Zoek op ${T.id}, klant of plaats" aria-label="Zoek op ${T.id}, klant of plaats" autocomplete="off"></label><span class="sp"></span><div class="seg"><button data-act="jobscope" data-k="dag" aria-pressed="${S.jobScope==='dag'}">${esc(fdate(S.date,{day:'numeric',month:'short'}))}</button><button data-act="jobscope" data-k="alle" aria-pressed="${S.jobScope==='alle'}">Alle datums</button></div>${importLogs().length?`<button class="btn" data-act="openlog">Importlog</button>`:''}<button class="btn" data-act="import">${I.imp} Importeren uit Excel</button><button class="btn primary" data-act="newjob">${I.plus} Nieuwe opdracht</button></div>
   ${jobFilterBar()}
   <div id="jobsTbl">${jobsTable()}</div></section>`;
 }
@@ -334,7 +336,7 @@ function jobFilterBar(){
   return`<div class="jfbar"><label class="jf"><span>Van</span><input type="date" class="mini" data-jf="from" value="${esc(f.from)}"></label><label class="jf"><span>Tot en met</span><input type="date" class="mini" data-jf="to" value="${esc(f.to)}"></label>
     ${sel('wid',[['','Alle medewerkers'],...D.workers.map(w=>[w.id,w.name]),['__none','Niet ingepland']],'Medewerker')}${sel('cust',[['','Alle klanten'],...custs.map(c=>[c,c])],'Klant')}${sel('type',[['','Alle types'],...D.types.map(t=>[t.id,t.name])],'Type')}
     ${sel('st',[['','Alle'],['planned','Ingepland'],['late','Buiten tijdvak'],['unplanned','Niet ingepland'],['none','Nog niet gepland']],'Planning')}${sel('prio',[['','Alle'],['3','Hoog'],['2','Normaal'],['1','Laag']],'Prioriteit')}
-    ${sel('sort',[['date','Datum oplopend'],['date-','Datum aflopend'],['wrk','Datum, medewerker, rit'],['cust','Klant'],['city','Plaats'],['plate','Kenteken']],'Sorteren')}
+    ${sel('sort',[['date','Datum oplopend'],['date-','Datum aflopend'],['wrk','Datum, medewerker, rit'],['cust','Klant'],['city','Plaats'],['plate',T.Id]],'Sorteren')}
     ${active?`<button class="btn sm ghost" data-act="jfclear">Filters wissen</button>`:''}</div>`;
 }
 function jobsTable(){
@@ -349,16 +351,16 @@ function jobsTable(){
   const pr={1:'Laag',2:'Normaal',3:'Hoog'};
   const grpKey=j=>f.sort==='wrk'?j.date+'|'+(jobPlanInfo(j).wid||''):(f.sort==='date'||f.sort==='date-')?j.date:null;
   const cnt={};list.forEach(j=>{const k=grpKey(j);if(k!=null)cnt[k]=(cnt[k]||0)+1});
-  const grpH=j=>{const w=WRK[jobPlanInfo(j).wid];return`<tr class="grp"><td colspan="9"><b>${esc(fdate(j.date,{weekday:'long',day:'numeric',month:'long'}))}</b>${f.sort==='wrk'?` \u00b7 ${w?`<i class="dot" style="background:${wc(w)}"></i> ${esc(w.name)}`:'<span style="color:var(--warn)">Niet ingepland</span>'}`:''}<span class="muted"> \u00b7 ${cnt[grpKey(j)]} ${cnt[grpKey(j)]===1?'auto':'auto\u2019s'}</span>${f.sort==='wrk'&&w?` <button class="btn sm ghost" data-act="jfgoto" data-date="${j.date}" data-wid="${w.id}">Naar rit</button>`:''}</td></tr>`};
+  const grpH=j=>{const w=WRK[jobPlanInfo(j).wid];return`<tr class="grp"><td colspan="9"><b>${esc(fdate(j.date,{weekday:'long',day:'numeric',month:'long'}))}</b>${f.sort==='wrk'?` \u00b7 ${w?`<i class="dot" style="background:${wc(w)}"></i> ${esc(w.name)}`:'<span style="color:var(--warn)">Niet ingepland</span>'}`:''}<span class="muted"> \u00b7 ${cnt[grpKey(j)]} ${nObj(cnt[grpKey(j)]).replace("'",'\u2019')}</span>${f.sort==='wrk'&&w?` <button class="btn sm ghost" data-act="jfgoto" data-date="${j.date}" data-wid="${w.id}">Naar rit</button>`:''}</td></tr>`};
   let prevG=null;
   const rowsH=list.map(j=>{const gk=grpKey(j),gh=gk!=null&&gk!==prevG?grpH(j):'';prevG=gk;const l=LOC[j.locationId]||{},c=CUS[l.customerId]||{};return gh+`<tr><td>${plateHtml(j.plate)}<div class="small muted">${esc(j.vehicle)}</div></td><td><b>${esc(c.name)}</b><div class="small muted">${esc(l.name)} · ${esc(l.postcode)} ${esc(l.city)}</div></td><td class="mono">${esc(fdate(j.date,{weekday:'short',day:'numeric',month:'short'}))}</td><td class="mono">${j.from||j.to?esc((j.from||'—')+'–'+(j.to||'—')):'<span class="muted">hele dag</span>'}</td><td>${esc((TYP[j.type]||{}).name||j.type)}</td><td class="mono">${jobDur(j)} min</td><td>${+j.priority===3?'<span class="chip warn">Hoog</span>':pr[j.priority]||'Normaal'}</td><td>${jobStatus(j)}</td><td class="act"><button class="btn ghost" data-act="chat" data-id="${j.id}" title="Herplan met AI" aria-label="Herplan met AI">${I.auto}</button><button class="btn ghost" data-act="editjob" data-id="${j.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`}).join('');
-  return`${list.length?`<div class="tbl-wrap"><table><thead><tr><th>Kenteken</th><th>Klant · locatie</th><th>Datum</th><th>Venster</th><th>Type</th><th>Duur</th><th>Prioriteit</th><th>Planning</th><th></th></tr></thead><tbody>${rowsH}</tbody></table></div>`:`<p class="empty">${q?`Geen opdrachten gevonden voor "${esc(q)}".`:'Geen opdrachten voor deze selectie.'}</p>`}
+  return`${list.length?`<div class="tbl-wrap"><table><thead><tr><th>${T.Id}</th><th>Klant · locatie</th><th>Datum</th><th>Venster</th><th>Type</th><th>Duur</th><th>Prioriteit</th><th>Planning</th><th></th></tr></thead><tbody>${rowsH}</tbody></table></div>`:`<p class="empty">${q?`Geen opdrachten gevonden voor "${esc(q)}".`:'Geen opdrachten voor deze selectie.'}</p>`}
   <p class="hint">${list.length} opdracht(en)${q?' gevonden over alle datums':''}. Na een wijziging in opdrachten plant de app die dag opnieuw automatisch; handmatig vastgezette bezoeken blijven bij dezelfde medewerker.</p>`;
 }
 function jobFields(){
-  return[{k:'plate',label:'Kenteken',req:1,ph:'AB-123-C'},{k:'vehicle',label:'Voertuig',ph:'Merk en model'},
+  return[{k:'plate',label:T.Id,req:1,ph:T.idPh},{k:'vehicle',label:T.objVeld,ph:T.objVeldPh},
     {k:'locationId',label:'Klant en locatie',type:'combo',req:1,ph:'Zoek op klant, plaats, postcode of adres',options:D.locations.map(l=>{const c=CUS[l.customerId]||{};const sub=[l.name,l.address,[l.postcode,l.city].filter(Boolean).join(' ')].filter(Boolean).join(' · ');return{v:l.id,label:locLabel(l),title:c.name||'?',sub,hay:normTxt([c.name,l.name,l.address,l.postcode,String(l.postcode||'').replace(/\s/g,''),l.city,c.contact].join(' '))}}).sort((a,b)=>a.title.localeCompare(b.title))},
-    {k:'date',label:'Gewenste datum',type:'date',req:1},{k:'type',label:'Type reiniging',type:'select',options:D.types.map(t=>[t.id,`${t.name} (${t.dur} min)`])},
+    {k:'date',label:'Gewenste datum',type:'date',req:1},{k:'type',label:T.TypeVeld,type:'select',options:D.types.map(t=>[t.id,`${t.name} (${t.dur} min)`])},
     {k:'from',label:'Vanaf (optioneel)',type:'time'},{k:'to',label:'Uiterlijk gereed (optioneel)',type:'time'},
     {k:'duration',label:'Afwijkende duur (min)',type:'number',ph:'standaard per type'},{k:'priority',label:'Prioriteit',type:'select',options:[[1,'Laag'],[2,'Normaal'],[3,'Hoog']]},
     {k:'notes',label:'Opmerking',wide:1}];
@@ -401,11 +403,11 @@ function onContext(e){
     openCtx(e.clientX,e.clientY,
       ctxBtn('visit','Details van dit bezoek',`data-wid="${wid}" data-loc="${lid}"`)+
       ctxBtn('ctxnew',`${I.plus} Nieuwe afspraak op deze locatie`,`data-wid="${wid}" data-loc="${lid}" data-t="${stop?Math.round(stop.end):''}"`,`bij ${esc(w.name.split(' ')[0])}, aansluitend`)+
-      ctxBtn('chat',`${I.auto} Herplan met AI`,`data-id="${ids[0]}"`,ids.length>1?`${ids.length} auto's, begint bij ${esc(JOB[ids[0]].plate)}`:esc(JOB[ids[0]].plate))+
+      ctxBtn('chat',`${I.auto} Herplan met AI`,`data-id="${ids[0]}"`,ids.length>1?`${ids.length} ${T.objMv}, begint bij ${esc(JOB[ids[0]].plate)}`:esc(JOB[ids[0]].plate))+
       ctxBtn('pin',pinned?'Losmaken':'Vastzetten bij '+esc(w.name.split(' ')[0]),`data-wid="${wid}" data-ids="${ids.join(',')}"`)+
       `<div class="ctx-sep"></div><div class="ctx-t">Verplaatsen naar</div>`+others.map(o=>ctxBtn('ctxmove',`<i class="dot" style="background:${wc(o)}"></i> ${esc(o.name)}`,`data-wid="${o.id}" data-ids="${ids.join(',')}"`)).join('')+
       ctxBtn('ctxmove','Uit de planning halen',`data-wid="" data-ids="${ids.join(',')}"`),
-      `${esc(cu.name||'Bezoek')} · ${ids.length} ${ids.length===1?'auto':"auto's"}`);
+      `${esc(cu.name||'Bezoek')} · ${ids.length} ${nObj(ids.length)}`);
     return;
   }
   const row=e.target.closest('.tl-row'),tr=row&&row.querySelector('.tl-track'),wid=(tr&&tr.dataset.wid)||(who&&who.dataset.wid);const w=WRK[wid];if(!w)return;
@@ -493,10 +495,10 @@ async function aiParse(C,text){
   const mode=aiMode(),j=JOB[C.id],l=LOC[j.locationId]||{},cu=CUS[l.customerId]||{},wh=jobWhere(C.id)||{};
   const cal=[];for(let i=0;i<35;i++){const d=addDays(todayIso(),i);cal.push(`${fdate(d,{weekday:'long',day:'numeric',month:'long'})} = ${d}`)}
   const hist=C.turns.slice(-8).map(t=>(t.role==='user'?'Planner: ':'Assistent: ')+t.content).join('\n');
-  const prompt=`Je helpt een planner van een autoreinigingsbedrijf om één afspraak te verplaatsen. Vertaal het verzoek naar zoekcriteria; de planningssoftware rekent daarna zelf de beste plekken door. Verzin zelf geen tijden of planning.
+  const prompt=`Je helpt een planner van ${T.bedrijf} om één afspraak te verplaatsen. Vertaal het verzoek naar zoekcriteria; de planningssoftware rekent daarna zelf de beste plekken door. Verzin zelf geen tijden of planning.
 
 Vandaag is ${fdate(todayIso(),{weekday:'long',day:'numeric',month:'long',year:'numeric'})} (${todayIso()}).
-Afspraak: kenteken ${j.plate}, klant ${cu.name||'?'} in ${l.city||'?'}, ${jobDur(j)} minuten, nu op ${fdate(j.date,{weekday:'long',day:'numeric',month:'long'})} (${j.date})${wh.wid?` bij ${WRK[wh.wid].name} om ${m2t(wh.start)}`:', nog niet ingepland'}, tijdvak klant ${j.from||j.to?(j.from||'?')+'-'+(j.to||'?'):'hele dag'}.
+Afspraak: ${T.id} ${j.plate}, klant ${cu.name||'?'} in ${l.city||'?'}, ${jobDur(j)} minuten, nu op ${fdate(j.date,{weekday:'long',day:'numeric',month:'long'})} (${j.date})${wh.wid?` bij ${WRK[wh.wid].name} om ${m2t(wh.start)}`:', nog niet ingepland'}, tijdvak klant ${j.from||j.to?(j.from||'?')+'-'+(j.to||'?'):'hele dag'}.
 Medewerkers: ${D.workers.map(w=>w.name).join(', ')}.
 Kalender:
 ${cal.join('\n')}
@@ -595,9 +597,9 @@ function openVisit(wid,lid){
       <div class="row"><button class="btn sm primary" data-act="chat" data-id="${id}">${I.auto} Herplan met AI</button><button class="btn sm" data-act="editjob" data-id="${id}">${I.edit} Opdracht wijzigen</button>${g&&g.late?`<button class="btn sm" data-act="propose" data-ids="${id}">${I.auto} Slim voorstel</button>`:''}</div></li>`}).join('');
   FORM=null;
   $('#modal').innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="vT" style="width:min(680px,100%)">
-    <div class="row"><span class="num" style="--c:${wc(w)}">${idx+1}</span><h3 id="vT" style="margin:0">${esc(cu.name||'Onbekende klant')}</h3><span class="chip">${p.jobs.length} ${p.jobs.length===1?'auto':"auto's"}</span></div>
+    <div class="row"><span class="num" style="--c:${wc(w)}">${idx+1}</span><h3 id="vT" style="margin:0">${esc(cu.name||'Onbekende klant')}</h3><span class="chip">${p.jobs.length} ${nObj(p.jobs.length)}</span></div>
     <p class="note" style="margin:8px 0">${esc([l.address,[l.postcode,l.city].filter(Boolean).join(' ')].filter(Boolean).join(', '))}</p>
-    <div class="row small" style="margin-bottom:10px"><i class="dot" style="background:${wc(w)}"></i><b>${esc(w.name)}</b><span>${esc(fdate(date,{weekday:'short',day:'numeric',month:'short'}))} · aankomst ${m2t(p.arrive)} · reinigen ${m2t(p.start)}–${m2t(p.end)} · ${fdur(p.travel)} rijden ernaartoe</span></div>
+    <div class="row small" style="margin-bottom:10px"><i class="dot" style="background:${wc(w)}"></i><b>${esc(w.name)}</b><span>${esc(fdate(date,{weekday:'short',day:'numeric',month:'short'}))} · aankomst ${m2t(p.arrive)} · ${T.werk} ${m2t(p.start)}–${m2t(p.end)} · ${fdur(p.travel)} rijden ernaartoe</span></div>
     ${l.info?`<div class="small" style="background:var(--warn-soft);border-left:3px solid var(--warn);padding:8px 10px;border-radius:6px;margin-bottom:10px"><b>Locatie-info:</b> ${esc(l.info)}</div>`:''}
     ${cu.notes?`<div class="small" style="background:var(--sunk);padding:8px 10px;border-radius:6px;margin-bottom:10px"><b>Opmerkingen klant:</b> ${esc(cu.notes)}</div>`:''}
     ${cu.contact||cu.phone||cu.email||cu.login?`<p class="small" style="margin:0 0 10px">${[cu.contact,cu.phone,cu.email,cu.login?'inlog '+cu.login:''].filter(Boolean).map(esc).join(' · ')}</p>`:''}
@@ -634,7 +636,7 @@ function locRowsHtml(r){return r.locs.map(l=>{const c=CUS[l.customerId]||{};cons
 function cusFilterBar(){const f=CF(),leases=D.customers.filter(c=>D.customers.some(x=>x.billTo===c.id)).sort((a,b)=>a.name.localeCompare(b.name,'nl'));
   const sel=(k,opts,lab)=>`<label class="jf"><span>${lab}</span><select class="mini" data-cf="${k}">${opts.map(([v,l])=>`<option value="${esc(v)}"${String(f[k])===String(v)?' selected':''}>${esc(l)}</option>`).join('')}</select></label>`;
   return`<div class="jfbar"><label class="jf" style="flex:1 1 260px"><span>Zoeken</span><input class="mini" id="cusQ" type="search" value="${esc(f.q)}" placeholder="Naam, contact, adres, plaats, postcode, debiteurnr." autocomplete="off"></label>
-  ${sel('bill',[['','Alle klanten'],['self','Factureert zelf'],['lease','Via leasemaatschappij'],['isLease','Is leasemaatschappij'],...leases.map(c=>[c.id,'Via '+c.name])],'Facturatie')}
+  ${sel('bill',[['','Alle klanten'],['self','Factureert zelf'],['lease','Via '+T.facturant],['isLease','Is '+T.facturant],...leases.map(c=>[c.id,'Via '+c.name])],'Facturatie')}
   ${sel('bc',[['','Alle'],['met','Met debiteurnr.'],['zonder','Zonder debiteurnr.']],'Business Central')}
   ${sel('sort',[['name','Naam A-Z'],['jobs','Meeste opdrachten'],['locs','Meeste locaties']],'Sorteren')}
   ${f.q||f.bill||f.bc?'<button class="btn sm ghost" data-act="cfreset">Filters wissen</button>':''}</div>`}
@@ -656,7 +658,7 @@ function editCus(id){
   const nl=id?D.locations.filter(l=>l.customerId===id):[];const nj=D.jobs.filter(j=>nl.some(l=>l.id===j.locationId)).length;
   const fields=[{k:'name',label:'Klantnaam',req:1,wide:1},{k:'contact',label:'Contactpersoon'},{k:'phone',label:'Telefoon'},{k:'email',label:'E-mail',type:'email'},{k:'login',label:'Inlog (app/account)'},
     {k:'notes',label:'Opmerkingen over deze klant',type:'textarea',plain:1,ph:'bijv. altijd vooraf bellen, facturatie via hoofdkantoor, sleutels bij de receptie'},
-    {k:'_bc',type:'heading',label:'Business Central'},{k:'billTo',label:'Factureren aan',type:'select',wide:1,options:[['','Deze klant zelf']].concat(D.customers.filter(x=>x.id!==id&&!x.billTo).sort((a,b)=>a.name.localeCompare(b.name,'nl')).map(x=>[x.id,x.name+(x.bcNo?' ('+x.bcNo+')':'')]))},{k:'bcNo',label:'Debiteurnummer in BC',ph:'bijv. D10023 (leeg laten als je factureert aan een leasemaatschappij)'},{k:'bcFail',label:'Niet gelukt naar BC',type:'select',options:BCFAIL},{k:'bcNb',label:'"Niet beschikbaar" uit Excel naar BC',type:'select',options:[['','Nee'],['1','Ja, als niet factureerbaar']]}];
+    {k:'_bc',type:'heading',label:'Business Central'},{k:'billTo',label:'Factureren aan',type:'select',wide:1,options:[['','Deze klant zelf']].concat(D.customers.filter(x=>x.id!==id&&!x.billTo).sort((a,b)=>a.name.localeCompare(b.name,'nl')).map(x=>[x.id,x.name+(x.bcNo?' ('+x.bcNo+')':'')]))},{k:'bcNo',label:'Debiteurnummer in BC',ph:'bijv. D10023 (leeg laten als je factureert aan een '+T.facturant+')'},{k:'bcFail',label:'Niet gelukt naar BC',type:'select',options:BCFAIL},{k:'bcNb',label:'"Niet beschikbaar" uit Excel naar BC',type:'select',options:[['','Nee'],['1','Ja, als niet factureerbaar']]}];
   if(!id)fields.push({k:'_h',type:'heading',label:'Adres (eerste locatie)'},{k:'locName',label:'Naam locatie',ph:'Hoofdlocatie'},{k:'address',label:'Straat en huisnummer'},{k:'postcode',label:'Postcode',ph:'5301 LK'},{k:'city',label:'Plaats'},
     {k:'info',label:'Locatie-informatie voor de medewerker',type:'textarea',plain:1,ph:'bijv. parkeergarage P2, melden bij de receptie, sleutel in kluisje'});
   openForm({title:id?'Klant bewerken':'Nieuwe klant',fields,values:c,
@@ -709,7 +711,7 @@ function viewWorkers(){
   const r=D.workers.map(w=>`<tr><td><b style="display:flex;gap:7px;align-items:center"><i class="dot" style="background:${wc(w)}"></i>${esc(w.name)}</b></td><td>${esc(w.postcode)} ${esc(w.city)}</td><td class="mono">${esc(w.start)}–${esc(w.end)}</td><td>${DAYS.filter(([n])=>(w.days||[]).includes(n)).map(d=>d[1]).join(' ')}</td><td class="small">${(()=>{const up=(D.absences||[]).filter(a=>a.wid===w.id&&a.to>=todayIso()).sort((a,b)=>a.from.localeCompare(b.from));const b=leaveBalance(w,+todayIso().slice(0,4));return(up.length?up.slice(0,3).map(a=>`<div>${absChip(a)} ${esc(absPeriod(a))}</div>`).join('')+(up.length>3?`<div class="muted">+${up.length-3} meer</div>`:''):'<span class="muted">—</span>')+(b.total?`<div class="muted" style="margin-top:3px">Verlof ${todayIso().slice(0,4)}: nog ${b.left} van ${b.total}</div>`:'')})()}</td><td class="small">${Object.entries(w.overrides||{}).filter(([d])=>d>=new Date().toISOString().slice(0,10)).sort().map(([d,o])=>`<span class="chip warn" title="${esc(o.note||'')}">${esc(fdate(d,{day:'numeric',month:'short'}))} ${esc(o.start)}–${esc(o.end)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${(w.skills||[]).map(s=>`<span class="chip">${esc(s)}</span>`).join(' ')||'<span class="muted">—</span>'}</td><td>${avail(w,S.date)?'<span class="chip ok">Beschikbaar</span>':`<span class="chip bad">${esc(availWhy(w,S.date))}</span>`}</td><td><div class="row" style="flex-wrap:nowrap"><button class="btn sm" data-act="wlink" data-id="${w.id}">${I.copy} Kopieer link</button>${sickBtns(w,S.date)}</div></td><td class="act"><button class="btn ghost" data-act="editw" data-id="${w.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
   return`<section class="panel"><div class="toolbar"><h2>Medewerkers</h2><span class="sp"></span><button class="btn primary" data-act="neww">${I.plus} Nieuwe medewerker</button></div>
   <div class="tbl-wrap"><table><thead><tr><th>Medewerker</th><th>Standplaats</th><th>Werktijd</th><th>Werkdagen</th><th>Afwezig</th><th>Afwijkende werktijd</th><th>Vaardigheden</th><th>${esc(fdate(S.date,{day:'numeric',month:'short'}))}</th><th>Medewerker-app</th><th></th></tr></thead><tbody>${r||'<tr><td colspan="10" class="empty">Nog geen medewerkers</td></tr>'}</tbody></table></div>
-  <p class="hint">Vaardigheden koppelen aan reinigingstypes (Instellingen). Een opdracht die een vaardigheid vraagt, gaat alleen naar medewerkers die die vaardigheid hebben.</p></section>`;
+  <p class="hint">Vaardigheden koppelen aan ${T.Types.toLowerCase()} (Instellingen). Een opdracht die een vaardigheid vraagt, gaat alleen naar medewerkers die die vaardigheid hebben.</p></section>`;
 }
 function editW(id){
   const w=id?WRK[id]:{name:'',postcode:'',city:'',lat:'',lng:'',start:'08:00',end:'16:30',days:[1,2,3,4,5],absent:[],skills:[],color:D.workers.length%6};
@@ -746,6 +748,7 @@ function viewSettings(){
   const tr=D.types.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td class="mono">${t.dur} min</td><td>${t.skill?`<span class="chip">${esc(t.skill)}</span>`:'<span class="muted">iedereen</span>'}</td><td class="act"><button class="btn ghost" data-act="edittype" data-id="${t.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
   const orsPts=orsPointsFor(null),orsMiss=orsMissing(orsPts),orsTot=orsPts.length*(orsPts.length-1);
   const pages={planning:`<section class="panel sec"><h2>Reistijd en werkdag</h2>
+  <div class="settings"><label class="fld"><span>Branche (profiel)</span><select id="set_profiel" data-set="profiel">${Object.values(PROFIELEN).map(p=>`<option value="${esc(p.id)}"${(PRF&&PRF.id)===p.id?' selected':''}>${esc(p.label)}</option>`).join('')}</select><small class="muted">Woorden in de app, kolommen bij importeren, redenen in de medewerker-app en de grens voor vaste tijdsloten (nu ${prfRegel('slotMaxMin',60)} min). Publiceer opnieuw om de medewerker-app mee te laten gaan.</small></label></div>
   <div class="settings"><label class="fld"><span>Bron voor reistijden</span><select id="set_travelSource" data-set="travelSource"><option value="schatting"${!useORS()?' selected':''}>Schatting (hemelsbreed × wegfactor)</option><option value="ors"${useORS()?' selected':''}>OpenRouteService (echte wegen)</option></select><small class="muted">Bij OpenRouteService gebruikt de app echte rijtijden over de weg. Waar die nog niet zijn opgehaald, wordt geschat.</small></label>
   <div class="fld"><span>OpenRouteService</span><div class="small">${SERVER?`${orsTot?`${orsTot-orsMiss} van ${orsTot} rijtijden opgehaald`:'Nog geen locaties'}${D.orsAt?` · bijgewerkt ${esc(new Date(D.orsAt).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}`:''}`:'Werkt in de Netlify-versie, met ORS_API_KEY in Netlify.'}</div><div class="row" style="margin-top:6px"><button class="btn sm" data-act="orsfetch"${SERVER?'':' disabled'}>${I.route} Rijtijden ophalen</button>${D.ors&&Object.keys(D.ors).length?'<button class="btn sm ghost" data-act="orsclear">Opgehaalde rijtijden wissen</button>':''}</div><small class="muted">Haalt rijtijden op tussen alle standplaatsen en locaties met opdrachten vanaf vandaag. Nieuwe locaties? Klik opnieuw; alleen wat ontbreekt wordt opgehaald.</small></div></div>
   <div class="settings">${num('urbanSpeed','Snelheid in de bebouwde kom (km/u)','Geldt voor de eerste kilometers van elke rit')}${num('urbanKm','Kilometers stadsverkeer per rit','Daarna rekent de app met de snelheid buiten de kom',1)}${num('roadSpeed','Snelheid buiten de kom (km/u)','Gemiddelde inclusief snelweg')}${num('roadFactor','Wegfactor','Hemelsbrede afstand × factor = rijafstand',.05)}${num('parkMin','Parkeren en opstarten (min)','Per aankomst op een klantlocatie')}${num('minTravel','Minimale rijtijd tussen locaties (min)','Voorkomt 0 min bij geschatte posities')}${num('pauseMin','Pauze (min)','0 = geen pauze inplannen')}<label class="fld"><span>Pauze vanaf</span><input type="time" id="set_pauseAt" data-set="pauseAt" value="${esc(s.pauseAt)}"><small class="muted">De pauze begint niet eerder dan dit tijdstip, tussen twee bezoeken</small></label><label class="fld"><span>Pauze uiterlijk</span><input type="time" id="set_pauseTot" data-set="pauseTot" value="${esc(s.pauseTot||'')}"><small class="muted">De pauze begint uiterlijk op dit tijdstip, ook als een vaste afspraak dan later wordt. Leeg = geen grens</small></label>${num('kmWeight','Weging kilometers','Minuten "kosten" per km naast reistijd',.05)}</div>
@@ -754,12 +757,12 @@ function viewSettings(){
   <div class="row"><button class="btn primary" data-act="saveset">Opslaan en opnieuw plannen</button></div></section>
   <section class="panel sec"><h2>Feestdagen</h2><p class="small">Op een aangevinkte feestdag is niemand beschikbaar: er wordt die dag niets ingepland.</p><div class="settings">${FD_KEYS.map(([k,l])=>`<label class="chk"><input type="checkbox" data-fd="${k}"${fdCfg()[k]?' checked':''}> ${l}</label>`).join('')}</div><div class="row"><button class="btn" data-act="savefd">Feestdagen opslaan</button></div></section>
   <section class="panel sec"><div class="help"><h3 style="margin-top:14px">Zo rekent de planner</h3>
-  <p>Per dag simuleert de app voor elke medewerker de rit: vertrek op begintijd vanaf de standplaats, rijden, parkeren, eventueel wachten tot het tijdvenster opent, reinigen, pauze, en terug naar de standplaats. Een rit is geldig als alle voertuigen binnen hun venster klaar zijn, de medewerker voor de eindtijd terug is en de vaardigheden kloppen.</p>
+  <p>Per dag simuleert de app voor elke medewerker de rit: vertrek op begintijd vanaf de standplaats, rijden, parkeren, eventueel wachten tot het tijdvenster opent, ${T.werk}, pauze, en terug naar de standplaats. Een rit is geldig als alle ${T.objLangMv} binnen hun venster klaar zijn, de medewerker voor de eindtijd terug is en de vaardigheden kloppen.</p>
   <p>Staat "Begintijd = aanwezig bij de eerste klant" aan, dan vertrekt de medewerker zo vroeg dat hij precies op zijn begintijd bij de eerste klant is. Bij begintijd 08:00 kan de eerste klus dus om 08:00 beginnen, waar de medewerker ook woont.</p>
-  <p>Het plannen gebeurt in twee stappen. Eerst wordt opdracht voor opdracht ingevoegd op de goedkoopste plek; opdrachten met hoge prioriteit en weinig alternatieven gaan voor. Daarna verschuift de app hele klantlocaties tussen medewerkers en draait volgordes om zolang reistijd en kilometers dalen. Auto's op dezelfde locatie blijven zo vanzelf bij elkaar.</p>
+  <p>Het plannen gebeurt in twee stappen. Eerst wordt opdracht voor opdracht ingevoegd op de goedkoopste plek; opdrachten met hoge prioriteit en weinig alternatieven gaan voor. Daarna verschuift de app hele klantlocaties tussen medewerkers en draait volgordes om zolang reistijd en kilometers dalen. ${T.ObjMv} op dezelfde locatie blijven zo vanzelf bij elkaar.</p>
   <p>Reistijden zijn een schatting op basis van hemelsbrede afstand. Voor productie koppel je een routeservice (bijv. OSRM, Google of TomTom) voor echte rijtijden en wegroutes.</p></div></section>`,
   archief:`<section class="panel sec"><h2>Archief</h2><p class="small">Gereed gemelde bezoeken worden naar het archief gekopieerd. De planning zelf blijft ongewijzigd.</p>${archiefHtml()}</section>`,
-  types:`<section class="panel sec"><div class="toolbar"><h2>Reinigingstypes</h2><span class="sp"></span><button class="btn" data-act="edittype">${I.plus} Nieuw type</button></div>
+  types:`<section class="panel sec"><div class="toolbar"><h2>${T.Types}</h2><span class="sp"></span><button class="btn" data-act="edittype">${I.plus} Nieuw type</button></div>
   <div class="tbl-wrap"><table><thead><tr><th>Type</th><th>Standaardduur</th><th>Vereiste vaardigheid</th><th></th></tr></thead><tbody>${tr}</tbody></table></div></section>`,
   data:`<section class="panel sec"><h2>Gegevens</h2>
   <p class="help">Gegevens worden in deze browser bewaard. Kopieer een back-up om ze elders te gebruiken of terug te zetten.</p>
@@ -780,7 +783,7 @@ function viewApi(){
   const bcInfo=!SERVER||!t?'':t.ok?`Getest ${esc(when(t.at))} \u00b7 omgeving <b>${esc(t.env||'')}</b>${t.company?' \u00b7 bedrijf <b>'+esc(t.company)+'</b>':''}`:`<span style="color:var(--bad)">${esc(t.error||'')}</span> <span class="muted">(${esc(when(t.at))})</span>`;
   const nPdok=D.locations.filter(needsPdok).length,orsPts=orsPointsFor(null),orsMiss=orsMissing(orsPts),orsTot=orsPts.length*(orsPts.length-1);
   const box=(k,title,sub,chip,body)=>`<details class="panel sec apibox" data-apibox="${k}"${API_OPEN()[k]?' open':''}><summary><span class="apit"><b>${title}</b><span class="small muted">${sub}</span></span><span class="sp"></span>${chip}</summary><div class="apibody">${body}</div></details>`;
-  return box('bc','Business Central','Reinigingen naar BC voor facturatie',bcChip,`
+  return box('bc','Business Central','Opdrachten naar BC voor facturatie',bcChip,`
     ${bcInfo?`<p style="margin:0 0 10px" class="small">${bcInfo}</p>`:''}
     <div class="row" style="align-items:center;margin-bottom:6px">${SERVER?'<button class="btn sm primary" data-act="bctest">Koppeling testen</button>':''}<span class="small muted">Logt in bij Microsoft en toont de bedrijven in BC. Er verandert niets in BC.</span></div>
     <h3 style="margin:14px 0 6px;font-size:15px">Exporteren</h3>
@@ -802,7 +805,7 @@ function viewApi(){
 }
 function editType(id){
   const t=id?TYP[id]:{name:'',dur:30,skill:''};const used=id?D.jobs.filter(j=>j.type===id).length:0;
-  openForm({title:id?'Reinigingstype bewerken':'Nieuw reinigingstype',fields:[{k:'name',label:'Naam',req:1},{k:'dur',label:'Standaardduur (min)',type:'number',req:1},{k:'skill',label:'Vereiste vaardigheid (leeg = iedereen)',wide:1,ph:'bijv. coating'},{k:'bcItem',label:'Artikel- of resourcenummer in BC',ph:'bijv. BUITENWAS'}],values:t,
+  openForm({title:id?T.Type+' bewerken':'Nieuw '+T.type,fields:[{k:'name',label:'Naam',req:1},{k:'dur',label:'Standaardduur (min)',type:'number',req:1},{k:'skill',label:'Vereiste vaardigheid (leeg = iedereen)',wide:1,ph:'bijv. coating'},{k:'bcItem',label:'Artikel- of resourcenummer in BC',ph:'bijv. BUITENWAS'}],values:t,
     onSave:v=>{v.dur=+v.dur||30;v.skill=v.skill.toLowerCase();if(id)Object.assign(t,v);else D.types.push({id:uid('t'),...v});replan(Object.keys(D.plans));toast('Type opgeslagen.')},
     onDelete:id&&!used?()=>{D.types=D.types.filter(x=>x.id!==id);save();render()}:null});
 }

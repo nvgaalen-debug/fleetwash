@@ -11,6 +11,18 @@
       ]
     },
     {
+      "route": "/profielen/*",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
+      "route": "/js/00-profiel.js",
+      "allowedRoles": [
+        "anonymous"
+      ]
+    },
+    {
       "route": "/api/mijn-planning",
       "allowedRoles": [
         "anonymous"
@@ -53,7 +65,8 @@
       "/medewerker.html",
       "/api/*",
       "/css/*",
-      "/js/*"
+      "/js/*",
+      "/profielen/*"
     ]
   }
 }

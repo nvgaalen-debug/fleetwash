@@ -64,7 +64,7 @@ function onClick(e){
     case'xpvf':{if(XIMP){XIMP.pv.f=el.dataset.f;renderXPrev();if(el.closest('#xdet'))xScrollTbl()}break}
     case'xdet':{if(XIMP){const k=el.dataset.k;if(k==='imp'){XIMP.det=XIMP.det==='imp'?null:'imp';XIMP.pv.f='imp';XIMP.pv.q='';renderXPrev();xScrollTbl()}else{XIMP.det=XIMP.det===k?null:k;if(k==='skip'&&XIMP.det)XIMP.pv.f='skip';renderXPrev()}}break}
     case'xpvq':{if(XIMP){XIMP.pv.q=el.dataset.q;XIMP.pv.f='all';renderXPrev();xScrollTbl()}break}
-    case'xlog':{const box=$('#xlogBox');if(box.innerHTML){box.innerHTML='';el.textContent=`Bekijk alle regels per voertuig (${XIMP.log.length})`}else{LOGSRC={entries:XIMP.log,preview:true};LOGF={st:'alle',q:'',m:''};box.innerHTML=logShell();logRefresh();el.textContent='Verberg regels'}break}
+    case'xlog':{const box=$('#xlogBox');if(box.innerHTML){box.innerHTML='';el.textContent=`Bekijk alle regels per ${T.objLang} (${XIMP.log.length})`}else{LOGSRC={entries:XIMP.log,preview:true};LOGF={st:'alle',q:'',m:''};box.innerHTML=logShell();logRefresh();el.textContent='Verberg regels'}break}
     case'publish':openPublish();break;
     case'wlink':copyWorkerLink(el.dataset.id);break;
     case'visit':S.wid=el.dataset.wid;S.selLoc=el.dataset.loc;openVisit(el.dataset.wid,el.dataset.loc);break;
@@ -95,7 +95,7 @@ function onClick(e){
     case'orsclear':D.ors={};D.orsAt=null;save();render();toast('Opgehaalde rijtijden gewist; de schatting wordt weer gebruikt.');break;
     case'msgs':openMsgs({wid:el.dataset.wid,ref:el.dataset.ref});break;
     case'msgw':{const t=$('#msgTxt');if(t)MV.draft=t.value;MV.wid=el.dataset.wid;markSeen(MV.wid);renderMsgs();break}
-    case'msgtpl':{const t=$('#msgTxt');t.value=(t.value?t.value.trim()+' ':'')+MSGT[+el.dataset.i];t.focus();const k=t.value.indexOf('{tijd}');if(k>=0)t.setSelectionRange(k,k+6);break}
+    case'msgtpl':{const t=$('#msgTxt');t.value=(t.value?t.value.trim()+' ':'')+msgT()[+el.dataset.i];t.focus();const k=t.value.indexOf('{tijd}');if(k>=0)t.setSelectionRange(k,k+6);break}
     case'msgsend':sendMsg();break;
     case'msgnoref':{const t=$('#msgTxt');if(t)MV.draft=t.value;MV.ref='';renderMsgs();break}
     case'msgref':fetchMsgs(true).then(()=>{if(MSG.err==='pw'){const w=MV&&MV.wid;askPw(()=>{openMsgs({wid:w})})}else renderMsgs()});break;
@@ -122,7 +122,7 @@ function onClick(e){
     case'newloc':editLoc(null);break;case'editloc':editLoc(el.dataset.id);break;
     case'neww':editW(null);break;case'editw':editW(el.dataset.id);break;
     case'edittype':editType(el.dataset.id||null);break;
-    case'saveset':{document.querySelectorAll('[data-set]').forEach(i=>{const k=i.dataset.set;D.settings[k]=i.type==='checkbox'?i.checked:i.type==='number'?(+i.value||0):i.value});replan(Object.keys(D.plans));toast('Instellingen opgeslagen, planningen opnieuw berekend.');break}
+    case'saveset':{document.querySelectorAll('[data-set]').forEach(i=>{const k=i.dataset.set;D.settings[k]=i.type==='checkbox'?i.checked:i.type==='number'?(+i.value||0):i.value});if(typeof profielKies==='function')profielKies(D.settings.profiel||'wassen');replan(Object.keys(D.plans));toast('Instellingen opgeslagen, planningen opnieuw berekend.');break}
     case'export':copyText(JSON.stringify(D),'Back-up gekopieerd naar het klembord.');break;
     case'restore':openForm({title:'Back-up terugzetten',okLabel:'Terugzetten',note:'Plak een eerder gekopieerde back-up. Dit vervangt alle huidige gegevens.',fields:[{k:'csv',label:'Back-up (JSON)',type:'textarea'}],values:{},onSave:v=>{try{const x=JSON.parse(v.csv);if(!x.version||!x.jobs)throw 0;D=x;save();render();toast('Back-up teruggezet.')}catch(e){return'Dit is geen geldige back-up.'}}});break;
     case'reset':if(el.dataset.armed){D=sample();S.date='2026-10-29';save();render();toast('Voorbeelddata hersteld.')}else{el.dataset.armed='1';el.textContent='Klik nogmaals: alles wordt vervangen';setTimeout(()=>{if(el.isConnected){delete el.dataset.armed;el.textContent='Voorbeelddata herstellen'}},4000)}break;

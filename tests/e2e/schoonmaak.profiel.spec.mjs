@@ -69,6 +69,8 @@ test("profiel schoonmaak gebouwen: kiezen, importeren, plannen, medewerker-app",
   await expect(tel.getByText("GB-1.01").first()).toBeVisible();
   await expect(tel).toHaveTitle(/Mijn Schoonmaakroute/);
   await expect(tel.getByText(/ruimtes · schoonmaken/).first()).toBeVisible();
+  await expect(tel.locator(".objcode").first()).toBeVisible();
+  await expect(tel.locator(".plate")).toHaveCount(0);
   const gbId = await page.evaluate(() => D.jobs.find(j => j.plate === "GB-1.01").id);
   await tel.locator(`[data-act=issue][data-id="${gbId}"]`).click();
   await expect(tel.getByText("Ruimte niet toegankelijk")).toBeVisible();

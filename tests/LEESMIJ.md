@@ -57,6 +57,9 @@ Browsertests (`npm run browser`):
 Profielen (`profielen/`):
 - Profiel schoonmaak gebouwen kiezen in Beheer, Excel met ruimtecodes importeren, plannen, medewerker-app met eigen woorden en redenen.
 - Scan: met het schoonmaakprofiel staat op geen enkel scherm, menu, formulier of tooltip nog een woord van het wasprofiel.
+- Profiel technische dienst (onderhoud aan huis): server start al met dit profiel, woorden/plannen/medewerker-app en redenen gecontroleerd.
+- Scan: met het technische-dienstprofiel staat op geen enkel scherm nog een woord van het was- of schoonmaakprofiel.
+- Motortest `voorbeelddata.test.mjs`: "Voorbeelddata herstellen" geeft elk profiel zijn eigen voorbeeldset (alles plant, geen kentekens/auto-termen in een ander profiel dan wassen).
 
 Bekende grens (gemarkeerd als TODO, telt niet als fout): dagroute met "pauze uiterlijk 13:30" zit circa 8% van het optimum, omdat daarvoor drie medewerkers tegelijk moeten ruilen.
 

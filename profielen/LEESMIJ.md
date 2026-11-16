@@ -8,6 +8,7 @@ Een **profiel** bepaalt wat de gebruiker ziet en hoe de import leest. Wisselen k
 |---|---|---|---|---|
 | Autowassen op locatie (standaard) | `wassen.js` | een auto, met kenteken | kolom "Kenteken" | 60 min |
 | Schoonmaak gebouwen | `schoonmaak-gebouwen.js` | een ruimte of zone, met ruimtecode | kolom "Ruimtecode", "Ruimte" of "Zone" | 120 min |
+| Technische dienst (onderhoud aan huis) | `technische-dienst.js` | een klus bij een klant thuis, met ordernummer | kolom "Ordernummer", "Order", "Werkbon" of "Melding" | 90 min |
 
 ## Een profiel toevoegen
 
@@ -25,8 +26,12 @@ Een **profiel** bepaalt wat de gebruiker ziet en hoe de import leest. Wisselen k
 4. **redenen**: de keuzes in de medewerker-app als een opdracht niet lukt.
 5. **regels**: `slotMaxMin` (begin- en eindtijd tot zoveel minuten = vaste afspraak, langer = tijdvak),
    `kentekenplaat` (gele NL-plaat of gewone code).
-6. Laad het bestand in `index.html` en `medewerker.html`, naast de andere profielen.
-7. Voeg een testset toe in `tests/fixtures/` en een browsertest naar het voorbeeld van `tests/e2e/schoonmaak.profiel.spec.mjs`.
-   `tests/e2e/schoonmaak.scan.spec.mjs` laat zien hoe je controleert dat er geen woorden van een ander profiel achterblijven.
+6. Laad het bestand in `index.html`, `medewerker.html` en `tests/engine/lib.mjs`, naast de andere profielen.
+7. **Voorbeelddata** (de knop "Voorbeelddata herstellen" in Beheer): voeg een eigen `sample<Naam>()`-functie toe in
+   `js/01-kern.js`, naar het voorbeeld van `sampleSchoonmaak()` of `sampleTechnischeDienst()`, en voeg hem toe aan de
+   if-reeks in `sample()`. Zonder eigen voorbeelddata krijgt het profiel de wasset.
+8. Voeg een testset toe in `tests/fixtures/` en een browsertest naar het voorbeeld van `tests/e2e/schoonmaak.profiel.spec.mjs`
+   of `tests/e2e/technische-dienst.profiel.spec.mjs`. De bijbehorende `*.scan.spec.mjs` laat zien hoe je controleert dat
+   er geen woorden van een ander profiel achterblijven (let op: sluit `#set_profiel` uit, die somt bewust alle profielen op).
 
 Ontbreekt een woord in een profiel, dan valt de app terug op het woord uit `wassen.js`.

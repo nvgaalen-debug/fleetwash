@@ -88,6 +88,7 @@ code{background:var(--sunk);padding:2px 6px;border-radius:5px;font-size:14px}
 .plate{display:inline-flex;align-items:stretch;border-radius:4px;overflow:hidden;border:1px solid rgba(0,0,0,.4);font:700 19px/1 var(--f-disp);letter-spacing:.06em;flex:none}
 .plate i{font-style:normal;background:var(--eu);color:#fff;font-size:9px;padding:0 4px 3px;display:flex;align-items:flex-end}
 .plate span{background:var(--plate);color:var(--plate-ink);padding:5px 8px 4px}
+.objcode{display:inline-block;padding:3px 7px;border-radius:4px;border:1px solid var(--line);background:var(--surface);font:600 15px/1.2 var(--f-disp);letter-spacing:.03em;white-space:nowrap;flex:none}
 .car-meta{display:grid;min-width:0}
 .car-meta b{font-weight:600}
 .car-meta span{font-size:14px;color:var(--muted)}
@@ -154,11 +155,14 @@ textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:1
 <script src="js/00-profiel.js"></script>
 <script src="profielen/wassen.js"></script>
 <script src="profielen/schoonmaak-gebouwen.js"></script>
+<script src="profielen/technische-dienst.js"></script>
 <script>
 profielKies('wassen');
 "use strict";
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* Kenteken als gele plaat (profiel met kentekenplaat), anders als code */
+const plateHtml=p=>(typeof prfRegel==='function'&&!prfRegel('kentekenplaat',true))?`<span class="objcode">${esc(p||'—')}</span>`:`<span class="plate"><i>NL</i><span>${esc(p||'—')}</span></span>`;
 const pad=n=>String(n).padStart(2,'0');
 const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 const addDays=(s,n)=>{const d=new Date(s+'T12:00:00');d.setDate(d.getDate()+n);return iso(d)};
@@ -337,7 +341,7 @@ function carHtml(j,st){
   }else{
     act=`<div class="state bad">${IC.warn} ${esc(s.reason||'Probleem gemeld')}${s.pending?' <small>wordt verstuurd…</small>':''}</div>${s.note?`<p class="note">${esc(s.note)}</p>`:''}<button class="linkbtn" data-act="undo" data-id="${esc(j.id)}">Ongedaan maken</button>`;
   }
-  return`<li class="car${s&&S.form!==j.id?' is-'+s.st:''}"><div class="car-top"><span class="plate"><i>NL</i><span>${esc(j.plate)}</span></span><div class="car-meta"><b>${esc(j.type)}</b><span>${esc([j.vehicle,j.start&&j.end?j.start+'–'+j.end:'',j.duration?j.duration+' min':''].filter(Boolean).join(' · '))}</span>${j.window?`<span>Tijdvak klant ${esc(j.window)}</span>`:''}</div></div>${j.notes?`<p class="note">${esc(j.notes)}</p>`:''}${act}</li>`;
+  return`<li class="car${s&&S.form!==j.id?' is-'+s.st:''}"><div class="car-top">${plateHtml(j.plate)}<div class="car-meta"><b>${esc(j.type)}</b><span>${esc([j.vehicle,j.start&&j.end?j.start+'–'+j.end:'',j.duration?j.duration+' min':''].filter(Boolean).join(' · '))}</span>${j.window?`<span>Tijdvak klant ${esc(j.window)}</span>`:''}</div></div>${j.notes?`<p class="note">${esc(j.notes)}</p>`:''}${act}</li>`;
 }
 function visitHtml(v,st){
   const all=v.jobs.length&&v.jobs.every(j=>st[j.id]&&st[j.id].st==='done');

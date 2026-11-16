@@ -48,7 +48,9 @@ function rng(seed){return()=>(seed=(seed*1664525+1013904223)%4294967296)/4294967
 /* Voorbeelddata: per profiel een eigen, passend voorbeeld. Zonder opgegeven profiel wordt het actieve (of anders wassen) gebruikt. */
 function sample(profielId){
   const id=profielId||(typeof PRF!=='undefined'&&PRF&&PRF.id)||'wassen';
-  return id==='schoonmaak-gebouwen'?sampleSchoonmaak():sampleWassen();
+  if(id==='schoonmaak-gebouwen')return sampleSchoonmaak();
+  if(id==='technische-dienst')return sampleTechnischeDienst();
+  return sampleWassen();
 }
 function sampleWassen(){
   const r=rng(11),CON='BDFGHJKLNPRSTVXZ',L=()=>CON[Math.floor(r()*CON.length)],N=()=>Math.floor(r()*10);
@@ -124,6 +126,40 @@ function sampleSchoonmaak(){
   d.absences=[{id:'a_s1',wid:'w3',type:'training',from:'2026-11-20',to:'2026-11-20',part:'',time:'',note:'Cursus hoogwerkerzeem',at:0},
     {id:'a_s2',wid:'w2',type:'arts',from:'2026-11-17',to:'2026-11-17',part:'laat',time:'10:00',note:'Huisarts',at:0},
     {id:'a_s3',wid:'w4',type:'vakantie',from:'2026-08-10',to:'2026-08-24',part:'',time:'',note:'Zomervakantie',at:0}];
+  return d;
+}
+function sampleTechnischeDienst(){
+  const r=rng(37),order=()=>'WO-'+(20000+Math.floor(r()*9999));
+  const APPARATEN=['CV-ketel Remeha Avanta','Wasmachine Bosch','Vaatwasser Siemens','Rookmelders (5x)','Zonneboiler','Warmtepomp Daikin','Kookplaat inductie','Boiler Atag','Droger Miele','Mechanische ventilatie'];
+  const d={version:1,settings:{profiel:'technische-dienst',urbanKm:6,urbanSpeed:35,roadSpeed:80,roadFactor:1.3,parkMin:5,minTravel:6,pauseMin:30,pauseAt:'12:00',pauseMinDay:330,kmWeight:0.3,startAtFirst:true,endAtLast:false,maxPreTravel:60},
+    types:[{id:'cv-onderhoud',name:'CV-onderhoud',dur:45,skill:'gas'},{id:'reparatie',name:'Reparatie apparaat',dur:60,skill:''},{id:'storing',name:'Storing verhelpen',dur:40,skill:''},{id:'keuring',name:'Veiligheidskeuring',dur:30,skill:'keuring'},{id:'installatie',name:'Nieuwe installatie',dur:90,skill:'gas'}],
+    customers:[],locations:[],jobs:[],workers:[],plans:{}};
+  const A='2026-11-17',B='2026-11-18';
+  const SPEC=[
+   ['Fam. de Wit','Karin de Wit','030 271 44 10','Thuis','Vogelzand 14','3514 GV','Utrecht',52.085,5.115,[[A,1,'cv-onderhoud','09:00','11:00',2]]],
+   ['Dhr. Scholten','Bert Scholten','030 605 90 21','Thuis','Componistenlaan 22','3438 SH','Nieuwegein',52.031,5.090,[[A,1,'storing','09:30','10:30',3]]],
+   ['Fam. Al-Amin','Yasmin Al-Amin','030 637 10 45','Thuis','Castellumlaan 5','3992 XL','Houten',52.034,5.162,[[A,1,'reparatie','11:00','13:00',2]]],
+   ['Mw. Hendriksen','Joke Hendriksen','033 472 20 18','Thuis','Ringweg-Randenbroek 88','3816 NC','Amersfoort',52.148,5.378,[[A,1,'keuring','13:30','14:30',2]]],
+   ['Dhr. en Mw. Peeters','Wim Peeters','030 605 33 09','Thuis','Vreeswijksestraatweg 12','3433 PE','Nieuwegein',52.021,5.088,[[B,1,'installatie','08:00','11:00',2]]],
+   ['Fam. Dijkstra','Anneke Dijkstra','030 637 45 02','Thuis','Loerikseweg 3','3992 BA','Houten',52.037,5.155,[[B,1,'cv-onderhoud','09:00','11:00',2]]],
+   ['Dhr. Yilmaz','Serkan Yilmaz','030 273 18 60','Thuis','Rubenslaan 44','3523 BK','Utrecht',52.078,5.108,[[B,1,'storing','11:30','12:30',3]]],
+   ['Mw. Bakker','Ineke Bakker','033 465 02 77','Thuis','Smitsweg 9','3811 ED','Amersfoort',52.158,5.390,[[B,1,'reparatie','13:00','15:00',2]]]
+  ];
+  SPEC.forEach((s,i)=>{const cid='c'+(i+1),lid='l'+(i+1);
+    d.customers.push({id:cid,name:s[0],contact:s[1],phone:s[2],email:''});
+    d.locations.push({id:lid,customerId:cid,name:s[3],address:s[4],postcode:s[5],city:s[6],lat:s[7],lng:s[8],geo:'manual'});
+    s[9].forEach(([date,n,type,from,to,prio])=>{for(let k=0;k<n;k++){d.jobs.push({id:'j'+(d.jobs.length+1),plate:order(),vehicle:APPARATEN[Math.floor(r()*APPARATEN.length)],locationId:lid,date,from,to,type,duration:'',priority:prio,notes:''})}});
+  });
+  d.workers=[
+   {id:'w1',name:'Robin Dekker',postcode:'3511 AB',city:'Utrecht',lat:52.090,lng:5.120,geo:'pc4',start:'07:30',end:'16:00',days:[1,2,3,4,5],absent:[],skills:['gas'],color:0},
+   {id:'w2',name:'Mila Verbeek',postcode:'3431 LZ',city:'Nieuwegein',lat:52.029,lng:5.087,geo:'pc4',start:'07:30',end:'16:00',days:[1,2,3,4,5],absent:[],skills:[],color:1},
+   {id:'w3',name:'Hassan Bouzid',postcode:'3991 AE',city:'Houten',lat:52.030,lng:5.160,geo:'pc4',start:'08:00',end:'16:30',days:[1,2,3,4,5],absent:[],skills:['gas','keuring'],color:2},
+   {id:'w4',name:'Jorrit Smeets',postcode:'3811 AA',city:'Amersfoort',lat:52.156,lng:5.387,geo:'pc4',start:'07:30',end:'15:30',days:[1,2,3,4],absent:[],skills:[],color:3}
+  ];
+  d.workers.forEach((w,i)=>{w.token=randTok();w.leaveDays=[25,24,25,20][i]});
+  d.absences=[{id:'a_s1',wid:'w2',type:'arts',from:'2026-11-17',to:'2026-11-17',part:'laat',time:'10:00',note:'Huisarts',at:0},
+    {id:'a_s2',wid:'w4',type:'training',from:'2026-11-20',to:'2026-11-20',part:'',time:'',note:'Cursus veiligheidskeuringen',at:0},
+    {id:'a_s3',wid:'w3',type:'vakantie',from:'2026-08-10',to:'2026-08-24',part:'',time:'',note:'Zomervakantie',at:0}];
   return d;
 }
 /* data: de planning zoals de server die heeft geleverd. Op de server-versie is er geen lokale kopie meer. */

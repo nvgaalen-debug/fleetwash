@@ -1,0 +1,32 @@
+{
+ "naam": "technische-dienst",
+ "bron": "handmatig samengesteld voor het profiel technische-dienst (scan-test)",
+ "opmerking": "Coördinaten benaderd.",
+ "medewerkers": [
+  { "id": "R", "name": "Robin Dekker", "start": "07:30", "end": "16:00", "lat": 52.090, "lng": 5.120, "skills": ["gas"] },
+  { "id": "M", "name": "Mila Verbeek", "start": "07:30", "end": "16:00", "lat": 52.029, "lng": 5.087, "skills": [] }
+ ],
+ "instellingen": {
+  "profiel": "technische-dienst",
+  "pauseMin": 30,
+  "pauseAt": "12:00",
+  "pauseTot": "13:30",
+  "pauseMinDay": 330,
+  "kmWeight": 0.3,
+  "startAtFirst": true,
+  "endAtLast": false,
+  "travelSource": "estimate"
+ },
+ "types": [
+  { "id": "cv-onderhoud", "name": "CV-onderhoud", "dur": 45, "skill": "gas" },
+  { "id": "reparatie", "name": "Reparatie apparaat", "dur": 60, "skill": "" },
+  { "id": "storing", "name": "Storing verhelpen", "dur": 40, "skill": "" },
+  { "id": "keuring", "name": "Veiligheidskeuring", "dur": 30, "skill": "keuring" }
+ ],
+ "opdrachten": [
+  { "kenteken": "WO-20101", "klant": "Fam. de Wit", "adres": "Vogelzand 14", "postcode": "3514 GV", "plaats": "UTRECHT", "datum": "2026-12-17", "tijd": "09.00 tot 11.00", "type": "cv-onderhoud", "info": "CV-ketel Remeha Avanta", "lat": 52.085, "lng": 5.115 },
+  { "kenteken": "WO-20102", "klant": "Dhr. Scholten", "adres": "Componistenlaan 22", "postcode": "3438 SH", "plaats": "NIEUWEGEIN", "datum": "2026-12-17", "tijd": "09.30 tot 10.30", "type": "storing", "info": "Wasmachine Bosch", "lat": 52.031, "lng": 5.090 },
+  { "kenteken": "WO-20103", "klant": "Fam. Al-Amin", "adres": "Castellumlaan 5", "postcode": "3992 XL", "plaats": "HOUTEN", "datum": "2026-12-17", "tijd": "11.00 tot 13.00", "type": "reparatie", "info": "Vaatwasser Siemens", "lat": 52.034, "lng": 5.162 },
+  { "kenteken": "WO-20104", "klant": "Mw. Hendriksen", "adres": "Ringweg-Randenbroek 88", "postcode": "3816 NC", "plaats": "AMERSFOORT", "datum": "2026-12-17", "tijd": "Niet beschikbaar", "type": "keuring", "info": "Rookmelders (5x)", "lat": 52.148, "lng": 5.378 }
+ ]
+}

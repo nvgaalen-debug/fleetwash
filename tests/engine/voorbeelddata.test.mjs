@@ -45,4 +45,23 @@ describe("Voorbeelddata per profiel", () => {
     const dates = E.call("T_sample", "niet-bestaand-profiel");
     assert.equal(dates[0], "2026-10-29");
   });
+
+  test("profiel technische-dienst: eigen klussen bij klanten thuis, alles plant", () => {
+    const E = engine();
+    const dates = E.call("T_sample", "technische-dienst");
+    assert.equal(dates.length, 2);
+    for (const date of dates) {
+      const total = E.call("T_state", date).jobs.filter(j => j.date === date).length;
+      E.call("T_plan", date);
+      const m = E.call("T_metrics", date);
+      assert.ok(m.feasible, `plan op ${date} is haalbaar`);
+      assert.equal(m.split, 0);
+      assert.equal(m.cars, total, `alles ingepland op ${date}`);
+    }
+    const jobs = E.call("T_state").jobs;
+    for (const j of jobs) {
+      assert.doesNotMatch(j.plate, /^[A-Z]{2}-\d{3}-[A-Z]$/, "geen kentekenformaat als ordernummer");
+      assert.doesNotMatch(String(j.vehicle || ""), /VW|Toyota|Kia|Skoda|Peugeot|Volvo|Tesla|Renault|BMW|Audi|Transit|Sprinter|Crafter|Jumper/i);
+    }
+  });
 });

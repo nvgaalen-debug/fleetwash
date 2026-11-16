@@ -15,6 +15,14 @@ function profielKies(id){
     document.querySelectorAll('[data-profiel]').forEach(el=>{const v=T[el.dataset.profiel];if(v)el.textContent=v});
     const app=document.body&&document.body.dataset.profielTitel==='app';
     document.title=app?T.appNaam:(p.titel||document.title);
+    /* Branche-kleur en -icoon (css/app.css resp. het eigen stijlblok van medewerker.html kiezen de kleur op dit attribuut;
+       zonder eigen stijl blijft het de kleur/vorm van wassen, zodat dat profiel er niet door verandert) */
+    document.documentElement.dataset.profiel=p.id;
+    const st=p.stijl||(PROFIELEN.wassen&&PROFIELEN.wassen.stijl);
+    if(st){
+      const svg=document.querySelector('.brand svg[data-logo]');if(svg)svg.innerHTML=(app?st.medewerker:st.planner)||svg.innerHTML;
+      const tc=document.querySelector('meta[name="theme-color"]');if(tc&&st.accent)tc.content=st.accent;
+    }
   }}catch(e){}
   if(typeof menuProfiel==='function')try{menuProfiel()}catch(e){}
   return p;

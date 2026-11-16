@@ -481,24 +481,48 @@ function repairPass(R,ws,pins,todoIds,deadline){
 function insertLoop(rest,R,ws){
   const base={};const upd=wid=>base[wid]=costOf(simulate(WRK[wid],R[wid]));ws.forEach(w=>upd(w.id));
   let units=unitsOf(rest);
+  if(!units.length)return;
+  /* Kostentabel: voor elk nog te plaatsen bezoek de optie (beste plek + meerkosten) bij elke medewerker, aflopend
+     gesorteerd. Bij elke plaatsing verandert maar één medewerkersroute, dus hoeft alleen de rij van díe medewerker
+     herberekend te worden voor de resterende bezoeken — niet alles bij alle medewerkers opnieuw (dat maakte deze
+     stap bij veel medewerkers en veel bezoeken onevenredig traag: O(bezoeken² × medewerkers) in plaats van
+     O(bezoeken² ) hieronder). */
+  const calcOpt=(u,w)=>{const b=bestPos(w,R[w.id],u,true);return b?{w:w.id,arr:b.arr,d:b.c-base[w.id]}:null};
+  const optsOf=new Map();
+  units.forEach(u=>{const opts=[];for(const w of ws){const o=calcOpt(u,w);if(o)opts.push(o)}opts.sort((a,b)=>a.d-b.d);optsOf.set(u,opts)});
+  /* Index: welke medewerkers hebben al een bezoek op precies deze fysieke plek (voor stap 1 hieronder), zodat
+     samePlaceFit niet elke ronde alle medewerkers hoeft langs te gaan. */
+  const locKey=u=>{const l=JOB[u[0]]&&LOC[JOB[u[0]].locationId];return l?physKey(l):''};
+  const locWorkers=new Map();
+  ws.forEach(w=>{const seen=new Set();(R[w.id]||[]).forEach(id=>{const l=JOB[id]&&LOC[JOB[id].locationId];if(!l)return;const k=physKey(l);if(seen.has(k))return;seen.add(k);
+    if(!locWorkers.has(k))locWorkers.set(k,new Set());locWorkers.get(k).add(w.id)})});
+  const place=(u,wid,arr)=>{
+    R[wid]=arr;upd(wid);
+    const k=locKey(u);if(!locWorkers.has(k))locWorkers.set(k,new Set());locWorkers.get(k).add(wid);
+    units=units.filter(x=>x!==u);optsOf.delete(u);
+    const w=WRK[wid];
+    for(const x of units){const opts=optsOf.get(x).filter(o=>o.w!==wid);const o=calcOpt(x,w);if(o)opts.push(o);opts.sort((a,b)=>a.d-b.d);optsOf.set(x,opts)}
+  };
   while(units.length){
     /* Stap 1, vóór de normale selectie: staat een medewerker al op dezelfde fysieke plek en past het volledige bezoek bij hem/haar, dan gaat het bezoek naar die medewerker */
     let direct=null;
-    for(const u of units){const r=samePlaceFit(u,R,ws);if(r.fit&&(!direct||r.c<direct.c))direct={u,...r}}
-    if(direct){R[direct.w]=direct.arr;upd(direct.w);units=units.filter(x=>x!==direct.u);continue}
+    for(const u of units){
+      const cand=locWorkers.get(locKey(u));if(!cand||!cand.size)continue;
+      const r=samePlaceFit(u,R,[...cand].map(id=>WRK[id]).filter(Boolean));
+      if(r.fit&&(!direct||r.c<direct.c))direct={u,...r};
+    }
+    if(direct){place(direct.u,direct.w,direct.arr);continue}
     let pick=null;
     for(const u of units){
-      const pr=Math.max(...u.map(id=>+(JOB[id]&&JOB[id].priority)||2)),opts=[];
+      const opts=optsOf.get(u);if(!opts||!opts.length)continue;
+      const pr=Math.max(...u.map(id=>+(JOB[id]&&JOB[id].priority)||2));
       /* Het hele bezoek moet binnen één medewerker passen; anders blijft het bezoek liever even onbezet */
-      for(const w of ws){const b=bestPos(w,R[w.id],u,true);if(b)opts.push({w:w.id,arr:b.arr,d:b.c-base[w.id]})}
-      if(!opts.length)continue;
-      opts.sort((a,b)=>a.d-b.d);
       const regret=opts.length>1?opts[1].d-opts[0].d:300;
       const score=pr*1e6+Math.min(regret,999)*100-opts[0].d;
       if(!pick||score>pick.score)pick={u,score,o:opts[0]};
     }
     if(!pick)break;
-    R[pick.o.w]=pick.o.arr;upd(pick.o.w);units=units.filter(x=>x!==pick.u);
+    place(pick.u,pick.o.w,pick.o.arr);
   }
 }
 function better(vN,cN,vO,cO){return vN<vO-.5||(vN<=vO+.01&&cN<cO-.5)}

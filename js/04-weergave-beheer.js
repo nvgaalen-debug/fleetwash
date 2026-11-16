@@ -17,12 +17,13 @@ const MENU_ITEMS={
   'instellingen:archief':['Archief','Gereed gemelde bezoeken archiveren, bekijken en oude planningen opruimen'],
   'instellingen:menu':['Menu indelen','Kies wat in het hoofdmenu en in de groepen staat'],
   'act:logout':['Uitloggen','App-wachtwoord vergeten op deze computer'],
+  'act:beheerlock':['Beheer vergrendelen','Verberg het Beheer-menu weer tot het wachtwoord opnieuw is ingevuld'],
   'facturatie':['Business Central interface','Gereedmeldingen per maand naar BC voor facturatie'],
   'instellingen:api':['API koppelingen','Business Central testen en exporteren, rijtijden, adressen en AI']};
 /* Menu-teksten die van het profiel afhangen: bijgewerkt bij elke profielkeuze */
 function menuProfiel(){MENU_ITEMS['opdrachten'][1]=T.opdrachtenUitleg;MENU_ITEMS['instellingen:types']=[T.Types,T.TypesUitleg];if(typeof MENU_SHORT!=='undefined'&&MENU_SHORT['instellingen:types'])MENU_SHORT['instellingen:types']=T.Types}
 const MENU_SHORT={'opdrachten':'Overzicht','medewerkers':'Gegevens'};
-const menuDefault=()=>({top:['planning','g:opdr','klanten','g:mw','g:beheer'],groups:{opdr:{l:'Opdrachten',items:['opdrachten','importlog','facturatie','act:import']},mw:{l:'Medewerkers',items:['medewerkers','afwezigheid','act:msgs']},beheer:{l:'Beheer',items:['instellingen:planning','instellingen:types','instellingen:data','instellingen:archief','instellingen:api','instellingen:menu','act:logout']}},hidden:[]});
+const menuDefault=()=>({top:['planning','g:opdr','klanten','g:mw','g:beheer'],groups:{opdr:{l:'Opdrachten',items:['opdrachten','importlog','facturatie','act:import']},mw:{l:'Medewerkers',items:['medewerkers','afwezigheid','act:msgs']},beheer:{l:'Beheer',items:['instellingen:planning','instellingen:types','instellingen:data','instellingen:archief','instellingen:api','instellingen:menu','act:logout','act:beheerlock']}},hidden:[]});
 function menuCfg(){
   let m=D.menu;if(!m||!m.top||!m.groups)m=D.menu=menuDefault();
   const placed=new Set([...m.top.filter(x=>!x.startsWith('g:')),...Object.values(m.groups).flatMap(g=>g.items),...(m.hidden||[])]);
@@ -34,7 +35,15 @@ function menuCfg(){
   return m;
 }
 const mLabel=(id,inGroup)=>(inGroup&&MENU_SHORT[id])||MENU_ITEMS[id][0];
-function buildNav(){const m=menuCfg();return m.top.map(x=>{if(!x.startsWith('g:'))return{k:x,l:mLabel(x),to:x,d:MENU_ITEMS[x][1]};const g=m.groups[x.slice(2)];return{k:x,l:g.l,items:g.items.map(id=>[id,mLabel(id,true),MENU_ITEMS[id][1]])}}).filter(g=>!g.items||g.items.length)}
+/* Als een BEHEER_WACHTWOORD actief is en (nog) niet is ingevuld in dit tabblad, blijft de hele Beheer-groep
+   (instellingen:*, en voor de volledigheid ook "Uitloggen") uit de navigatie, ongeacht waar iemand de
+   onderdelen via "Menu indelen" ooit heeft neergezet. "Beheer vergrendelen" is alleen zinvol en zichtbaar
+   zodra het al ontgrendeld is. */
+const navHidden=id=>{
+  if(id==='act:beheerlock')return BEHEER_ACTIEF!==true||beheerGated();
+  return(id.startsWith('instellingen:')||id==='act:logout')&&beheerGated();
+};
+function buildNav(){const m=menuCfg();return m.top.map(x=>{if(!x.startsWith('g:'))return navHidden(x)?null:{k:x,l:mLabel(x),to:x,d:MENU_ITEMS[x][1]};const g=m.groups[x.slice(2)];const items=g.items.filter(id=>!navHidden(id));return{k:x,l:g.l,items:items.map(id=>[id,mLabel(id,true),MENU_ITEMS[id][1]])}}).filter(Boolean).filter(g=>!g.items||g.items.length)}
 function menuLoc(id){const m=menuCfg();if(m.hidden.includes(id))return'hidden';if(m.top.includes(id))return'top';for(const k in m.groups)if(m.groups[k].items.includes(id))return'g:'+k;return'top'}
 function menuMove(id,to){
   const m=menuCfg();m.top=m.top.filter(x=>x!==id);m.hidden=m.hidden.filter(x=>x!==id);for(const k in m.groups)m.groups[k].items=m.groups[k].items.filter(x=>x!==id);
@@ -62,7 +71,8 @@ function viewMenu(){
 const navCur=()=>S.tab==='instellingen'?'instellingen:'+(S.setPage||'planning'):S.tab;
 const navGroup=()=>buildNav().find(g=>g.to===S.tab||(g.items||[]).some(([t])=>t===navCur()))||{};
 function navTo(t){
-  if(t.startsWith('act:')){closeMenus();const a=t.slice(4);if(a==='import')openXlsxImport();else if(a==='msgs')openMsgs({});else if(a==='logout')logoutPw();return}
+  if(t.startsWith('act:')){closeMenus();const a=t.slice(4);if(a==='import')openXlsxImport();else if(a==='msgs')openMsgs({});else if(a==='logout')logoutPw();else if(a==='beheerlock')beheerVergrendel();return}
+  if(t.startsWith('instellingen:')&&beheerGated()){closeMenus();askBeheerPw(()=>navTo(t));return}
   const[tab,sub]=t.split(':');S.tab=tab;if(sub)S.setPage=sub;closeMenus();render();window.scrollTo(0,0);
 }
 function closeMenus(){document.querySelectorAll('.navg.open').forEach(g=>{g.classList.remove('open');const b=g.querySelector('[aria-expanded]');if(b)b.setAttribute('aria-expanded','false')})}
@@ -76,7 +86,8 @@ function renderNav(nIss){
     if(!g.items)return`<button class="tab" data-act="navto" data-to="${g.to}" aria-pressed="${on}" title="${esc(g.d)}">${esc(g.l)}${g.k==='planning'?badge(nIss,nIss+' open melding(en) en ongelezen berichten van medewerkers'):itemBadge(g.k)}</button>`;
     const ids=g.items.map(x=>x[0]),red=ids.includes('act:msgs')?msgUnread():0,neu=ids.includes('importlog')?nLog:0;
     return`<div class="navg"><button class="tab" data-act="navg" aria-haspopup="true" aria-expanded="false" aria-pressed="${on}">${esc(g.l)}${red||neu?`<span class="navdot${red?'':' neu'}" aria-label="${red||neu} nieuw"></span>`:''}<svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      <div class="navmenu" role="menu">${g.items.map(([t,l,d])=>`<button role="menuitem" data-act="navto" data-to="${t}"${t===cur?' aria-current="page"':''}><b>${esc(l)}${itemBadge(t)}</b><small>${esc(d)}</small></button>`).join('')}</div></div>`}).join('');
+      <div class="navmenu" role="menu">${g.items.map(([t,l,d])=>`<button role="menuitem" data-act="navto" data-to="${t}"${t===cur?' aria-current="page"':''}><b>${esc(l)}${itemBadge(t)}</b><small>${esc(d)}</small></button>`).join('')}</div></div>`}).join('')
+    +(beheerGated()?`<button class="iconbtn" data-act="beheerslot" title="Beheer ontgrendelen" style="margin-left:4px">${I.unlock}</button>`:'');
   const sub=$('#subnav');
   if(grp.items){sub.hidden=false;sub.innerHTML=`<div class="subnav-in gut"><span class="subnav-t">${esc(grp.l)}</span>${grp.items.map(([t,l])=>`<button data-act="navto" data-to="${t}" aria-pressed="${t===cur}">${t.startsWith('act:')?(t==='act:import'?I.imp:t==='act:msgs'?I.chat:I.unlock)+' ':''}${esc(l)}${itemBadge(t)}</button>`).join('')}</div>`}
   else{sub.hidden=true;sub.innerHTML=''}
@@ -183,7 +194,14 @@ function viewPlanning(){
     <div class="kpi"><b>${nUtil?Math.round(util/nUtil*100):0}%</b><span>benutting werktijd</span></div>
     <div class="kpi ${warn?'bad':'okk'}"><b>${warn}</b><span>waarschuwingen</span></div>
     ${stKpi(st.date,rows,P)}
-    <div class="acts">${orsChip(st.date,rows)}${edited}${pubChip(st.date)}${msgBtn()}<button class="btn" data-act="publish" title="Ritten klaarzetten in de medewerker-app">${I.send} Publiceer naar medewerkers</button><button class="btn" data-act="unpinall" title="Alle handmatige vastzettingen voor deze dag opheffen">${I.unlock} Vastzetten opheffen</button><button class="btn" data-act="mailklant" title="Planning van deze dag per klant mailen">Mail planning klant</button><button class="btn primary" data-act="auto">${I.auto} Automatisch plannen</button></div>
+    <div class="acts">${orsChip(st.date,rows)}${edited}${pubChip(st.date)}${msgBtn()}<button class="btn" data-act="publish" title="Ritten klaarzetten in de medewerker-app">${I.send} Publiceer naar medewerkers</button>
+      <div class="navg"><button class="btn" data-act="navg" aria-haspopup="true" aria-expanded="false" title="Meer acties voor deze dag">${I.more} Meer</button>
+        <div class="navmenu" role="menu" style="min-width:250px">
+          <button role="menuitem" data-act="unpinall"><b>${I.unlock} Vastzetten opheffen</b><small>Alle handmatige vastzettingen voor deze dag opheffen</small></button>
+          <button role="menuitem" data-act="mailklant"><b>Mail planning klant</b><small>Planning van deze dag per klant mailen</small></button>
+        </div>
+      </div>
+      <button class="btn primary" data-act="auto">${I.auto} Automatisch plannen</button></div>
   </section>`;
   if(!jobs.length)return kpis+`<section class="panel empty"><h2>Geen opdrachten op ${esc(fdate(st.date))}</h2><p>Voeg opdrachten toe onder Opdrachten of kies een andere datum.</p><button class="btn primary" data-act="newjob">${I.plus} Nieuwe opdracht</button></section>`;
   return kpis+sickBanner()+reportsPanel(st)+timeline(st)+`<div class="split">${mapPanel(st)}${routePanel(st)}</div>`+unplannedPanel(st)
@@ -748,11 +766,15 @@ function viewSettings(){
   const tr=D.types.map(t=>`<tr><td><b>${esc(t.name)}</b></td><td class="mono">${t.dur} min</td><td>${t.skill?`<span class="chip">${esc(t.skill)}</span>`:'<span class="muted">iedereen</span>'}</td><td class="act"><button class="btn ghost" data-act="edittype" data-id="${t.id}" aria-label="Bewerken">${I.edit}</button></td></tr>`).join('');
   const orsPts=orsPointsFor(null),orsMiss=orsMissing(orsPts),orsTot=orsPts.length*(orsPts.length-1);
   const pages={planning:`<section class="panel sec"><h2>Reistijd en werkdag</h2>
+  <div class="subhd">Branche</div>
   <div class="settings"><label class="fld"><span>Branche (profiel)</span><select id="set_profiel" data-set="profiel">${Object.values(PROFIELEN).map(p=>`<option value="${esc(p.id)}"${(PRF&&PRF.id)===p.id?' selected':''}>${esc(p.label)}</option>`).join('')}</select><small class="muted">Woorden in de app, kolommen bij importeren, redenen in de medewerker-app en de grens voor vaste tijdsloten (nu ${prfRegel('slotMaxMin',60)} min). Publiceer opnieuw om de medewerker-app mee te laten gaan.</small></label></div>
+  <div class="subhd">Reistijd</div>
   <div class="settings"><label class="fld"><span>Bron voor reistijden</span><select id="set_travelSource" data-set="travelSource"><option value="schatting"${!useORS()?' selected':''}>Schatting (hemelsbreed × wegfactor)</option><option value="ors"${useORS()?' selected':''}>OpenRouteService (echte wegen)</option></select><small class="muted">Bij OpenRouteService gebruikt de app echte rijtijden over de weg. Waar die nog niet zijn opgehaald, wordt geschat.</small></label>
   <div class="fld"><span>OpenRouteService</span><div class="small">${SERVER?`${orsTot?`${orsTot-orsMiss} van ${orsTot} rijtijden opgehaald`:'Nog geen locaties'}${D.orsAt?` · bijgewerkt ${esc(new Date(D.orsAt).toLocaleString('nl-NL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}))}`:''}`:'Werkt in de Netlify-versie, met ORS_API_KEY in Netlify.'}</div><div class="row" style="margin-top:6px"><button class="btn sm" data-act="orsfetch"${SERVER?'':' disabled'}>${I.route} Rijtijden ophalen</button>${D.ors&&Object.keys(D.ors).length?'<button class="btn sm ghost" data-act="orsclear">Opgehaalde rijtijden wissen</button>':''}</div><small class="muted">Haalt rijtijden op tussen alle standplaatsen en locaties met opdrachten vanaf vandaag. Nieuwe locaties? Klik opnieuw; alleen wat ontbreekt wordt opgehaald.</small></div></div>
-  <div class="settings">${num('urbanSpeed','Snelheid in de bebouwde kom (km/u)','Geldt voor de eerste kilometers van elke rit')}${num('urbanKm','Kilometers stadsverkeer per rit','Daarna rekent de app met de snelheid buiten de kom',1)}${num('roadSpeed','Snelheid buiten de kom (km/u)','Gemiddelde inclusief snelweg')}${num('roadFactor','Wegfactor','Hemelsbrede afstand × factor = rijafstand',.05)}${num('parkMin','Parkeren en opstarten (min)','Per aankomst op een klantlocatie')}${num('minTravel','Minimale rijtijd tussen locaties (min)','Voorkomt 0 min bij geschatte posities')}${num('pauseMin','Pauze (min)','0 = geen pauze inplannen')}<label class="fld"><span>Pauze vanaf</span><input type="time" id="set_pauseAt" data-set="pauseAt" value="${esc(s.pauseAt)}"><small class="muted">De pauze begint niet eerder dan dit tijdstip, tussen twee bezoeken</small></label><label class="fld"><span>Pauze uiterlijk</span><input type="time" id="set_pauseTot" data-set="pauseTot" value="${esc(s.pauseTot||'')}"><small class="muted">De pauze begint uiterlijk op dit tijdstip, ook als een vaste afspraak dan later wordt. Leeg = geen grens</small></label>${num('kmWeight','Weging kilometers','Minuten "kosten" per km naast reistijd',.05)}</div>
-  <div class="settings">${num('maxPreTravel','Maximale aanrijtijd vóór de begintijd (min)','Rijtijd naar de eerste klant die buiten werktijd valt. Is de rit langer, dan begint de eerste klus later.')}</div>
+  <div class="settings">${num('urbanSpeed','Snelheid in de bebouwde kom (km/u)','Geldt voor de eerste kilometers van elke rit')}${num('urbanKm','Kilometers stadsverkeer per rit','Daarna rekent de app met de snelheid buiten de kom',1)}${num('roadSpeed','Snelheid buiten de kom (km/u)','Gemiddelde inclusief snelweg')}${num('roadFactor','Wegfactor','Hemelsbrede afstand × factor = rijafstand',.05)}${num('parkMin','Parkeren en opstarten (min)','Per aankomst op een klantlocatie')}${num('minTravel','Minimale rijtijd tussen locaties (min)','Voorkomt 0 min bij geschatte posities')}${num('kmWeight','Weging kilometers','Minuten "kosten" per km naast reistijd',.05)}${num('maxPreTravel','Maximale aanrijtijd vóór de begintijd (min)','Rijtijd naar de eerste klant die buiten werktijd valt. Is de rit langer, dan begint de eerste klus later.')}</div>
+  <div class="subhd">Pauze</div>
+  <div class="settings">${num('pauseMin','Pauze (min)','0 = geen pauze inplannen')}<label class="fld"><span>Pauze vanaf</span><input type="time" id="set_pauseAt" data-set="pauseAt" value="${esc(s.pauseAt)}"><small class="muted">De pauze begint niet eerder dan dit tijdstip, tussen twee bezoeken</small></label><label class="fld"><span>Pauze uiterlijk</span><input type="time" id="set_pauseTot" data-set="pauseTot" value="${esc(s.pauseTot||'')}"><small class="muted">De pauze begint uiterlijk op dit tijdstip, ook als een vaste afspraak dan later wordt. Leeg = geen grens</small></label></div>
+  <div class="subhd">Werktijd</div>
   <div style="display:grid;gap:8px"><label class="chk"><input type="checkbox" id="set_startAtFirst" data-set="startAtFirst"${s.startAtFirst!==false?' checked':''}> Begintijd = aanwezig bij de eerste klant (aanrijden vanaf standplaats valt vóór de begintijd)</label><label class="chk"><input type="checkbox" id="set_endAtLast" data-set="endAtLast"${s.endAtLast===true?' checked':''}> Eindtijd = klaar bij de laatste klant (terugrit naar standplaats valt na de eindtijd)</label></div>
   <div class="row"><button class="btn primary" data-act="saveset">Opslaan en opnieuw plannen</button></div></section>
   <section class="panel sec"><h2>Feestdagen</h2><p class="small">Op een aangevinkte feestdag is niemand beschikbaar: er wordt die dag niets ingepland.</p><div class="settings">${FD_KEYS.map(([k,l])=>`<label class="chk"><input type="checkbox" data-fd="${k}"${fdCfg()[k]?' checked':''}> ${l}</label>`).join('')}</div><div class="row"><button class="btn" data-act="savefd">Feestdagen opslaan</button></div></section>

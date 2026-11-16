@@ -19,5 +19,11 @@ profielRegistreer({
   import:{ id:'ruimtecode|ruimte|zone|object', obj:'omschrijving|verdieping|zone|soort', objTitel:'ruimtes|zones|panden' },
   redenen:['Ruimte niet toegankelijk','Sleutel of pas ontbreekt','Ruimte in gebruik','Anders'],
   /* Schoonmaakrondes duren vaak langer dan een uur: een tijdvak tot 120 minuten is nog een vaste afspraak */
-  regels:{ slotMaxMin:120, kentekenplaat:false, facturatieViaDerde:true }
+  regels:{ slotMaxMin:120, kentekenplaat:false, facturatieViaDerde:true },
+  /* Een sprankel in plaats van de druppel van het wasprofiel: geen kenteken, geen water. */
+  stijl:{
+    accent:'#0d8a6c',
+    planner:'<path d="M13 3 15.1 10 22 13 15.1 16 13 23 10.9 16 4 13 10.9 10Z" fill="var(--accent)"/>',
+    medewerker:'<path d="M13 3 15.1 10 22 13 15.1 16 13 23 10.9 16 4 13 10.9 10Z" fill="currentColor"/>'
+  }
 });

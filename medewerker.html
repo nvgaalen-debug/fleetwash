@@ -31,6 +31,14 @@
   --bad:#f07b69; --bad-soft:#3a1c18; --warn:#e8a549; --warn-soft:#382912; --ok:#5ac690; --ok-soft:#113124;
   color-scheme:dark;
 }
+html[data-profiel="schoonmaak-gebouwen"]{--accent:#0d8a6c; --accent-soft:#cdeee3; --on-accent:#ffffff}
+html[data-profiel="technische-dienst"]{--accent:#a15a08; --accent-soft:#f3e0c3; --on-accent:#ffffff}
+@media (prefers-color-scheme: dark){
+  html[data-profiel="schoonmaak-gebouwen"]:not([data-theme="light"]){--accent:#3fcf9e; --accent-soft:#0f3328; --on-accent:#04231a}
+  html[data-profiel="technische-dienst"]:not([data-theme="light"]){--accent:#e2a24d; --accent-soft:#3a2a12; --on-accent:#2b1c05}
+}
+html[data-profiel="schoonmaak-gebouwen"][data-theme="dark"]{--accent:#3fcf9e; --accent-soft:#0f3328; --on-accent:#04231a}
+html[data-profiel="technische-dienst"][data-theme="dark"]{--accent:#e2a24d; --accent-soft:#3a2a12; --on-accent:#2b1c05}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:400 16px/1.45 var(--f-body);font-variant-numeric:tabular-nums}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--accent)}
@@ -140,7 +148,7 @@ textarea{width:100%;min-height:70px;border:1px solid var(--line);border-radius:1
 </head>
 <body data-profiel-titel="app">
 
-<header class="top gut"><div class="wrap"><div class="brand"><svg width="22" height="22" viewBox="0 0 26 26" aria-hidden="true"><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="currentColor"/></svg><span data-profiel="appNaam">Mijn Wasroute</span></div><div class="who" id="who"></div><button class="mbtn" data-act="msgs" id="mbtn" aria-label="Berichten van de planner"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><b id="mcount" hidden></b></button></div></header>
+<header class="top gut"><div class="wrap"><div class="brand"><svg width="22" height="22" viewBox="0 0 26 26" aria-hidden="true" data-logo><path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="currentColor"/></svg><span data-profiel="appNaam">Mijn Wasroute</span></div><div class="who" id="who"></div><button class="mbtn" data-act="msgs" id="mbtn" aria-label="Berichten van de planner"><svg class="ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg><b id="mcount" hidden></b></button></div></header>
 <nav class="daynav gut" aria-label="Dag kiezen"><div class="wrap">
   <div style="display:grid;grid-template-columns:44px 1fr 44px;align-items:center;gap:8px">
     <button class="arrow" data-act="day" data-d="-1" aria-label="Vorige dag"><svg class="ic" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>

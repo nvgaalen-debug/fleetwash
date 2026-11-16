@@ -19,5 +19,11 @@ profielRegistreer({
   import:{ id:'ordernummer|order|werkbon|melding|ticket', obj:'apparaat|merk|model|klacht|installatie', objTitel:'klussen|werkbonnen|meldingen|orders' },
   redenen:['Klant niet thuis','Onderdeel niet op voorraad','Apparaat niet toegankelijk','Anders'],
   /* Onderhoudsafspraken duren vaak tot anderhalf uur: een tijdvak tot 90 minuten is nog een vaste afspraak */
-  regels:{ slotMaxMin:90, kentekenplaat:false, facturatieViaDerde:true }
+  regels:{ slotMaxMin:90, kentekenplaat:false, facturatieViaDerde:true },
+  /* Een moer/bout in plaats van de druppel van het wasprofiel: technisch, geen water. */
+  stijl:{
+    accent:'#a15a08',
+    planner:'<path d="M13 3 20.1 7.5 20.1 16.5 13 21 5.9 16.5 5.9 7.5Z" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/><circle cx="13" cy="12" r="2.6" fill="none" stroke="var(--accent)" stroke-width="2"/>',
+    medewerker:'<path d="M13 3 20.1 7.5 20.1 16.5 13 21 5.9 16.5 5.9 7.5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="13" cy="12" r="2.6" fill="none" stroke="currentColor" stroke-width="2"/>'
+  }
 });

@@ -29,6 +29,16 @@
   --abs-vakantie:#4a95e0; --abs-vrij:#9a84ec; --abs-ziek:#e5685a; --abs-training:#d99a32; --abs-bijzonder:#4fb883; --abs-arts:#3fb4c4; --abs-overig:#8fa0a6;
   color-scheme:dark;
 }
+/* Accentkleur per branche (profiel), zodat de app niet overal naar "wasbedrijf" blijft ogen zodra een andere branche is gekozen.
+   html[data-profiel] wordt gezet door profielKies() in js/00-profiel.js; zonder profiel (of bij 'wassen') blijft de kleur hierboven. */
+html[data-profiel="schoonmaak-gebouwen"]{--accent:#0d8a6c; --accent-soft:#cdeee3; --on-accent:#ffffff}
+html[data-profiel="technische-dienst"]{--accent:#a15a08; --accent-soft:#f3e0c3; --on-accent:#ffffff}
+@media (prefers-color-scheme: dark){
+  html[data-profiel="schoonmaak-gebouwen"]:not([data-theme="light"]){--accent:#3fcf9e; --accent-soft:#0f3328; --on-accent:#04231a}
+  html[data-profiel="technische-dienst"]:not([data-theme="light"]){--accent:#e2a24d; --accent-soft:#3a2a12; --on-accent:#2b1c05}
+}
+html[data-profiel="schoonmaak-gebouwen"][data-theme="dark"]{--accent:#3fcf9e; --accent-soft:#0f3328; --on-accent:#04231a}
+html[data-profiel="technische-dienst"][data-theme="dark"]{--accent:#e2a24d; --accent-soft:#3a2a12; --on-accent:#2b1c05}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:400 15px/1.45 var(--f-body);font-variant-numeric:tabular-nums}
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:30;background:var(--surface)}
@@ -124,8 +134,8 @@ select.mini{padding:4px 6px;border:1px solid var(--line);border-radius:var(--r);
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .lg{display:inline-block;width:18px;height:10px;border-radius:2px}
 .lg.job{background:var(--muted)}
-.lg.drive{background:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 5px)}
-.lg.wait{border:1px dashed var(--muted)}
+.lg.drive{background:var(--muted);opacity:.4}
+.lg.wait{background:var(--sunk);border:1px dashed var(--muted)}
 .lg.pause{background:var(--sunk);border:1px solid var(--line)}
 .tl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
 .tl{min-width:820px}
@@ -147,8 +157,8 @@ select.mini{padding:4px 6px;border:1px solid var(--line);border-radius:var(--r);
 .blk.job{top:10px;bottom:10px;background:var(--c);color:var(--on-w);padding:5px 6px;cursor:grab;font-weight:600;box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
 .blk.job small{display:block;font-weight:500;opacity:.88}
 .blk.job.sel{box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--ink)}
-.blk.drive{top:26px;bottom:26px;background:repeating-linear-gradient(135deg,var(--c) 0 2px,transparent 2px 6px);opacity:.75}
-.blk.wait{top:22px;bottom:22px;border:1px dashed var(--muted)}
+.blk.drive{top:26px;bottom:26px;background:var(--c);opacity:.4;border-radius:3px}
+.blk.wait{top:22px;bottom:22px;background:var(--sunk);border:1px dashed var(--muted);border-radius:3px}
 .blk.pause{top:20px;bottom:20px;background:var(--sunk);border:1px solid var(--line);color:var(--muted);font-size:10px;display:grid;place-items:center}
 .blk.late{outline:2px solid var(--bad);outline-offset:1px}
 .endmark{position:absolute;top:6px;bottom:6px;width:2px;background:var(--ink);opacity:.55}
@@ -339,6 +349,8 @@ tr.muted-row td{opacity:.6}
 .search:focus-within{border-color:var(--accent)}
 .search input{border:0;background:none;padding:8px 0;width:100%;min-width:0;outline:none;color:var(--ink)}
 .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.subhd{margin:16px 0 2px;font:600 13px/1.2 var(--f-body);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+h2+.subhd{margin-top:4px}
 /* Formulier */
 #pviewSeg button{padding:6px 10px}
 .wk-wrap{overflow-x:auto}.wk{table-layout:fixed;min-width:980px}.wk th,.wk td{vertical-align:top}
@@ -354,7 +366,7 @@ tr.muted-row td{opacity:.6}
 .mo td.other .mo-hit{opacity:.45}.mo td.is-today .mo-d{background:var(--accent);color:#fff;border-radius:999px;padding:0 7px}
 .mo-d{font-weight:700;align-self:flex-start}.mo-n{font-size:13px}
 #modal{position:fixed;inset:0;z-index:50;background:rgba(5,15,20,.45);display:grid;place-items:center;padding:16px}
-#pwModal{position:fixed;inset:0;z-index:80;background:rgba(5,15,20,.5);display:grid;place-items:center;padding:16px}#pwModal[hidden]{display:none}
+#pwModal,#bpwModal{position:fixed;inset:0;z-index:80;background:rgba(5,15,20,.5);display:grid;place-items:center;padding:16px}#pwModal[hidden],#bpwModal[hidden]{display:none}
 .dlg{background:var(--surface);border-radius:12px;border:1px solid var(--line);width:min(640px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:18px 18px 14px;box-shadow:0 20px 50px rgba(0,0,0,.25)}
 .dlg h3{font-size:21px;margin-bottom:12px}
 .fgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}

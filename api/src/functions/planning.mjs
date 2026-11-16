@@ -19,6 +19,8 @@
 //                        { action: "seen", items: [{ wid, id }] }            planner      (APP_PASSWORD)
 //                        { t, action: "read", ids }                          medewerker
 //                        { t, action: "reply", text, ref }                   medewerker
+//   GET  /api/beheerpw       planner: checkt BEHEER_WACHTWOORD (apart, optioneel wachtwoord dat het
+//                             Beheer-menu verbergt voor planners die het niet kennen)
 
 import { app } from "@azure/functions";
 import { getStore } from "../lib/store.mjs";
@@ -35,6 +37,14 @@ const isId = (s) => /^[\w-]{1,64}$/.test(s || "");
 const plannerOk = (req) => {
   const pw = process.env.APP_PASSWORD;
   return !pw || req.headers.get("x-app-password") === pw;
+};
+// Los, optioneel tweede wachtwoord dat alleen het Beheer-menu ontgrendelt (verbergen voor planners
+// die alleen het app-wachtwoord kennen). Zonder BEHEER_WACHTWOORD blijft Beheer voor iedereen zichtbaar,
+// zoals vóór deze functie.
+const beheerActief = () => !!process.env.BEHEER_WACHTWOORD;
+const beheerOk = (req) => {
+  const pw = process.env.BEHEER_WACHTWOORD;
+  return !pw || req.headers.get("x-beheer-password") === pw;
 };
 
 async function worker(store, token) {
@@ -82,6 +92,16 @@ async function handler(req) {
   const store = getStore({ name: "wasroute", consistency: "strong" });
 
   try {
+    // ---- planner: Beheer-wachtwoord controleren (zonder wachtwoord in de header: alleen checken of er
+    // überhaupt een BEHEER_WACHTWOORD is ingesteld, zodat de app weet of ze het Beheer-menu moet verbergen) ----
+    if (path.endsWith("/beheerpw")) {
+      if (req.method !== "GET") return json({ error: "Alleen GET is toegestaan." }, 405);
+      if (!beheerActief()) return json({ actief: false, ok: true });
+      if (!req.headers.get("x-beheer-password")) return json({ actief: true, ok: false }, 401);
+      if (!beheerOk(req)) return json({ actief: true, ok: false, error: "Wachtwoord klopt niet." }, 401);
+      return json({ actief: true, ok: true });
+    }
+
     // ---- planner: publiceren ----
     if (path.endsWith("/publiceer")) {
       if (req.method !== "POST") return json({ error: "Alleen POST is toegestaan." }, 405);
@@ -296,6 +316,6 @@ async function handler(req) {
   }
 }
 
-for (const r of ["publiceer", "status", "mijn-planning", "melding", "berichten", "foto"]) {
+for (const r of ["publiceer", "status", "mijn-planning", "melding", "berichten", "foto", "beheerpw"]) {
   app.http(`planning-${r}`, { route: r, methods: ["GET", "POST"], authLevel: "anonymous", handler });
 }

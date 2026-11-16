@@ -525,6 +525,49 @@ async function showFoto(date,id){
   }catch(e){toast('Foto\'s niet opgehaald.')}
 }
 function getPw(){if(PWMEM)return PWMEM;let v='';try{v=sessionStorage.getItem(PWKEY)||localStorage.getItem(PWKEEP)||''}catch(e){}if(!v){const el=$('#aiPw');if(el&&el.value)v=el.value}if(v)PWMEM=v;return v}
+/* ---------- Beheer-slot: los, optioneel wachtwoord (BEHEER_WACHTWOORD) dat alleen het Beheer-menu verbergt
+   voor planners die het niet kennen. Zonder dat wachtwoord ingesteld op de server blijft Beheer gewoon
+   zichtbaar, zoals vóór deze functie. Alleen voor de duur van het browser-tabblad (sessionStorage, geen
+   "onthoud dit wachtwoord"-optie). */
+const BPWKEY='wasroute.beheerpw';
+let BEHEER_ACTIEF=null,BEHEER_OK=false;
+async function beheerCheck(pw){try{const r=await fetch('/api/beheerpw',{cache:'no-store',headers:pw?{'x-beheer-password':pw}:{}});return r.ok}catch(e){return false}}
+/* Eén keer per laadbeurt checken of er een BEHEER_WACHTWOORD actief is; roept daarna render() aan zodat de navigatie klopt */
+async function beheerStatus(){
+  if(BEHEER_ACTIEF!==null)return BEHEER_ACTIEF;
+  if(!SERVER){BEHEER_ACTIEF=false;BEHEER_OK=true;return false}
+  const ok=await beheerCheck();BEHEER_ACTIEF=!ok;if(!BEHEER_ACTIEF){BEHEER_OK=true;return false}
+  let saved='';try{saved=sessionStorage.getItem(BPWKEY)||''}catch(e){}
+  if(saved&&await beheerCheck(saved))BEHEER_OK=true;
+  return BEHEER_ACTIEF;
+}
+const beheerGated=()=>BEHEER_ACTIEF===true&&!BEHEER_OK;
+let BPWASK=null;
+function askBeheerPw(cb){
+  if(!BPWASK)BPWASK=new Promise(res=>beheerDialog(res)).finally(()=>{BPWASK=null});
+  return BPWASK.then(ok=>{if(ok&&typeof cb==='function')setTimeout(cb,0);return ok});
+}
+function beheerDialog(done){
+  let ov=document.getElementById('bpwModal');if(!ov){ov=document.createElement('div');ov.id='bpwModal';document.body.appendChild(ov)}
+  ov.innerHTML=`<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="bpwT" style="width:min(420px,100%)"><form id="bpwF" autocomplete="off">
+    <h3 id="bpwT">Beheer ontgrendelen</h3>
+    <p class="note">Los wachtwoord voor het Beheer-menu, alleen geldig in dit browsertabblad.</p>
+    <label class="fld"><span>Wachtwoord</span><input type="password" id="bpwI" autocomplete="off" required></label>
+    <p id="bpwE" class="small" role="alert" style="color:var(--bad);min-height:1.3em;margin:8px 0 0"></p>
+    <div class="dlg-foot"><span class="sp"></span><button type="button" class="btn" id="bpwC">Annuleren</button><button type="submit" class="btn primary" id="bpwOk">Ontgrendelen</button></div>
+  </form></div>`;
+  ov.hidden=false;setTimeout(()=>{const i=$('#bpwI');if(i)i.focus()},20);
+  const close=ok=>{ov.hidden=true;ov.innerHTML='';done(ok)};
+  $('#bpwC').onclick=()=>close(false);
+  ov.onkeydown=e=>{if(e.key==='Escape'){e.stopPropagation();close(false)}};
+  $('#bpwF').onsubmit=async e=>{e.preventDefault();const pw=$('#bpwI').value;if(!pw)return;
+    const btn=$('#bpwOk'),err=$('#bpwE');btn.disabled=true;btn.textContent='Controleren…';err.textContent='';
+    const ok=await beheerCheck(pw);
+    if(!ok){btn.disabled=false;btn.textContent='Ontgrendelen';err.textContent='Dit wachtwoord klopt niet.';const i=$('#bpwI');i.select();return}
+    BEHEER_OK=true;try{sessionStorage.setItem(BPWKEY,pw)}catch(x){}
+    close(true)};
+}
+function beheerVergrendel(){BEHEER_OK=false;try{sessionStorage.removeItem(BPWKEY)}catch(e){}if(S.tab==='instellingen'){S.tab='planning'}render();toast('Beheer-menu vergrendeld.')}
 /* Een bewaard wachtwoord dat de server afwijst, overal weggooien (ook in andere tabbladen) */
 function pwForget(bad){if(bad&&getPw()!==bad)return;PWMEM='';try{sessionStorage.removeItem(PWKEY);if(!bad||localStorage.getItem(PWKEEP)===bad)localStorage.removeItem(PWKEEP)}catch(e){}try{PWBC&&PWBC.postMessage({forget:bad||''})}catch(e){}}
 /* Open tabbladen delen het wachtwoord, zodat een nieuw tabblad er niet opnieuw om vraagt */

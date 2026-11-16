@@ -20,5 +20,11 @@ profielRegistreer({
   import:{ id:'kenteken', obj:'voertuig|merk|model|soort', objTitel:"auto['’]?s|voertuigen|wagens|leasewagens|bedrijfswagens" },
   /* Redenen in de medewerker-app als een opdracht niet lukt */
   redenen:['Auto niet aanwezig','Geen toegang tot de locatie','Schade of niet goed te reinigen','Anders'],
-  regels:{ slotMaxMin:60, kentekenplaat:true, facturatieViaDerde:true }
+  regels:{ slotMaxMin:60, kentekenplaat:true, facturatieViaDerde:true },
+  /* Standaard, ongewijzigd t.o.v. de app van vóór de profielen: dezelfde druppel, dezelfde kleur. */
+  stijl:{
+    accent:'#0a6a88',
+    planner:'<path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="var(--accent)"/><path d="M9.5 15.5c1.2 1.8 4.6 2.2 6.4-.4" fill="none" stroke="var(--surface)" stroke-width="1.8" stroke-linecap="round"/>',
+    medewerker:'<path d="M13 2c4 5.2 7 9 7 12.6A7 7 0 0 1 6 14.6C6 11 9 7.2 13 2z" fill="currentColor"/>'
+  }
 });

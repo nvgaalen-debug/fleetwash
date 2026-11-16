@@ -21,7 +21,8 @@ const I={
   auto:ic('<path d="M8 1.5v3M8 11.5v3M1.5 8h3M11.5 8h3M3.4 3.4l2 2M10.6 10.6l2 2M12.6 3.4l-2 2M5.4 10.6l-2 2"/>'),
   route:ic('<circle cx="4" cy="12" r="2"/><circle cx="12" cy="4" r="2"/><path d="M6 12h3.5a2.5 2.5 0 0 0 0-5h-3a2.5 2.5 0 0 1 0-5H10"/>'),
   unlock:ic('<rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.8-1"/>'),
-  imp:ic('<path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 13.5h10"/>'),chat:ic('<path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/>'),send:ic('<path d="M14 2 2 7.2l5 1.8 1.8 5z"/>'),check:ic('<path d="m3 8.5 3.2 3L13 4.5"/>'),copy:ic('<rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M3 10.5V3.5A1 1 0 0 1 4 2.5h6.5"/>')
+  imp:ic('<path d="M8 2v8M4.5 6.5 8 10l3.5-3.5M3 13.5h10"/>'),chat:ic('<path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/>'),send:ic('<path d="M14 2 2 7.2l5 1.8 1.8 5z"/>'),check:ic('<path d="m3 8.5 3.2 3L13 4.5"/>'),copy:ic('<rect x="5" y="5" width="8.5" height="8.5" rx="1.5"/><path d="M3 10.5V3.5A1 1 0 0 1 4 2.5h6.5"/>'),
+  more:ic('<circle cx="3" cy="8" r="1.4" fill="currentColor" stroke="none"/><circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none"/><circle cx="13" cy="8" r="1.4" fill="currentColor" stroke="none"/>')
 };
 /* Kenteken als gele plaat (profiel met kentekenplaat), anders als code */
 const plateHtml=p=>(typeof prfRegel==='function'&&!prfRegel('kentekenplaat',true))?`<span class="objcode">${esc(p||'—')}</span>`:`<span class="plate"><i>NL</i><span>${esc(p||'—')}</span></span>`;

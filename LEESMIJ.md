@@ -15,6 +15,7 @@
 2. Netlify: Add new site > Import an existing project > kies de repository. Laat het build command leeg.
 3. Netlify: Site configuration > Environment variables:
    - `APP_PASSWORD` = een wachtwoord voor planners. Sterk aangeraden: zonder wachtwoord kan iedereen met het adres ritten publiceren en meldingen lezen.
+   - `BEHEER_WACHTWOORD` = optioneel, los wachtwoord dat alleen het "Beheer"-menu (instellingen, types, archief, API-koppelingen, menu indelen) verbergt voor planners die alleen het gewone app-wachtwoord kennen. Leeg/niet ingesteld = Beheer blijft zichtbaar voor iedereen, zoals voorheen. Let op: dit is alleen een afscherming in het scherm, geen harde serverbeveiliging — iedereen met APP_PASSWORD kan de onderliggende instellingen nog steeds via de normale opslag wijzigen.
    - `ANTHROPIC_API_KEY` = je Claude API-sleutel (alleen nodig voor AI-advies)
    - `ORS_API_KEY` = sleutel van openrouteservice.org (alleen nodig voor echte rijtijden; gratis account)
 4. Deploys > Trigger deploy > Deploy site.

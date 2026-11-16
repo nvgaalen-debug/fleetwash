@@ -13,6 +13,7 @@ function onClick(e){
     case'menudelg':{const m=menuCfg(),k=el.dataset.k;if(m.groups[k]&&!m.groups[k].items.length){delete m.groups[k];m.top=m.top.filter(x=>x!=='g:'+k);save();render()}break}
     case'menureset':D.menu=menuDefault();save();render();toast('Standaardindeling hersteld.');break;
     case'navg':{const g=el.closest('.navg'),open=!g.classList.contains('open');closeMenus();if(open){g.classList.add('open');el.setAttribute('aria-expanded','true');const f=g.querySelector('[role=menuitem]');if(f&&e.detail===0)f.focus()}break}
+    case'beheerslot':askBeheerPw(()=>render());break;
     case'day':stepPeriod(+el.dataset.d);break;
     case'today':S.date=todayIso();S.selLoc=null;save();render();break;
     case'pview':S.pview=el.dataset.v;D.ui=D.ui||{};save();render();window.scrollTo(0,0);break;
@@ -188,6 +189,7 @@ function init(){
   if(SERVER){if(!D)D=sample()}   // alleen als tijdelijke vulling: de echte planning komt van de server (initSync)
   else{try{load();migrateBillTo()}catch(err){if(!D)D=sample();try{index()}catch(e){}setTimeout(()=>showFatal('gegevens laden',err),0)}}
   initSync();
+  beheerStatus().then(()=>render());
   try{if(window.claude&&typeof window.claude.use==='function')window.claude.use('sample').then(s=>{SAMPLE=s||null}).catch(()=>{})}catch(e){}
   document.addEventListener('click',onClick);
   if(SERVER)setInterval(()=>{if(!document.hidden&&(S.tab==='planning'||S.tab==='opdrachten'))fetchStatus(S.date,true)},60000);if(SERVER)setInterval(()=>{if(!document.hidden&&(MV||(S.tab==='planning'&&Date.now()-MSG.at>30000)))fetchMsgs(true)},15000);document.addEventListener('change',onChange);document.addEventListener('contextmenu',onContext);addEventListener('scroll',closeCtx,{passive:true});addEventListener('resize',closeCtx);

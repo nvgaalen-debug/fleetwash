@@ -32,6 +32,14 @@ function T_build(fx, opts) {
   return [...new Set(D.jobs.map(j => j.date))].sort();
 }
 
+/* Voorbeelddata laden zoals 'Voorbeelddata herstellen' dat doet: D=sample(profielId), gevolgd door index(). */
+function T_sample(profielId) {
+  LEGS.clear();
+  D = sample(profielId);
+  index();
+  return [...new Set(D.jobs.map(j => j.date))].sort();
+}
+
 function T_plan(date) { autoPlan(date); return T_routes(date) }
 function T_routes(date) { const P = D.plans[date] || { routes: {} }, o = {}; D.workers.forEach(w => o[w.id] = (P.routes[w.id] || []).slice()); return o }
 function T_workerOf(date, id) { const R = T_routes(date); return Object.keys(R).find(w => R[w].includes(id)) || null }

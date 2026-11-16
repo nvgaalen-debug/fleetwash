@@ -45,7 +45,12 @@ let JOB={},LOC={},CUS={},WRK={},TYP={};
 if(typeof profielKies==='function')profielKies('wassen');
 function index(){if(typeof profielKies==='function')profielKies((D.settings&&D.settings.profiel)||'wassen');if(typeof physReset==='function')physReset();JOB={};LOC={};CUS={};WRK={};TYP={};D.jobs.forEach(x=>JOB[x.id]=x);D.locations.forEach(x=>LOC[x.id]=x);D.customers.forEach(x=>CUS[x.id]=x);D.workers.forEach(x=>WRK[x.id]=x);if(!D.absences)migrateAbsences();(D.absences||[]).forEach(a=>{if(a.type==='ziek')a.note=''});(D.sickLog||[]).forEach(x=>{if(!x.type||x.type==='ziek')x.note='Ziek'});syncAbsences();D.types.forEach(x=>TYP[x.id]=x)}
 function rng(seed){return()=>(seed=(seed*1664525+1013904223)%4294967296)/4294967296}
-function sample(){
+/* Voorbeelddata: per profiel een eigen, passend voorbeeld. Zonder opgegeven profiel wordt het actieve (of anders wassen) gebruikt. */
+function sample(profielId){
+  const id=profielId||(typeof PRF!=='undefined'&&PRF&&PRF.id)||'wassen';
+  return id==='schoonmaak-gebouwen'?sampleSchoonmaak():sampleWassen();
+}
+function sampleWassen(){
   const r=rng(11),CON='BDFGHJKLNPRSTVXZ',L=()=>CON[Math.floor(r()*CON.length)],N=()=>Math.floor(r()*10);
   const plate=()=>r()<.55?`${L()}${L()}-${N()}${N()}${N()}-${L()}`:`${N()}-${L()}${L()}${L()}-${N()}${N()}`;
   const CARS=['VW Golf','Toyota Corolla','Kia Niro','Skoda Octavia','Peugeot 308','Volvo XC40','Tesla Model 3','Renault Clio','BMW 3-serie','Audi A4'];
@@ -87,6 +92,38 @@ function sample(){
     {id:'a_s3',wid:'w3',type:'arts',from:'2026-11-04',to:'2026-11-04',part:'laat',time:'10:00',note:'Tandarts',at:0},
     {id:'a_s4',wid:'w1',type:'vakantie',from:'2026-08-03',to:'2026-08-21',part:'',time:'',note:'Zomervakantie',at:0},
     {id:'a_s5',wid:'w4',type:'vrij',from:'2026-11-19',to:'2026-11-19',part:'',time:'',note:'',at:0}];
+  return d;
+}
+function sampleSchoonmaak(){
+  const r=rng(23),room=()=>'B'+(1+Math.floor(r()*4))+'-'+(100+Math.floor(r()*220));
+  const ROOMS=['Kantoorverdieping','Vergaderzone','Entree en trappenhuis','Kantine','Sanitairgroep','Archiefruimte','Open werkruimte','Spreekkamers'];
+  const GEVELS=['Gevel noordzijde','Gevel zuidzijde','Binnenhof glaswand','Entreepui'];
+  const d={version:1,settings:{profiel:'schoonmaak-gebouwen',urbanKm:6,urbanSpeed:35,roadSpeed:80,roadFactor:1.3,parkMin:5,minTravel:6,pauseMin:30,pauseAt:'12:00',pauseMinDay:330,kmWeight:0.3,startAtFirst:true,endAtLast:false,maxPreTravel:60},
+    types:[{id:'dagelijks',name:'Dagelijkse schoonmaak',dur:20,skill:''},{id:'intensief',name:'Intensieve schoonmaak',dur:45,skill:''},{id:'sanitair',name:'Sanitair dieptereiniging',dur:35,skill:''},{id:'vloeren',name:'Vloeronderhoud (machinaal)',dur:60,skill:'vloeren'},{id:'ramen',name:'Ramen zemen',dur:30,skill:'ramen'}],
+    customers:[],locations:[],jobs:[],workers:[],plans:{}};
+  const A='2026-11-17',B='2026-11-18';
+  const SPEC=[
+   ['Kantoorgebouw Stadsplateau','Monique Rietveld','030 230 11 00','Hoofdgebouw','Stadsplateau 1','3521 AZ','Utrecht',52.089,5.110,[[A,2,'dagelijks','07:30','09:00',2],[A,1,'ramen','07:30','09:00',1],[B,2,'dagelijks','07:30','09:00',2]]],
+   ['Stadhuis Nieuwegein','Pieter Kooij','030 607 14 11','Publiekshal','Stadsplein 1','3431 LZ','Nieuwegein',52.029,5.087,[[A,1,'intensief','08:00','12:00',2],[A,1,'sanitair','08:00','12:00',3]]],
+   ['Bibliotheek Houten','Saskia Dekker','030 639 24 11','Hoofdvestiging','Onderdoor 25','3995 DW','Houten',52.028,5.168,[[A,2,'dagelijks','13:00','14:00',2]]],
+   ['Zorgcentrum De Burcht','Omar Haddadi','033 461 23 00','Begane grond','Burcht 2','3811 AA','Amersfoort',52.156,5.387,[[A,1,'vloeren','14:00','17:00',2],[B,2,'dagelijks','07:00','09:00',2]]],
+   ['Bedrijfsverzamelgebouw De Hoef','Lotte Brands','030 605 77 00','Centrale hal','De Hoef 6','3433 JA','Nieuwegein',52.035,5.095,[[B,1,'ramen','09:00','12:00',1],[B,2,'dagelijks','09:00','12:00',2]]]
+  ];
+  SPEC.forEach((s,i)=>{const cid='c'+(i+1),lid='l'+(i+1);
+    d.customers.push({id:cid,name:s[0],contact:s[1],phone:s[2],email:''});
+    d.locations.push({id:lid,customerId:cid,name:s[3],address:s[4],postcode:s[5],city:s[6],lat:s[7],lng:s[8],geo:'manual'});
+    s[9].forEach(([date,n,type,from,to,prio])=>{for(let k=0;k<n;k++){const ram=type==='ramen';d.jobs.push({id:'j'+(d.jobs.length+1),plate:room(),vehicle:(ram?GEVELS:ROOMS)[Math.floor(r()*(ram?GEVELS:ROOMS).length)],locationId:lid,date,from,to,type,duration:'',priority:prio,notes:''})}});
+  });
+  d.workers=[
+   {id:'w1',name:'Fatima Idrissi',postcode:'3511 CK',city:'Utrecht',lat:52.092,lng:5.118,geo:'pc4',start:'07:00',end:'15:30',days:[1,2,3,4,5],absent:[],skills:['vloeren'],color:0},
+   {id:'w2',name:'Daan Smit',postcode:'3431 LZ',city:'Nieuwegein',lat:52.029,lng:5.081,geo:'pc4',start:'07:00',end:'16:00',days:[1,2,3,4,5],absent:[],skills:[],color:1},
+   {id:'w3',name:'Els Vermeer',postcode:'3991 AE',city:'Houten',lat:52.030,lng:5.160,geo:'pc4',start:'07:30',end:'16:30',days:[1,2,3,4,5],absent:[],skills:['ramen','vloeren'],color:2},
+   {id:'w4',name:'Niek Hofman',postcode:'3811 AA',city:'Amersfoort',lat:52.156,lng:5.387,geo:'pc4',start:'07:00',end:'15:00',days:[1,2,3,4],absent:[],skills:[],color:3}
+  ];
+  d.workers.forEach((w,i)=>{w.token=randTok();w.leaveDays=[25,24,25,20][i]});
+  d.absences=[{id:'a_s1',wid:'w3',type:'training',from:'2026-11-20',to:'2026-11-20',part:'',time:'',note:'Cursus hoogwerkerzeem',at:0},
+    {id:'a_s2',wid:'w2',type:'arts',from:'2026-11-17',to:'2026-11-17',part:'laat',time:'10:00',note:'Huisarts',at:0},
+    {id:'a_s3',wid:'w4',type:'vakantie',from:'2026-08-10',to:'2026-08-24',part:'',time:'',note:'Zomervakantie',at:0}];
   return d;
 }
 /* data: de planning zoals de server die heeft geleverd. Op de server-versie is er geen lokale kopie meer. */
